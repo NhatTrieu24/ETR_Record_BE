@@ -1,3 +1,4 @@
+using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
 
@@ -12,7 +13,7 @@ public class LearnerService : ILearnerService
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<Learner> CreateLearnerAsync(
+    public async Task<LearnerResponse> CreateLearnerAsync(
         string learnerCode,
         string fullName,
         string idNumber,
@@ -32,6 +33,17 @@ public class LearnerService : ILearnerService
         await _unitOfWork.LearnerRepository.AddAsync(learner, cancellationToken);
         await _unitOfWork.SaveAsync(cancellationToken);
 
-        return learner;
+        return new LearnerResponse(
+            learner.LearnerId,
+            learner.LearnerCode,
+            learner.FullName,
+            learner.DateOfBirth,
+            learner.Gender,
+            learner.Phone,
+            learner.Email,
+            learner.IdentificationNumber ?? string.Empty,
+            learner.Organization,
+            learner.Status,
+            learner.LearnerTypeId);
     }
 }

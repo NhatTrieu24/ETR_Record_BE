@@ -1,16 +1,18 @@
-using ETR.Domain.Entities;
+using ETR.Application.DTOs;
 
 namespace ETR.Application.Interfaces;
 
 public interface IEtrService
 {
-    Task<ETRChecklistProgress> UpdateChecklistProgressAsync(
+    Task<ChecklistProgressResponse> UpdateChecklistProgressAsync(
         int progressId,
         bool isCompleted,
         int? verifiedByUserId,
         string? comment,
         CancellationToken cancellationToken = default);
-    Task<ETRRecord> SubmitEtrAsync(int etrRecordId, int userId, CancellationToken cancellationToken = default);
-    Task<ETRRecord> VerifyEtrAsync(int etrRecordId, int userId, CancellationToken cancellationToken = default);
-    Task<ETRRecord> CompleteEtrAsync(int etrRecordId, int userId, CancellationToken cancellationToken = default);
+    Task<EtrRecordResponse> SubmitEtrAsync(int etrRecordId, int userId, CancellationToken cancellationToken = default);
+    Task<EtrRecordResponse> VerifyEtrAsync(int etrRecordId, int userId, CancellationToken cancellationToken = default);
+    Task<EtrRecordResponse> CompleteEtrAsync(int etrRecordId, int userId, CancellationToken cancellationToken = default);
+    Task<EtrRecordResponse> LockEtrAsync(int etrRecordId, int userId, CancellationToken cancellationToken = default);
+    Task<EtrRecordResponse> UnlockEtrAsync(int etrRecordId, int userId, CancellationToken cancellationToken = default);
 }

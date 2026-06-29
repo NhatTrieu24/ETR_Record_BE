@@ -1,3 +1,4 @@
+using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
 using Microsoft.AspNetCore.Mvc;
@@ -5,55 +6,186 @@ using Microsoft.AspNetCore.Mvc;
 namespace ETR.API.Controllers;
 
 [ApiController]
-[Route("api/etr")]
+[Route("api")]
 public class EtrController : ControllerBase
 {
     private readonly IEtrService _etrService;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public EtrController(IEtrService etrService)
+    public EtrController(IEtrService etrService, IUnitOfWork unitOfWork)
     {
         _etrService = etrService;
+        _unitOfWork = unitOfWork;
     }
 
-    // 1. Cập nhật tiến độ của một đầu mục Checklist
-    [HttpPut("checklist/{progressId:int}")]
-    public async Task<ActionResult<ETRChecklistProgress>> UpdateChecklistProgress(
-        int progressId,
+    #region ETR Records
+
+    [HttpGet("etr")]
+    public async Task<ActionResult<IEnumerable<EtrRecordResponse>>> GetAllEtr(CancellationToken cancellationToken)
+    {
+        var list = await _unitOfWork.ETRRecordRepository.GetAllAsync(cancellationToken);
+        return Ok(list.Select(MapEtrToResponse));
+    }
+
+    [HttpGet("etr/{id:int}")]
+    public async Task<ActionResult<EtrRecordResponse>> GetEtrById(int id, CancellationToken cancellationToken)
+    {
+        var etr = await _unitOfWork.ETRRecordRepository.GetByIdAsync(id, cancellationToken);
+        if (etr == null) return NotFound($"Không tìm thấy hồ sơ ETR với ID {id}.");
+        return Ok(MapEtrToResponse(etr));
+    }
+
+    [HttpPost("etr/{id:int}/submit")]
+    public async Task<ActionResult<EtrRecordResponse>> SubmitEtr(
+        int id,
+        [FromBody] EtrActionRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await _etrService.SubmitEtrAsync(id, request.UserId, cancellationToken);
+            return Ok(response);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPost("etr/{id:int}/verify")]
+    public async Task<ActionResult<EtrRecordResponse>> VerifyEtr(
+        int id,
+        [FromBody] EtrActionRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await _etrService.VerifyEtrAsync(id, request.UserId, cancellationToken);
+            return Ok(response);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPost("etr/{id:int}/complete")]
+    public async Task<ActionResult<EtrRecordResponse>> CompleteEtr(
+        int id,
+        [FromBody] EtrActionRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await _etrService.CompleteEtrAsync(id, request.UserId, cancellationToken);
+            return Ok(response);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPost("etr/{id:int}/lock")]
+    public async Task<ActionResult<EtrRecordResponse>> LockEtr(
+        int id,
+        [FromBody] EtrActionRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await _etrService.LockEtrAsync(id, request.UserId, cancellationToken);
+            return Ok(response);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
+    [HttpPost("etr/{id:int}/unlock")]
+    public async Task<ActionResult<EtrRecordResponse>> UnlockEtr(
+        int id,
+        [FromBody] EtrActionRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await _etrService.UnlockEtrAsync(id, request.UserId, cancellationToken);
+            return Ok(response);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
+    [HttpGet("etr/{id:int}/summary")]
+    public async Task<ActionResult<EtrSummaryResponse>> GetEtrSummary(int id, CancellationToken cancellationToken)
+    {
+        var etr = await _unitOfWork.ETRRecordRepository.GetByIdAsync(id, cancellationToken);
+        if (etr == null) return NotFound($"Không tìm thấy hồ sơ ETR với ID {id}.");
+
+        var progressItems = (await _unitOfWork.ETRChecklistProgressRepository.GetAllAsync(cancellationToken))
+            .Where(p => p.ETRRecordId == id)
+            .ToList();
+
+        int total = progressItems.Count;
+        int completed = progressItems.Count(p => p.IsCompleted);
+        double percentage = total > 0 ? (double)completed / total * 100 : 0;
+
+        return Ok(new EtrSummaryResponse(etr.ETRRecordId, etr.Status, etr.IsLocked, total, completed, percentage));
+    }
+
+    [HttpGet("etr/{id:int}/progress")]
+    public async Task<ActionResult<IEnumerable<ChecklistProgressResponse>>> GetEtrProgress(int id, CancellationToken cancellationToken)
+    {
+        var progressItems = (await _unitOfWork.ETRChecklistProgressRepository.GetAllAsync(cancellationToken))
+            .Where(p => p.ETRRecordId == id)
+            .ToList();
+
+        return Ok(progressItems.Select(MapProgressToResponse));
+    }
+
+    #endregion
+
+    #region Checklist Progress
+
+    [HttpGet("checklist-progress")]
+    public async Task<ActionResult<IEnumerable<ChecklistProgressResponse>>> GetChecklistProgress(CancellationToken cancellationToken)
+    {
+        var list = await _unitOfWork.ETRChecklistProgressRepository.GetAllAsync(cancellationToken);
+        return Ok(list.Select(MapProgressToResponse));
+    }
+
+    [HttpPut("checklist-progress/{id:int}")]
+    public async Task<ActionResult<ChecklistProgressResponse>> UpdateChecklistProgress(
+        int id,
         [FromBody] UpdateChecklistProgressRequest request,
         CancellationToken cancellationToken)
     {
         try
         {
-            var progress = await _etrService.UpdateChecklistProgressAsync(
-                progressId,
+            var response = await _etrService.UpdateChecklistProgressAsync(
+                id,
                 request.IsCompleted,
                 request.VerifiedByUserId,
                 request.Comment,
                 cancellationToken);
 
-            return Ok(progress);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(ex.Message);
-        }
-        catch (InvalidOperationException ex) // Chặn khi ETR đã bị khóa/hoàn thành ở Chặng 3
-        {
-            return BadRequest(ex.Message);
-        }
-    }
-
-    // 2. Endpoint Nộp hồ sơ ETR (Submit)
-    [HttpPost("{id:int}/submit")]
-    public async Task<ActionResult<ETRRecord>> SubmitEtr(
-        int id,
-        [FromBody] EtrActionRequest request,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            var etr = await _etrService.SubmitEtrAsync(id, request.UserId, cancellationToken);
-            return Ok(etr);
+            return Ok(response);
         }
         catch (KeyNotFoundException ex)
         {
@@ -65,56 +197,38 @@ public class EtrController : ControllerBase
         }
     }
 
-    // 3. Endpoint Xác minh hồ sơ ETR (QA Verify)
-    [HttpPost("{id:int}/verify")]
-    public async Task<ActionResult<ETRRecord>> VerifyEtr(
-        int id,
-        [FromBody] EtrActionRequest request,
+    [HttpPut("checklist-progress")]
+    public async Task<ActionResult<ChecklistProgressResponse>> UpdateChecklistProgressQuery(
+        [FromQuery] int progressId,
+        [FromBody] UpdateChecklistProgressRequest request,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var etr = await _etrService.VerifyEtrAsync(id, request.UserId, cancellationToken);
-            return Ok(etr);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(ex.Message);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(ex.Message);
-        }
+        return await UpdateChecklistProgress(progressId, request, cancellationToken);
     }
 
-    // 4. Endpoint Hoàn thành & Khóa cứng hồ sơ (Complete & Lock)
-    [HttpPost("{id:int}/complete")]
-    public async Task<ActionResult<ETRRecord>> CompleteEtr(
-        int id,
-        [FromBody] EtrActionRequest request,
-        CancellationToken cancellationToken)
+    #endregion
+
+    private static EtrRecordResponse MapEtrToResponse(ETRRecord e)
     {
-        try
-        {
-            var etr = await _etrService.CompleteEtrAsync(id, request.UserId, cancellationToken);
-            return Ok(etr);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(ex.Message);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(ex.Message);
-        }
+        return new EtrRecordResponse(
+            e.ETRRecordId,
+            e.EnrollmentId,
+            e.Status,
+            e.IsLocked,
+            e.SubmittedAt,
+            e.VerifiedAt,
+            e.CompletedAt);
+    }
+
+    private static ChecklistProgressResponse MapProgressToResponse(ETRChecklistProgress p)
+    {
+        return new ChecklistProgressResponse(
+            p.ProgressId,
+            p.ETRRecordId,
+            p.ChecklistItemId,
+            p.IsCompleted,
+            p.VerifiedBy,
+            p.CompletedAt,
+            p.VerificationComment);
     }
 }
-
-// --- ĐỊNH NGHĨA CÁC REQUEST DTOs ---
-
-public record UpdateChecklistProgressRequest(
-    bool IsCompleted,
-    int? VerifiedByUserId,
-    string? Comment);
-
-public record EtrActionRequest(int UserId);
