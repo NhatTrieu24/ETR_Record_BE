@@ -1,0 +1,49 @@
+## Build outputs
+[Bb]in/
+[Oo]bj/
+[Zz]ip/
+[Pp]ackages/
+_ReSharper*/
+*.[Rr]e[Ss]harper
+
+## Visual Studio
+.vs/
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+*.suo
+*.userprefs
+*.dbmdl
+*.jfm
+
+## Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/code-workspace
+
+## JetBrains Rider / IntelliJ
+.idea/
+*.sln.iml
+
+## NuGet Packages
+*.nupkg
+**/packages/
+project.assets.json
+project.lock.json
+
+## Local configurations & overrides
+*.local.json
+*.user.json
+
+## OS-specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

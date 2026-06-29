@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="ETR.API/ETR.API.csproj" />
+  <Project Path="ETR.Application/ETR.Application.csproj" />
+  <Project Path="ETR.Domain/ETR.Domain.csproj" />
+  <Project Path="ETR.Infrastructure/ETR.Infrastructure.csproj" />
+</Solution>
