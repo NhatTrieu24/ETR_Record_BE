@@ -1,10 +1,10 @@
-using ETR.Domain.Entities;
+using ETR.Application.DTOs;
 
 namespace ETR.Application.Interfaces;
 
 public interface ILearnerService
 {
-    Task<Learner> CreateLearnerAsync(
+    Task<LearnerResponse> CreateLearnerAsync(
         string learnerCode,
         string fullName,
         string idNumber,

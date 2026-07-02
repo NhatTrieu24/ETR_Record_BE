@@ -1,3 +1,4 @@
+using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
 
@@ -16,7 +17,7 @@ public class EnrollmentService : IEnrollmentService
         _checklistProgressInitializer = checklistProgressInitializer;
     }
 
-    public async Task<CreateEnrollmentResult> CreateEnrollmentAsync(
+    public async Task<CreateEnrollmentResponse> CreateEnrollmentAsync(
         int learnerId,
         int classId,
         int createdByUserId,
@@ -63,7 +64,15 @@ public class EnrollmentService : IEnrollmentService
                 await _unitOfWork.SaveAsync(ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
 
-                return new CreateEnrollmentResult(enrollment, etrRecord);
+                return new CreateEnrollmentResponse(
+                    enrollment.EnrollmentId,
+                    enrollment.LearnerId,
+                    enrollment.ClassId,
+                    enrollment.Status,
+                    enrollment.EnrolledAt,
+                    etrRecord.ETRRecordId,
+                    etrRecord.Status,
+                    etrRecord.IsLocked);
             }
             catch
             {
