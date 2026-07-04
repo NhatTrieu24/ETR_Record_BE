@@ -18,19 +18,22 @@ public partial class AppDbContext : DbContext
     public DbSet<EvidenceType> EvidenceTypes => Set<EvidenceType>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Learner> Learners => Set<Learner>();
-    public DbSet<TrainingClass> TrainingClasses => Set<TrainingClass>();
-    public DbSet<Enrollment> Enrollments => Set<Enrollment>();
-    public DbSet<ClassInstructor> ClassInstructors => Set<ClassInstructor>();
-    public DbSet<CompletionRequirement> CompletionRequirements => Set<CompletionRequirement>();
-    public DbSet<ETRChecklistTemplate> ETRChecklistTemplates => Set<ETRChecklistTemplate>();
-    public DbSet<ETRChecklistItem> ETRChecklistItems => Set<ETRChecklistItem>();
-    public DbSet<ETRRecord> ETRRecords => Set<ETRRecord>();
-    public DbSet<ETRChecklistProgress> ETRChecklistProgresses => Set<ETRChecklistProgress>();
-    public DbSet<AttendanceSession> AttendanceSessions => Set<AttendanceSession>();
-    public DbSet<AttendanceRecord> AttendanceRecords => Set<AttendanceRecord>();
-    public DbSet<AssessmentComponent> AssessmentComponents => Set<AssessmentComponent>();
+    public DbSet<Subject> Subjects => Set<Subject>();
+    public DbSet<CourseSubject> CourseSubjects => Set<CourseSubject>();
+    public DbSet<Class> Classes => Set<Class>();
+    public DbSet<Session> Sessions => Set<Session>();
+    public DbSet<CourseEnrollment> CourseEnrollments => Set<CourseEnrollment>();
+    public DbSet<ETRCourseRecord> ETRCourseRecords => Set<ETRCourseRecord>();
+    public DbSet<SubjectResult> SubjectResults => Set<SubjectResult>();
+    public DbSet<Assessment> Assessments => Set<Assessment>();
     public DbSet<AssessmentResult> AssessmentResults => Set<AssessmentResult>();
+    public DbSet<PracticalChecklist> PracticalChecklists => Set<PracticalChecklist>();
+    public DbSet<PracticalChecklistResult> PracticalChecklistResults => Set<PracticalChecklistResult>();
+    public DbSet<SubjectSignoff> SubjectSignoffs => Set<SubjectSignoff>();
+    public DbSet<RetakeHistory> RetakeHistories => Set<RetakeHistory>();
+    public DbSet<AttendanceRecord> AttendanceRecords => Set<AttendanceRecord>();
     public DbSet<EvidenceFile> EvidenceFiles => Set<EvidenceFile>();
+    public DbSet<CompletionRequirement> CompletionRequirements => Set<CompletionRequirement>();
     public DbSet<ApprovalRequest> ApprovalRequests => Set<ApprovalRequest>();
     public DbSet<ApprovalHistory> ApprovalHistories => Set<ApprovalHistory>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
@@ -57,19 +60,22 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<EvidenceType>().HasKey(e => e.EvidenceTypeId);
         modelBuilder.Entity<User>().HasKey(e => e.UserId);
         modelBuilder.Entity<Learner>().HasKey(e => e.LearnerId);
-        modelBuilder.Entity<TrainingClass>().HasKey(e => e.ClassId);
-        modelBuilder.Entity<Enrollment>().HasKey(e => e.EnrollmentId);
-        modelBuilder.Entity<ClassInstructor>().HasKey(e => e.ClassInstructorId);
-        modelBuilder.Entity<CompletionRequirement>().HasKey(e => e.RequirementId);
-        modelBuilder.Entity<ETRChecklistTemplate>().HasKey(e => e.TemplateId);
-        modelBuilder.Entity<ETRChecklistItem>().HasKey(e => e.ChecklistItemId);
-        modelBuilder.Entity<ETRRecord>().HasKey(e => e.ETRRecordId);
-        modelBuilder.Entity<ETRChecklistProgress>().HasKey(e => e.ProgressId);
-        modelBuilder.Entity<AttendanceSession>().HasKey(e => e.AttendanceSessionId);
-        modelBuilder.Entity<AttendanceRecord>().HasKey(e => e.AttendanceRecordId);
-        modelBuilder.Entity<AssessmentComponent>().HasKey(e => e.AssessmentComponentId);
+        modelBuilder.Entity<Subject>().HasKey(e => e.SubjectId);
+        modelBuilder.Entity<CourseSubject>().HasKey(e => new { e.CourseId, e.SubjectId });
+        modelBuilder.Entity<Class>().HasKey(e => e.ClassId);
+        modelBuilder.Entity<Session>().HasKey(e => e.SessionId);
+        modelBuilder.Entity<CourseEnrollment>().HasKey(e => e.EnrollmentId);
+        modelBuilder.Entity<ETRCourseRecord>().HasKey(e => e.ETRCourseRecordId);
+        modelBuilder.Entity<SubjectResult>().HasKey(e => e.SubjectResultId);
+        modelBuilder.Entity<Assessment>().HasKey(e => e.AssessmentId);
         modelBuilder.Entity<AssessmentResult>().HasKey(e => e.AssessmentResultId);
+        modelBuilder.Entity<PracticalChecklist>().HasKey(e => e.PracticalChecklistId);
+        modelBuilder.Entity<PracticalChecklistResult>().HasKey(e => e.PracticalChecklistResultId);
+        modelBuilder.Entity<SubjectSignoff>().HasKey(e => e.SubjectSignoffId);
+        modelBuilder.Entity<RetakeHistory>().HasKey(e => e.RetakeHistoryId);
+        modelBuilder.Entity<AttendanceRecord>().HasKey(e => e.AttendanceRecordId);
         modelBuilder.Entity<EvidenceFile>().HasKey(e => e.EvidenceFileId);
+        modelBuilder.Entity<CompletionRequirement>().HasKey(e => e.RequirementId);
         modelBuilder.Entity<ApprovalRequest>().HasKey(e => e.ApprovalRequestId);
         modelBuilder.Entity<ApprovalHistory>().HasKey(e => e.ApprovalHistoryId);
         modelBuilder.Entity<AuditLog>().HasKey(e => e.AuditLogId);
@@ -79,287 +85,113 @@ public partial class AppDbContext : DbContext
 
     private static void ConfigureUniqueConstraints(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<Role>()
-            .HasIndex(r => r.RoleName)
-            .IsUnique();
+        modelBuilder.Entity<Role>().HasIndex(r => r.RoleName).IsUnique();
+        modelBuilder.Entity<Department>().HasIndex(d => d.DepartmentName).IsUnique();
+        modelBuilder.Entity<LearnerType>().HasIndex(lt => lt.TypeName).IsUnique();
+        modelBuilder.Entity<EvidenceType>().HasIndex(et => et.TypeName).IsUnique();
+        modelBuilder.Entity<Course>().HasIndex(c => c.CourseCode).IsUnique();
+        modelBuilder.Entity<Subject>().HasIndex(s => s.SubjectCode).IsUnique();
+        modelBuilder.Entity<Class>().HasIndex(tc => tc.ClassCode).IsUnique();
+        modelBuilder.Entity<User>().HasIndex(u => u.Username).IsUnique();
+        modelBuilder.Entity<User>().HasIndex(u => u.Email).IsUnique();
+        modelBuilder.Entity<Learner>().HasIndex(l => l.LearnerCode).IsUnique();
+        modelBuilder.Entity<Learner>().HasIndex(l => l.Email).IsUnique().HasFilter("[Email] IS NOT NULL");
+        modelBuilder.Entity<Learner>().HasIndex(l => l.IdentificationNumber).IsUnique().HasFilter("[IdentificationNumber] IS NOT NULL");
 
-        modelBuilder.Entity<Department>()
-            .HasIndex(d => d.DepartmentName)
-            .IsUnique();
-
-        modelBuilder.Entity<LearnerType>()
-            .HasIndex(lt => lt.TypeName)
-            .IsUnique();
-
-        modelBuilder.Entity<EvidenceType>()
-            .HasIndex(et => et.TypeName)
-            .IsUnique();
-
-        modelBuilder.Entity<Course>()
-            .HasIndex(c => c.CourseCode)
-            .IsUnique();
-
-        modelBuilder.Entity<TrainingClass>()
-            .HasIndex(tc => tc.ClassCode)
-            .IsUnique();
-
-        modelBuilder.Entity<User>()
-            .HasIndex(u => u.Username)
-            .IsUnique();
-
-        modelBuilder.Entity<User>()
-            .HasIndex(u => u.Email)
-            .IsUnique();
-
-        modelBuilder.Entity<Learner>()
-            .HasIndex(l => l.LearnerCode)
-            .IsUnique();
-
-        modelBuilder.Entity<Learner>()
-            .HasIndex(l => l.Email)
-            .IsUnique()
-            .HasFilter("[Email] IS NOT NULL");
-
-        modelBuilder.Entity<Learner>()
-            .HasIndex(l => l.IdentificationNumber)
-            .IsUnique()
-            .HasFilter("[IdentificationNumber] IS NOT NULL");
-
-        modelBuilder.Entity<Enrollment>()
+        modelBuilder.Entity<CourseEnrollment>()
             .HasIndex(e => new { e.LearnerId, e.ClassId })
             .IsUnique();
 
-        modelBuilder.Entity<ClassInstructor>()
-            .HasIndex(ci => new { ci.ClassId, ci.UserId })
-            .IsUnique();
-
-        modelBuilder.Entity<ETRRecord>()
+        modelBuilder.Entity<ETRCourseRecord>()
             .HasIndex(e => e.EnrollmentId)
             .IsUnique();
 
-        modelBuilder.Entity<ETRChecklistProgress>()
-            .HasIndex(p => new { p.ETRRecordId, p.ChecklistItemId })
+        modelBuilder.Entity<SubjectResult>()
+            .HasIndex(sr => new { sr.EnrollmentId, sr.CourseId, sr.SubjectId })
             .IsUnique();
 
         modelBuilder.Entity<AttendanceRecord>()
-            .HasIndex(ar => new { ar.AttendanceSessionId, ar.LearnerId })
+            .HasIndex(ar => new { ar.SessionId, ar.LearnerId })
             .IsUnique();
 
         modelBuilder.Entity<AssessmentResult>()
-            .HasIndex(ar => new { ar.AssessmentComponentId, ar.LearnerId })
+            .HasIndex(ar => new { ar.AssessmentId, ar.LearnerId })
+            .IsUnique();
+            
+        modelBuilder.Entity<PracticalChecklistResult>()
+            .HasIndex(pcr => new { pcr.SubjectResultId, pcr.PracticalChecklistId })
             .IsUnique();
     }
 
     private static void ConfigureDecimalPrecision(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<AssessmentComponent>()
-            .Property(a => a.Weight)
-            .HasColumnType("decimal(5,2)");
-
-        modelBuilder.Entity<AssessmentComponent>()
-            .Property(a => a.PassingScore)
-            .HasColumnType("decimal(5,2)");
-
-        modelBuilder.Entity<AssessmentResult>()
-            .Property(a => a.Score)
-            .HasColumnType("decimal(5,2)");
-
-        modelBuilder.Entity<DashboardSnapshot>()
-            .Property(d => d.AverageAttendanceRate)
-            .HasColumnType("decimal(5,2)");
-
-        modelBuilder.Entity<DashboardSnapshot>()
-            .Property(d => d.AverageAssessmentScore)
-            .HasColumnType("decimal(5,2)");
+        modelBuilder.Entity<CourseSubject>().Property(cs => cs.PassingScore).HasColumnType("decimal(5,2)");
+        modelBuilder.Entity<SubjectResult>().Property(sr => sr.AttendanceRate).HasColumnType("decimal(5,2)");
+        modelBuilder.Entity<SubjectResult>().Property(sr => sr.Score).HasColumnType("decimal(5,2)");
+        modelBuilder.Entity<Assessment>().Property(a => a.Weight).HasColumnType("decimal(5,2)");
+        modelBuilder.Entity<Assessment>().Property(a => a.PassingScore).HasColumnType("decimal(5,2)");
+        modelBuilder.Entity<AssessmentResult>().Property(a => a.Score).HasColumnType("decimal(5,2)");
+        modelBuilder.Entity<RetakeHistory>().Property(rh => rh.PreviousScore).HasColumnType("decimal(5,2)");
+        modelBuilder.Entity<RetakeHistory>().Property(rh => rh.NewScore).HasColumnType("decimal(5,2)");
+        modelBuilder.Entity<DashboardSnapshot>().Property(d => d.AverageAttendanceRate).HasColumnType("decimal(5,2)");
+        modelBuilder.Entity<DashboardSnapshot>().Property(d => d.AverageAssessmentScore).HasColumnType("decimal(5,2)");
     }
 
     private static void ConfigureRelationships(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<User>()
-            .HasOne<Role>()
-            .WithMany()
-            .HasForeignKey(u => u.RoleId)
-            .OnDelete(DeleteBehavior.Restrict);
+        var cascadeDeleteConfig = DeleteBehavior.Restrict;
 
-        modelBuilder.Entity<User>()
-            .HasOne<Department>()
-            .WithMany()
-            .HasForeignKey(u => u.DepartmentId)
-            .OnDelete(DeleteBehavior.Restrict);
+        // User & Learner Setup
+        modelBuilder.Entity<User>().HasOne<Role>().WithMany().HasForeignKey(u => u.RoleId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<User>().HasOne<Department>().WithMany().HasForeignKey(u => u.DepartmentId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<Learner>().HasOne<LearnerType>().WithMany().HasForeignKey(l => l.LearnerTypeId).OnDelete(cascadeDeleteConfig);
 
-        modelBuilder.Entity<Learner>()
-            .HasOne<LearnerType>()
-            .WithMany()
-            .HasForeignKey(l => l.LearnerTypeId)
-            .OnDelete(DeleteBehavior.Restrict);
+        // Course & Class Setup
+        modelBuilder.Entity<CourseSubject>().HasOne<Course>().WithMany().HasForeignKey(cs => cs.CourseId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<CourseSubject>().HasOne<Subject>().WithMany().HasForeignKey(cs => cs.SubjectId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<Class>().HasOne<Course>().WithMany().HasForeignKey(tc => tc.CourseId).OnDelete(cascadeDeleteConfig);
+        
+        // Enrollment Setup
+        modelBuilder.Entity<CourseEnrollment>().HasOne<Learner>().WithMany().HasForeignKey(e => e.LearnerId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<CourseEnrollment>().HasOne<Class>().WithMany().HasForeignKey(e => e.ClassId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<ETRCourseRecord>().HasOne<CourseEnrollment>().WithOne().HasForeignKey<ETRCourseRecord>(e => e.EnrollmentId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<SubjectResult>().HasOne<CourseEnrollment>().WithMany().HasForeignKey(sr => sr.EnrollmentId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<SubjectResult>().HasOne<CourseSubject>().WithMany().HasForeignKey(sr => new { sr.CourseId, sr.SubjectId }).OnDelete(cascadeDeleteConfig);
 
-        modelBuilder.Entity<TrainingClass>()
-            .HasOne<Course>()
-            .WithMany()
-            .HasForeignKey(tc => tc.CourseId)
-            .OnDelete(DeleteBehavior.Restrict);
+        // Session Setup
+        modelBuilder.Entity<Session>().HasOne<Class>().WithMany().HasForeignKey(s => s.ClassId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<Session>().HasOne<Subject>().WithMany().HasForeignKey(s => s.SubjectId).OnDelete(cascadeDeleteConfig);
 
-        modelBuilder.Entity<Enrollment>()
-            .HasOne<Learner>()
-            .WithMany()
-            .HasForeignKey(e => e.LearnerId)
-            .OnDelete(DeleteBehavior.Restrict);
+        // Attendance Setup
+        modelBuilder.Entity<AttendanceRecord>().HasOne<Session>().WithMany().HasForeignKey(ar => ar.SessionId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<AttendanceRecord>().HasOne<Learner>().WithMany().HasForeignKey(ar => ar.LearnerId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<AttendanceRecord>().HasOne<CourseEnrollment>().WithMany().HasForeignKey(ar => ar.EnrollmentId).OnDelete(cascadeDeleteConfig);
 
-        modelBuilder.Entity<Enrollment>()
-            .HasOne<TrainingClass>()
-            .WithMany()
-            .HasForeignKey(e => e.ClassId)
-            .OnDelete(DeleteBehavior.Restrict);
+        // Assessment Setup
+        modelBuilder.Entity<Assessment>().HasOne<CourseSubject>().WithMany().HasForeignKey(a => new { a.CourseId, a.SubjectId }).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<AssessmentResult>().HasOne<Assessment>().WithMany().HasForeignKey(ar => ar.AssessmentId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<AssessmentResult>().HasOne<Learner>().WithMany().HasForeignKey(ar => ar.LearnerId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<AssessmentResult>().HasOne<SubjectResult>().WithMany().HasForeignKey(ar => ar.SubjectResultId).OnDelete(cascadeDeleteConfig);
 
-        modelBuilder.Entity<Enrollment>()
-            .HasOne<User>()
-            .WithMany()
-            .HasForeignKey(e => e.CreatedBy)
-            .OnDelete(DeleteBehavior.Restrict);
+        // Practical Checklist Setup
+        modelBuilder.Entity<PracticalChecklist>().HasOne<CourseSubject>().WithMany().HasForeignKey(pc => new { pc.CourseId, pc.SubjectId }).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<PracticalChecklistResult>().HasOne<PracticalChecklist>().WithMany().HasForeignKey(pcr => pcr.PracticalChecklistId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<PracticalChecklistResult>().HasOne<SubjectResult>().WithMany().HasForeignKey(pcr => pcr.SubjectResultId).OnDelete(cascadeDeleteConfig);
 
-        modelBuilder.Entity<ClassInstructor>()
-            .HasOne<TrainingClass>()
-            .WithMany()
-            .HasForeignKey(ci => ci.ClassId)
-            .OnDelete(DeleteBehavior.Restrict);
+        // Signoff & Retake Setup
+        modelBuilder.Entity<SubjectSignoff>().HasOne<SubjectResult>().WithMany().HasForeignKey(ss => ss.SubjectResultId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<RetakeHistory>().HasOne<SubjectResult>().WithMany().HasForeignKey(rh => rh.SubjectResultId).OnDelete(cascadeDeleteConfig);
 
-        modelBuilder.Entity<ClassInstructor>()
-            .HasOne<User>()
-            .WithMany()
-            .HasForeignKey(ci => ci.UserId)
-            .OnDelete(DeleteBehavior.Restrict);
+        // Evidence Setup
+        modelBuilder.Entity<EvidenceFile>().HasOne<EvidenceType>().WithMany().HasForeignKey(ef => ef.EvidenceTypeId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<EvidenceFile>().HasOne<Learner>().WithMany().HasForeignKey(ef => ef.LearnerId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<EvidenceFile>().HasOne<SubjectResult>().WithMany().HasForeignKey(ef => ef.SubjectResultId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<EvidenceFile>().HasOne<AttendanceRecord>().WithMany().HasForeignKey(ef => ef.AttendanceRecordId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<EvidenceFile>().HasOne<AssessmentResult>().WithMany().HasForeignKey(ef => ef.AssessmentResultId).OnDelete(cascadeDeleteConfig);
 
-        modelBuilder.Entity<ETRRecord>()
-            .HasOne<Enrollment>()
-            .WithOne()
-            .HasForeignKey<ETRRecord>(e => e.EnrollmentId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<ETRChecklistProgress>()
-            .HasOne<ETRRecord>()
-            .WithMany()
-            .HasForeignKey(p => p.ETRRecordId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<ETRChecklistProgress>()
-            .HasOne<ETRChecklistItem>()
-            .WithMany()
-            .HasForeignKey(p => p.ChecklistItemId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<ETRChecklistProgress>()
-            .HasOne<User>()
-            .WithMany()
-            .HasForeignKey(p => p.VerifiedBy)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<AttendanceSession>()
-            .HasOne<TrainingClass>()
-            .WithMany()
-            .HasForeignKey(a => a.ClassId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<AttendanceSession>()
-            .HasOne<User>()
-            .WithMany()
-            .HasForeignKey(a => a.CreatedBy)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<AttendanceSession>()
-            .HasOne<User>()
-            .WithMany()
-            .HasForeignKey(a => a.ConfirmedBy)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<AttendanceRecord>()
-            .HasOne<AttendanceSession>()
-            .WithMany()
-            .HasForeignKey(ar => ar.AttendanceSessionId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<AttendanceRecord>()
-            .HasOne<Learner>()
-            .WithMany()
-            .HasForeignKey(ar => ar.LearnerId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<AttendanceRecord>()
-            .HasOne<ETRRecord>()
-            .WithMany()
-            .HasForeignKey(ar => ar.ETRRecordId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<AttendanceRecord>()
-            .HasOne<User>()
-            .WithMany()
-            .HasForeignKey(ar => ar.RecordedBy)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<AssessmentComponent>()
-            .HasOne<Course>()
-            .WithMany()
-            .HasForeignKey(ac => ac.CourseId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<AssessmentResult>()
-            .HasOne<AssessmentComponent>()
-            .WithMany()
-            .HasForeignKey(ar => ar.AssessmentComponentId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<AssessmentResult>()
-            .HasOne<Learner>()
-            .WithMany()
-            .HasForeignKey(ar => ar.LearnerId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<AssessmentResult>()
-            .HasOne<ETRRecord>()
-            .WithMany()
-            .HasForeignKey(ar => ar.ETRRecordId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<AssessmentResult>()
-            .HasOne<User>()
-            .WithMany()
-            .HasForeignKey(ar => ar.RecordedBy)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<EvidenceFile>()
-            .HasOne<EvidenceType>()
-            .WithMany()
-            .HasForeignKey(ef => ef.EvidenceTypeId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<EvidenceFile>()
-            .HasOne<User>()
-            .WithMany()
-            .HasForeignKey(ef => ef.UploadedBy)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<EvidenceFile>()
-            .HasOne<Learner>()
-            .WithMany()
-            .HasForeignKey(ef => ef.LearnerId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<EvidenceFile>()
-            .HasOne<ETRRecord>()
-            .WithMany()
-            .HasForeignKey(ef => ef.ETRRecordId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<EvidenceFile>()
-            .HasOne<AttendanceRecord>()
-            .WithMany()
-            .HasForeignKey(ef => ef.AttendanceRecordId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<EvidenceFile>()
-            .HasOne<AssessmentResult>()
-            .WithMany()
-            .HasForeignKey(ef => ef.AssessmentResultId)
-            .OnDelete(DeleteBehavior.Restrict);
+        // Approval Request Setup
+        modelBuilder.Entity<ApprovalRequest>().HasOne<ETRCourseRecord>().WithMany().HasForeignKey(ar => ar.ETRCourseRecordId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<ApprovalHistory>().HasOne<ApprovalRequest>().WithMany().HasForeignKey(ah => ah.ApprovalRequestId).OnDelete(cascadeDeleteConfig);
     }
 
     private static void ConfigureSoftDeleteFilters(ModelBuilder modelBuilder)

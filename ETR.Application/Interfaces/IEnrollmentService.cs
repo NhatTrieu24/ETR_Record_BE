@@ -1,5 +1,4 @@
 using ETR.Application.DTOs;
-using ETR.Domain.Entities;
 
 namespace ETR.Application.Interfaces;
 

@@ -2,13 +2,14 @@ namespace ETR.Application.DTOs;
 
 public record AssessmentResultResponse(
     int AssessmentResultId,
-    int AssessmentComponentId,
+    int AssessmentId,
     int LearnerId,
-    int ETRRecordId,
+    int SubjectResultId,
     decimal Score,
     string ResultStatus,
-    string? InstructorComment,
     int RecordedBy,
     DateTime RecordedAt,
     DateTime? PublishedAt,
-    bool IsPublished);
+    bool IsPublished,
+    DateTime? TakenAt,
+    string? Remark);

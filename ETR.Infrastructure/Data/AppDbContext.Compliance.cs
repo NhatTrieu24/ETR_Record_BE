@@ -55,7 +55,23 @@ public partial class AppDbContext
             return snapshots;
         }
 
-        var etrContextByRecordId = await LoadEtrRecordContextAsync(entries, cancellationToken);
+        var enrollmentIds = new HashSet<int>();
+        foreach (var entry in entries)
+        {
+            var enrollmentId = await ResolveEnrollmentIdAsync(entry, cancellationToken);
+            if (enrollmentId > 0) enrollmentIds.Add(enrollmentId);
+        }
+
+        var etrContextByEnrollmentId = new Dictionary<int, EtrRecordContext>();
+        if (enrollmentIds.Count > 0)
+        {
+            etrContextByEnrollmentId = await ETRCourseRecords
+                .AsNoTracking()
+                .IgnoreQueryFilters()
+                .Where(e => enrollmentIds.Contains(e.EnrollmentId))
+                .Select(e => new { e.EnrollmentId, Context = new EtrRecordContext(e.ETRCourseRecordId, e.Status, e.IsLocked) })
+                .ToDictionaryAsync(e => e.EnrollmentId, e => e.Context, cancellationToken);
+        }
 
         foreach (var entry in entries)
         {
@@ -64,21 +80,20 @@ public partial class AppDbContext
                 ? EntityChangeAction.Delete
                 : EntityChangeAction.Update;
 
-            if (entityName == nameof(ETRRecord))
+            if (entityName == nameof(ETRCourseRecord))
             {
                 snapshots.Add(new EntityChangeSnapshot
                 {
                     EntityName = entityName,
                     Action = action,
-                    OriginalEtrStatus = entry.Property(nameof(ETRRecord.Status)).OriginalValue as string,
-                    OriginalEtrIsLocked = entry.Property(nameof(ETRRecord.IsLocked)).OriginalValue as bool?
+                    OriginalEtrStatus = entry.Property(nameof(ETRCourseRecord.Status)).OriginalValue as string,
+                    OriginalEtrIsLocked = entry.Property(nameof(ETRCourseRecord.IsLocked)).OriginalValue as bool?
                 });
-
                 continue;
             }
 
-            var etrRecordId = ResolveEtrRecordId(entry);
-            etrContextByRecordId.TryGetValue(etrRecordId, out var etrContext);
+            var enrollmentId = await ResolveEnrollmentIdAsync(entry, cancellationToken);
+            etrContextByEnrollmentId.TryGetValue(enrollmentId, out var etrContext);
 
             snapshots.Add(new EntityChangeSnapshot
             {
@@ -96,40 +111,30 @@ public partial class AppDbContext
         return snapshots;
     }
 
-    private async Task<Dictionary<int, EtrRecordContext>> LoadEtrRecordContextAsync(
-        IEnumerable<EntityEntry> entries,
-        CancellationToken cancellationToken)
+    private async Task<int> ResolveEnrollmentIdAsync(EntityEntry entry, CancellationToken cancellationToken)
     {
-        var etrRecordIds = entries
-            .Select(ResolveEtrRecordId)
-            .Where(id => id > 0)
-            .Distinct()
-            .ToList();
+        if (entry.Entity is ETRCourseRecord record) return record.EnrollmentId;
+        if (entry.Entity is CourseEnrollment enrollment) return enrollment.EnrollmentId;
+        if (entry.Entity is SubjectResult sr) return GetOriginalOrCurrent(entry, sr.EnrollmentId, nameof(SubjectResult.EnrollmentId));
+        if (entry.Entity is AttendanceRecord ar) return GetOriginalOrCurrent(entry, ar.EnrollmentId, nameof(AttendanceRecord.EnrollmentId));
+        
+        int subjectResultId = 0;
+        if (entry.Entity is AssessmentResult asr) subjectResultId = GetOriginalOrCurrent(entry, asr.SubjectResultId, nameof(AssessmentResult.SubjectResultId));
+        else if (entry.Entity is PracticalChecklistResult pcr) subjectResultId = GetOriginalOrCurrent(entry, pcr.SubjectResultId, nameof(PracticalChecklistResult.SubjectResultId));
+        else if (entry.Entity is EvidenceFile ef) subjectResultId = GetOriginalOrCurrent(entry, ef.SubjectResultId, nameof(EvidenceFile.SubjectResultId));
+        else if (entry.Entity is RetakeHistory rh) subjectResultId = GetOriginalOrCurrent(entry, rh.SubjectResultId, nameof(RetakeHistory.SubjectResultId));
+        else if (entry.Entity is SubjectSignoff ss) subjectResultId = GetOriginalOrCurrent(entry, ss.SubjectResultId, nameof(SubjectSignoff.SubjectResultId));
 
-        if (etrRecordIds.Count == 0)
+        if (subjectResultId > 0)
         {
-            return [];
+            var srEntry = ChangeTracker.Entries<SubjectResult>().FirstOrDefault(e => e.Entity.SubjectResultId == subjectResultId);
+            if (srEntry != null) return srEntry.Entity.EnrollmentId;
+
+            var result = await SubjectResults.AsNoTracking().FirstOrDefaultAsync(sr => sr.SubjectResultId == subjectResultId, cancellationToken);
+            if (result != null) return result.EnrollmentId;
         }
 
-        return await ETRRecords
-            .AsNoTracking()
-            .IgnoreQueryFilters()
-            .Where(e => etrRecordIds.Contains(e.ETRRecordId))
-            .Select(e => new EtrRecordContext(e.ETRRecordId, e.Status, e.IsLocked))
-            .ToDictionaryAsync(e => e.ETRRecordId, cancellationToken);
-    }
-
-    private static int ResolveEtrRecordId(EntityEntry entry)
-    {
-        return entry.Entity switch
-        {
-            ETRRecord record => record.ETRRecordId,
-            ETRChecklistProgress progress => GetOriginalOrCurrent(entry, progress.ETRRecordId, nameof(ETRChecklistProgress.ETRRecordId)),
-            AttendanceRecord attendance => GetOriginalOrCurrent(entry, attendance.ETRRecordId, nameof(AttendanceRecord.ETRRecordId)),
-            AssessmentResult assessment => GetOriginalOrCurrent(entry, assessment.ETRRecordId, nameof(AssessmentResult.ETRRecordId)),
-            EvidenceFile evidence => GetOriginalOrCurrent(entry, evidence.ETRRecordId, nameof(EvidenceFile.ETRRecordId)),
-            _ => 0
-        };
+        return 0;
     }
 
     private static int GetOriginalOrCurrent(EntityEntry entry, int currentValue, string propertyName)
@@ -154,7 +159,7 @@ public partial class AppDbContext
                 entry.State == EntityState.Added ? null : SerializePropertyValues(entry.OriginalValues),
                 SerializePropertyValues(entry.CurrentValues),
                 ResolveAuditUserId(entry),
-                ResolveAuditEtrRecordId(entry.Entity),
+                null, 
                 entry.State == EntityState.Modified
                     && entry.Property(nameof(BaseEntity.IsDeleted)).IsModified
                     && entry.Entity.IsDeleted
@@ -173,23 +178,12 @@ public partial class AppDbContext
         return entry.Entity.CreatedBy;
     }
 
-    private static int? ResolveAuditEtrRecordId(BaseEntity entity)
-    {
-        return entity switch
-        {
-            ETRRecord record => record.ETRRecordId,
-            ETRChecklistProgress progress => progress.ETRRecordId,
-            AttendanceRecord attendance => attendance.ETRRecordId,
-            AssessmentResult assessment => assessment.ETRRecordId,
-            EvidenceFile evidence => evidence.ETRRecordId,
-            _ => null
-        };
-    }
-
     private static int GetPrimaryKeyValue(EntityEntry entry)
     {
         var key = entry.Metadata.FindPrimaryKey()
             ?? throw new InvalidOperationException($"Entity {entry.Metadata.Name} has no primary key.");
+
+        if (key.Properties.Count > 1) return 0; 
 
         var keyProperty = key.Properties[0];
         var keyValue = entry.Property(keyProperty.Name).CurrentValue;
@@ -198,17 +192,13 @@ public partial class AppDbContext
         {
             int intValue => intValue,
             long longValue when longValue <= int.MaxValue => (int)longValue,
-            _ => throw new InvalidOperationException(
-                $"Audit logging supports integer primary keys only. Entity: {entry.Metadata.Name}")
+            _ => 0
         };
     }
 
     private static string? SerializePropertyValues(PropertyValues? values)
     {
-        if (values is null)
-        {
-            return null;
-        }
+        if (values is null) return null;
 
         var payload = values.Properties.ToDictionary(
             property => property.Name,
@@ -217,7 +207,7 @@ public partial class AppDbContext
         return JsonSerializer.Serialize(payload, AuditJsonOptions);
     }
 
-    private sealed record EtrRecordContext(int ETRRecordId, string Status, bool IsLocked);
+    private sealed record EtrRecordContext(int ETRCourseRecordId, string Status, bool IsLocked);
 
     private sealed class PendingAuditEntry
     {

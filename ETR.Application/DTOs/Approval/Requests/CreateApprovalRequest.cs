@@ -1,6 +1,6 @@
 namespace ETR.Application.DTOs;
 
 public record CreateApprovalRequest(
-    int ETRRecordId,
+    int ETRCourseRecordId,
     int SubmittedBy,
     int? CurrentApproverId);

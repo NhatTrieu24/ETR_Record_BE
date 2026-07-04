@@ -16,24 +16,27 @@ public class UnitOfWork : IUnitOfWork
         _context = context;
         UserRepository = new GenericRepository<User>(_context);
         LearnerRepository = new GenericRepository<Learner>(_context);
-        EnrollmentRepository = new GenericRepository<Enrollment>(_context);
-        ETRRecordRepository = new GenericRepository<ETRRecord>(_context);
-        TrainingClassRepository = new GenericRepository<TrainingClass>(_context);
-        ETRChecklistTemplateRepository = new GenericRepository<ETRChecklistTemplate>(_context);
-        ETRChecklistItemRepository = new GenericRepository<ETRChecklistItem>(_context);
-        ETRChecklistProgressRepository = new GenericRepository<ETRChecklistProgress>(_context);
+        CourseEnrollmentRepository = new GenericRepository<CourseEnrollment>(_context);
+        ETRCourseRecordRepository = new GenericRepository<ETRCourseRecord>(_context);
+        ClassRepository = new GenericRepository<Class>(_context);
+        SubjectRepository = new GenericRepository<Subject>(_context);
+        CourseSubjectRepository = new GenericRepository<CourseSubject>(_context);
         RoleRepository = new GenericRepository<Role>(_context);
         DepartmentRepository = new GenericRepository<Department>(_context);
         LearnerTypeRepository = new GenericRepository<LearnerType>(_context);
         CourseRepository = new GenericRepository<Course>(_context);
         EvidenceTypeRepository = new GenericRepository<EvidenceType>(_context);
-        ClassInstructorRepository = new GenericRepository<ClassInstructor>(_context);
-        CompletionRequirementRepository = new GenericRepository<CompletionRequirement>(_context);
-        AttendanceSessionRepository = new GenericRepository<AttendanceSession>(_context);
+        SessionRepository = new GenericRepository<Session>(_context);
+        SubjectResultRepository = new GenericRepository<SubjectResult>(_context);
         AttendanceRecordRepository = new GenericRepository<AttendanceRecord>(_context);
-        AssessmentComponentRepository = new GenericRepository<AssessmentComponent>(_context);
+        AssessmentRepository = new GenericRepository<Assessment>(_context);
         AssessmentResultRepository = new GenericRepository<AssessmentResult>(_context);
+        PracticalChecklistRepository = new GenericRepository<PracticalChecklist>(_context);
+        PracticalChecklistResultRepository = new GenericRepository<PracticalChecklistResult>(_context);
+        SubjectSignoffRepository = new GenericRepository<SubjectSignoff>(_context);
+        RetakeHistoryRepository = new GenericRepository<RetakeHistory>(_context);
         EvidenceFileRepository = new GenericRepository<EvidenceFile>(_context);
+        CompletionRequirementRepository = new GenericRepository<CompletionRequirement>(_context);
         ApprovalRequestRepository = new GenericRepository<ApprovalRequest>(_context);
         ApprovalHistoryRepository = new GenericRepository<ApprovalHistory>(_context);
         AuditLogRepository = new AuditLogRepository(_context);
@@ -43,80 +46,70 @@ public class UnitOfWork : IUnitOfWork
 
     public IGenericRepository<User> UserRepository { get; }
     public IGenericRepository<Learner> LearnerRepository { get; }
-    public IGenericRepository<Enrollment> EnrollmentRepository { get; }
-    public IGenericRepository<ETRRecord> ETRRecordRepository { get; }
-    public IGenericRepository<TrainingClass> TrainingClassRepository { get; }
-    public IGenericRepository<ETRChecklistTemplate> ETRChecklistTemplateRepository { get; }
-    public IGenericRepository<ETRChecklistItem> ETRChecklistItemRepository { get; }
-    public IGenericRepository<ETRChecklistProgress> ETRChecklistProgressRepository { get; }
+    public IGenericRepository<CourseEnrollment> CourseEnrollmentRepository { get; }
+    public IGenericRepository<ETRCourseRecord> ETRCourseRecordRepository { get; }
+    public IGenericRepository<Class> ClassRepository { get; }
+    public IGenericRepository<Subject> SubjectRepository { get; }
+    public IGenericRepository<CourseSubject> CourseSubjectRepository { get; }
     public IGenericRepository<Role> RoleRepository { get; }
     public IGenericRepository<Department> DepartmentRepository { get; }
     public IGenericRepository<LearnerType> LearnerTypeRepository { get; }
     public IGenericRepository<Course> CourseRepository { get; }
     public IGenericRepository<EvidenceType> EvidenceTypeRepository { get; }
-    public IGenericRepository<ClassInstructor> ClassInstructorRepository { get; }
-    public IGenericRepository<CompletionRequirement> CompletionRequirementRepository { get; }
-    public IGenericRepository<AttendanceSession> AttendanceSessionRepository { get; }
+    public IGenericRepository<Session> SessionRepository { get; }
+    public IGenericRepository<SubjectResult> SubjectResultRepository { get; }
     public IGenericRepository<AttendanceRecord> AttendanceRecordRepository { get; }
-    public IGenericRepository<AssessmentComponent> AssessmentComponentRepository { get; }
+    public IGenericRepository<Assessment> AssessmentRepository { get; }
     public IGenericRepository<AssessmentResult> AssessmentResultRepository { get; }
+    public IGenericRepository<PracticalChecklist> PracticalChecklistRepository { get; }
+    public IGenericRepository<PracticalChecklistResult> PracticalChecklistResultRepository { get; }
+    public IGenericRepository<SubjectSignoff> SubjectSignoffRepository { get; }
+    public IGenericRepository<RetakeHistory> RetakeHistoryRepository { get; }
     public IGenericRepository<EvidenceFile> EvidenceFileRepository { get; }
+    public IGenericRepository<CompletionRequirement> CompletionRequirementRepository { get; }
     public IGenericRepository<ApprovalRequest> ApprovalRequestRepository { get; }
     public IGenericRepository<ApprovalHistory> ApprovalHistoryRepository { get; }
     public IAuditLogRepository AuditLogRepository { get; }
     public IGenericRepository<ExportJob> ExportJobRepository { get; }
     public IGenericRepository<DashboardSnapshot> DashboardSnapshotRepository { get; }
 
-    public Task BeginTransactionAsync(CancellationToken cancellationToken = default)
+    public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
     {
-        return BeginTransactionInternalAsync(cancellationToken);
+        _transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
     }
 
     public async Task CommitTransactionAsync(CancellationToken cancellationToken = default)
     {
-        if (_transaction is null)
+        try
         {
-            return;
+            await _context.SaveChangesAsync(cancellationToken);
+            if (_transaction != null)
+                await _transaction.CommitAsync(cancellationToken);
         }
-
-        await _transaction.CommitAsync(cancellationToken);
-        await _transaction.DisposeAsync();
-        _transaction = null;
+        finally
+        {
+            if (_transaction != null)
+                await _transaction.DisposeAsync();
+        }
     }
 
     public async Task RollbackTransactionAsync(CancellationToken cancellationToken = default)
     {
-        if (_transaction is null)
+        if (_transaction != null)
         {
-            return;
+            await _transaction.RollbackAsync(cancellationToken);
+            await _transaction.DisposeAsync();
         }
-
-        await _transaction.RollbackAsync(cancellationToken);
-        await _transaction.DisposeAsync();
-        _transaction = null;
     }
 
-    public Task<int> SaveAsync(CancellationToken cancellationToken = default)
+    public async Task<int> SaveAsync(CancellationToken cancellationToken = default)
     {
-        return _context.SaveChangesAsync(cancellationToken);
+        return await _context.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<T> ExecuteInStrategyAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken = default)
     {
         var strategy = _context.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async (ct) =>
-        {
-            return await operation(ct);
-        }, cancellationToken);
-    }
-
-    private async Task BeginTransactionInternalAsync(CancellationToken cancellationToken)
-    {
-        if (_transaction is not null)
-        {
-            return;
-        }
-
-        _transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        return await strategy.ExecuteAsync(operation, cancellationToken);
     }
 }

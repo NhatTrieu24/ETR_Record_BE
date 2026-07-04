@@ -6,6 +6,6 @@ public record CreateEnrollmentResponse(
     int ClassId,
     string Status,
     DateTime EnrolledAt,
-    int EtrRecordId,
+    int EtrCourseRecordId,
     string EtrStatus,
     bool EtrIsLocked);

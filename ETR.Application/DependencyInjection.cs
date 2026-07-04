@@ -11,7 +11,9 @@ public static class DependencyInjection
         services.AddScoped<ILearnerService, LearnerService>();
         services.AddScoped<IEnrollmentService, EnrollmentService>();
         services.AddScoped<IEtrService, EtrService>();
-        services.AddScoped<ChecklistProgressInitializer>();
+        services.AddScoped<IAttendanceService, AttendanceService>();
+        services.AddScoped<IAssessmentService, AssessmentService>();
+        services.AddScoped<IApprovalService, ApprovalService>();
 
         return services;
     }

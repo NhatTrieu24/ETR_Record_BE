@@ -7,14 +7,10 @@ namespace ETR.Application.Services;
 public class EnrollmentService : IEnrollmentService
 {
     private readonly IUnitOfWork _unitOfWork;
-    private readonly ChecklistProgressInitializer _checklistProgressInitializer;
 
-    public EnrollmentService(
-        IUnitOfWork unitOfWork,
-        ChecklistProgressInitializer checklistProgressInitializer)
+    public EnrollmentService(IUnitOfWork unitOfWork)
     {
         _unitOfWork = unitOfWork;
-        _checklistProgressInitializer = checklistProgressInitializer;
     }
 
     public async Task<CreateEnrollmentResponse> CreateEnrollmentAsync(
@@ -29,7 +25,24 @@ public class EnrollmentService : IEnrollmentService
 
             try
             {
-                var enrollment = new Enrollment
+                var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(classId, ct);
+                if (trainingClass == null) throw new InvalidOperationException("Class not found.");
+
+                var activeEnrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct);
+                var classes = await _unitOfWork.ClassRepository.GetAllAsync(ct);
+                var courseClasses = classes.Where(c => c.CourseId == trainingClass.CourseId).Select(c => c.ClassId).ToList();
+                
+                var hasDuplicate = activeEnrollments.Any(e => 
+                    e.LearnerId == learnerId && 
+                    e.Status == "Active" && 
+                    courseClasses.Contains(e.ClassId));
+
+                if (hasDuplicate)
+                {
+                    throw new InvalidOperationException("Learner is already enrolled in an active class for this course.");
+                }
+
+                var enrollment = new CourseEnrollment
                 {
                     LearnerId = learnerId,
                     ClassId = classId,
@@ -39,10 +52,10 @@ public class EnrollmentService : IEnrollmentService
                     CreatedBy = createdByUserId
                 };
 
-                await _unitOfWork.EnrollmentRepository.AddAsync(enrollment, ct);
+                await _unitOfWork.CourseEnrollmentRepository.AddAsync(enrollment, ct);
                 await _unitOfWork.SaveAsync(ct);
 
-                var etrRecord = new ETRRecord
+                var etrRecord = new ETRCourseRecord
                 {
                     EnrollmentId = enrollment.EnrollmentId,
                     Status = "InProgress",
@@ -52,14 +65,25 @@ public class EnrollmentService : IEnrollmentService
                     CreatedBy = createdByUserId
                 };
 
-                await _unitOfWork.ETRRecordRepository.AddAsync(etrRecord, ct);
+                await _unitOfWork.ETRCourseRecordRepository.AddAsync(etrRecord, ct);
                 await _unitOfWork.SaveAsync(ct);
 
-                await _checklistProgressInitializer.InitializeForEtrRecordAsync(
-                    etrRecord.ETRRecordId,
-                    classId,
-                    createdByUserId,
-                    ct);
+                var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct))
+                    .Where(cs => cs.CourseId == trainingClass.CourseId).ToList();
+
+                foreach (var cs in courseSubjects)
+                {
+                    var subjectResult = new SubjectResult
+                    {
+                        EnrollmentId = enrollment.EnrollmentId,
+                        CourseId = cs.CourseId,
+                        SubjectId = cs.SubjectId,
+                        Status = "Pending",
+                        CreatedAt = DateTime.UtcNow,
+                        CreatedBy = createdByUserId
+                    };
+                    await _unitOfWork.SubjectResultRepository.AddAsync(subjectResult, ct);
+                }
 
                 await _unitOfWork.SaveAsync(ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
@@ -70,7 +94,7 @@ public class EnrollmentService : IEnrollmentService
                     enrollment.ClassId,
                     enrollment.Status,
                     enrollment.EnrolledAt,
-                    etrRecord.ETRRecordId,
+                    etrRecord.ETRCourseRecordId,
                     etrRecord.Status,
                     etrRecord.IsLocked);
             }
