@@ -29,17 +29,23 @@ public class EnrollmentService : IEnrollmentService
                 if (trainingClass == null) throw new InvalidOperationException("Class not found.");
 
                 var activeEnrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct);
-                var classes = await _unitOfWork.ClassRepository.GetAllAsync(ct);
-                var courseClasses = classes.Where(c => c.CourseId == trainingClass.CourseId).Select(c => c.ClassId).ToList();
+                var activeLearnerEnrollments = activeEnrollments
+                    .Where(e => e.LearnerId == learnerId && e.Status == "Active")
+                    .Select(e => e.ClassId)
+                    .ToList();
                 
-                var hasDuplicate = activeEnrollments.Any(e => 
-                    e.LearnerId == learnerId && 
-                    e.Status == "Active" && 
-                    courseClasses.Contains(e.ClassId));
-
-                if (hasDuplicate)
+                if (activeLearnerEnrollments.Count > 0)
                 {
-                    throw new InvalidOperationException("Learner is already enrolled in an active class for this course.");
+                    var classes = await _unitOfWork.ClassRepository.GetAllAsync(ct);
+                    var activeCourseIds = classes
+                        .Where(c => activeLearnerEnrollments.Contains(c.ClassId))
+                        .Select(c => c.CourseId)
+                        .ToList();
+
+                    if (activeCourseIds.Contains(trainingClass.CourseId))
+                    {
+                        throw new InvalidOperationException("Learner is already enrolled in an active class for this course.");
+                    }
                 }
 
                 var enrollment = new CourseEnrollment
