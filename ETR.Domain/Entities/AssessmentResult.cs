@@ -14,4 +14,5 @@ public class AssessmentResult : BaseEntity
     public bool IsPublished { get; set; }
     public DateTime? TakenAt { get; set; }
     public string? Remark { get; set; }
+    public int AttemptNo { get; set; } = 1;
 }

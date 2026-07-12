@@ -1,5 +1,10 @@
+using System.Text;
+using ETR.API.Services;
 using ETR.Application;
+using ETR.Application.Interfaces;
 using ETR.Infrastructure;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 
 try
 {
@@ -8,9 +13,35 @@ try
     // 1. Thêm cấu hình Controllers và Swagger/Endpoints
     builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen(); // Đảm bảo cấu hình tài liệu API mượt mà cho Controller
+    builder.Services.AddSwaggerGen();
+
+    // Cấu hình JWT Authentication
+    var jwtSettings = builder.Configuration.GetSection("JwtSettings");
+    var secretKey = jwtSettings.GetValue<string>("SecretKey") ?? throw new InvalidOperationException("JWT SecretKey is missing.");
+
+    builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtSettings.GetValue<string>("Issuer"),
+            ValidAudience = jwtSettings.GetValue<string>("Audience"),
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
+        };
+    });
 
     // 2. Đăng ký các dịch vụ thuộc Clean Architecture các tầng
+    builder.Services.AddHttpContextAccessor();
+    builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+    
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -30,7 +61,9 @@ try
 
     app.UseHttpsRedirection();
 
-    app.UseAuthorization(); // Thêm middleware phân quyền mặc định
+    // Middleware xác thực (Authentication) phải nằm trước phân quyền (Authorization)
+    app.UseAuthentication();
+    app.UseAuthorization(); 
 
     app.MapControllers();
 

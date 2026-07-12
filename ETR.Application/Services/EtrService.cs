@@ -52,6 +52,27 @@ public class EtrService : IEtrService
         var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(etrCourseRecordId, cancellationToken)
             ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
 
+        var enrollment = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(etr.EnrollmentId, cancellationToken);
+        if (enrollment == null) throw new InvalidOperationException("Enrollment not found.");
+
+        var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(enrollment.ClassId, cancellationToken);
+        if (trainingClass == null) throw new InvalidOperationException("Class not found.");
+
+        var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken))
+            .Where(cs => cs.CourseId == trainingClass.CourseId && cs.IsMandatory).ToList();
+
+        var subjectResults = (await _unitOfWork.SubjectResultRepository.GetAllAsync(cancellationToken))
+            .Where(sr => sr.EnrollmentId == etr.EnrollmentId).ToList();
+
+        foreach (var cs in courseSubjects)
+        {
+            var sr = subjectResults.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
+            if (sr == null || (sr.Status != "Passed" && sr.Status != "Exempted"))
+            {
+                throw new InvalidOperationException($"Cannot complete ETR. Mandatory subject (ID: {cs.SubjectId}) is not Passed or Exempted.");
+            }
+        }
+
         etr.Status = "Completed";
         etr.CompletedAt = DateTime.UtcNow;
         etr.IsLocked = true;

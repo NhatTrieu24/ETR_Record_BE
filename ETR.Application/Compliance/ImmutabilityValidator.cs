@@ -45,7 +45,7 @@ public static class ImmutabilityValidator
 
     private static void ValidateEtrRecord(EntityChangeSnapshot change)
     {
-        if (change.EntityName == nameof(ETRCourseRecord) && change.Action != EntityChangeAction.Insert)
+        if (change.EntityName == nameof(ETRCourseRecord))
         {
             if (IsEtrImmutable(change.OriginalEtrStatus, change.OriginalEtrIsLocked))
             {
@@ -56,7 +56,7 @@ public static class ImmutabilityValidator
 
     private static void ValidateEtrChildEntity(EntityChangeSnapshot change)
     {
-        if (EtrChildEntities.Contains(change.EntityName) && change.Action != EntityChangeAction.Insert)
+        if (EtrChildEntities.Contains(change.EntityName))
         {
             if (IsEtrImmutable(change.OriginalEtrStatus, change.OriginalEtrIsLocked))
             {

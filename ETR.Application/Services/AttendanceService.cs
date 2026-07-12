@@ -46,15 +46,19 @@ public class AttendanceService : IAttendanceService
                 
                 if (sr != null)
                 {
-                    var allRecords = (await _unitOfWork.AttendanceRecordRepository.GetAllAsync(ct))
-                        .Where(r => r.EnrollmentId == request.EnrollmentId && r.Status == "Present").ToList();
-                    var allSessions = (await _unitOfWork.SessionRepository.GetAllAsync(ct))
-                        .Where(s => s.SubjectId == session.SubjectId).ToList();
-
-                    if (allSessions.Count > 0)
+                    var enrollment = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(request.EnrollmentId, ct);
+                    if (enrollment != null)
                     {
-                        sr.AttendanceRate = (decimal)allRecords.Count / allSessions.Count * 100;
-                        _unitOfWork.SubjectResultRepository.Update(sr);
+                        var allRecords = (await _unitOfWork.AttendanceRecordRepository.GetAllAsync(ct))
+                            .Where(r => r.EnrollmentId == request.EnrollmentId && r.Status == "Present").ToList();
+                        var allSessions = (await _unitOfWork.SessionRepository.GetAllAsync(ct))
+                            .Where(s => s.SubjectId == session.SubjectId && s.ClassId == enrollment.ClassId).ToList();
+
+                        if (allSessions.Count > 0)
+                        {
+                            sr.AttendanceRate = (decimal)allRecords.Count / allSessions.Count * 100;
+                            _unitOfWork.SubjectResultRepository.Update(sr);
+                        }
                     }
                 }
 
