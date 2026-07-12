@@ -1,8 +1,8 @@
 namespace ETR.Domain.Entities;
 
-public class ETRRecord : BaseEntity
+public class ETRCourseRecord : BaseEntity
 {
-    public int ETRRecordId { get; set; }
+    public int ETRCourseRecordId { get; set; }
     public int EnrollmentId { get; set; }
     public string Status { get; set; } = string.Empty;
     public DateTime? SubmittedAt { get; set; }

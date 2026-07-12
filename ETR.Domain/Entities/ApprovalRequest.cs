@@ -3,7 +3,7 @@ namespace ETR.Domain.Entities;
 public class ApprovalRequest : BaseEntity
 {
     public int ApprovalRequestId { get; set; }
-    public int ETRRecordId { get; set; }
+    public int ETRCourseRecordId { get; set; }
     public string CurrentStatus { get; set; } = string.Empty;
     public int SubmittedBy { get; set; }
     public DateTime SubmittedAt { get; set; }

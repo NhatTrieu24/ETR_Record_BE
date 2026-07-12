@@ -1,3 +1,9 @@
 namespace ETR.Application.DTOs;
 
-public record CreateAttendanceRecordRequest(int AttendanceSessionId, int LearnerId, int ETRRecordId, string Status, string? Remarks, int RecordedBy);
+public record CreateAttendanceRecordRequest(
+    int SessionId,
+    int LearnerId,
+    int EnrollmentId,
+    string Status,
+    string? Remarks,
+    int RecordedBy);

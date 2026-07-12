@@ -2,7 +2,7 @@ namespace ETR.Application.DTOs;
 
 public record ApprovalRequestResponse(
     int ApprovalRequestId,
-    int ETRRecordId,
+    int ETRCourseRecordId,
     string CurrentStatus,
     int SubmittedBy,
     DateTime SubmittedAt,

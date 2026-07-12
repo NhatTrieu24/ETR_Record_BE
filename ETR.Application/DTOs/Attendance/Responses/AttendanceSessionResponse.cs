@@ -1,8 +1,9 @@
 namespace ETR.Application.DTOs;
 
 public record AttendanceSessionResponse(
-    int AttendanceSessionId,
+    int SessionId,
     int ClassId,
+    int SubjectId,
     string SessionTitle,
     DateTime SessionDate,
     string? Location,

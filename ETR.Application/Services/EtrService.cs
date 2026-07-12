@@ -13,157 +13,84 @@ public class EtrService : IEtrService
         _unitOfWork = unitOfWork;
     }
 
-    // 1. Cập nhật tiến độ Checklist
-    public async Task<ChecklistProgressResponse> UpdateChecklistProgressAsync(
-        int progressId,
-        bool isCompleted,
-        int? verifiedByUserId,
-        string? comment,
-        CancellationToken cancellationToken = default)
+    public async Task<EtrRecordResponse> SubmitEtrAsync(int etrCourseRecordId, int userId, CancellationToken cancellationToken = default)
     {
-        var progress = await _unitOfWork.ETRChecklistProgressRepository.GetByIdAsync(progressId, cancellationToken)
-            ?? throw new KeyNotFoundException($"Checklist progress {progressId} was not found.");
+        var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(etrCourseRecordId, cancellationToken)
+            ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
 
-        var etrRecord = await _unitOfWork.ETRRecordRepository.GetByIdAsync(progress.ETRRecordId, cancellationToken)
-            ?? throw new KeyNotFoundException($"ETR Record {progress.ETRRecordId} was not found.");
-
-        if (etrRecord.IsLocked)
-        {
-            throw new InvalidOperationException("Không thể cập nhật tiến độ checklist vì hồ sơ ETR đã bị khóa.");
-        }
-
-        progress.IsCompleted = isCompleted;
-        progress.CompletedAt = isCompleted ? DateTime.UtcNow : null;
-        progress.VerifiedBy = verifiedByUserId;
-        progress.VerificationComment = comment;
-        progress.UpdatedAt = DateTime.UtcNow;
-        progress.UpdatedBy = verifiedByUserId;
-
-        _unitOfWork.ETRChecklistProgressRepository.Update(progress);
-        await _unitOfWork.SaveAsync(cancellationToken);
-
-        return new ChecklistProgressResponse(
-            progress.ProgressId,
-            progress.ETRRecordId,
-            progress.ChecklistItemId,
-            progress.IsCompleted,
-            progress.VerifiedBy,
-            progress.CompletedAt,
-            progress.VerificationComment);
-    }
-
-    // 2. Nộp hồ sơ ETR
-    public async Task<EtrRecordResponse> SubmitEtrAsync(int etrRecordId, int userId, CancellationToken cancellationToken = default)
-    {
-        var etr = await _unitOfWork.ETRRecordRepository.GetByIdAsync(etrRecordId, cancellationToken)
-            ?? throw new KeyNotFoundException($"Không tìm thấy hồ sơ ETR với ID {etrRecordId}.");
-
-        if (etr.IsLocked)
-            throw new InvalidOperationException("Không thể nộp hồ sơ ETR vì hồ sơ đã bị khóa.");
-
-        if (etr.Status != "InProgress" && etr.Status != "ReturnedForCorrection")
-            throw new InvalidOperationException("Hồ sơ chỉ được nộp khi đang ở trạng thái InProgress hoặc ReturnedForCorrection.");
-
+        if (etr.IsLocked) throw new InvalidOperationException("ETR is locked.");
+        
         etr.Status = "Submitted";
         etr.SubmittedAt = DateTime.UtcNow;
         etr.UpdatedAt = DateTime.UtcNow;
         etr.UpdatedBy = userId;
 
-        _unitOfWork.ETRRecordRepository.Update(etr);
+        _unitOfWork.ETRCourseRecordRepository.Update(etr);
         await _unitOfWork.SaveAsync(cancellationToken);
 
-        return MapEtrToResponse(etr);
+        return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt);
     }
 
-    // 3. Xác minh hồ sơ ETR (QA)
-    public async Task<EtrRecordResponse> VerifyEtrAsync(int etrRecordId, int userId, CancellationToken cancellationToken = default)
+    public async Task<EtrRecordResponse> VerifyEtrAsync(int etrCourseRecordId, int userId, CancellationToken cancellationToken = default)
     {
-        var etr = await _unitOfWork.ETRRecordRepository.GetByIdAsync(etrRecordId, cancellationToken)
-            ?? throw new KeyNotFoundException($"Không tìm thấy hồ sơ ETR với ID {etrRecordId}.");
-
-        if (etr.IsLocked)
-            throw new InvalidOperationException("Không thể xác minh hồ sơ ETR vì hồ sơ đã bị khóa.");
-
-        if (etr.Status != "Submitted")
-            throw new InvalidOperationException("Hồ sơ chỉ được xác minh khi đang ở trạng thái Submitted.");
+        var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(etrCourseRecordId, cancellationToken)
+            ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
 
         etr.Status = "Verified";
         etr.VerifiedAt = DateTime.UtcNow;
         etr.UpdatedAt = DateTime.UtcNow;
         etr.UpdatedBy = userId;
 
-        _unitOfWork.ETRRecordRepository.Update(etr);
+        _unitOfWork.ETRCourseRecordRepository.Update(etr);
         await _unitOfWork.SaveAsync(cancellationToken);
 
-        return MapEtrToResponse(etr);
+        return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt);
     }
 
-    // 4. Hoàn thành & Khóa cứng hồ sơ ETR
-    public async Task<EtrRecordResponse> CompleteEtrAsync(int etrRecordId, int userId, CancellationToken cancellationToken = default)
+    public async Task<EtrRecordResponse> CompleteEtrAsync(int etrCourseRecordId, int userId, CancellationToken cancellationToken = default)
     {
-        var etr = await _unitOfWork.ETRRecordRepository.GetByIdAsync(etrRecordId, cancellationToken)
-            ?? throw new KeyNotFoundException($"Không tìm thấy hồ sơ ETR với ID {etrRecordId}.");
-
-        if (etr.IsLocked)
-            throw new InvalidOperationException("Không thể hoàn thành hồ sơ ETR vì hồ sơ đã bị khóa.");
-
-        if (etr.Status != "Verified")
-            throw new InvalidOperationException("Hồ sơ chỉ được hoàn thành khi đã được QA Verified.");
+        var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(etrCourseRecordId, cancellationToken)
+            ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
 
         etr.Status = "Completed";
         etr.CompletedAt = DateTime.UtcNow;
-        etr.IsLocked = true; // Kích hoạt bộ lọc Immutability Guard bảo vệ hồ sơ
-
+        etr.IsLocked = true;
         etr.UpdatedAt = DateTime.UtcNow;
         etr.UpdatedBy = userId;
 
-        _unitOfWork.ETRRecordRepository.Update(etr);
+        _unitOfWork.ETRCourseRecordRepository.Update(etr);
         await _unitOfWork.SaveAsync(cancellationToken);
 
-        return MapEtrToResponse(etr);
+        return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt);
     }
 
-    // 5. Khóa hồ sơ ETR
-    public async Task<EtrRecordResponse> LockEtrAsync(int etrRecordId, int userId, CancellationToken cancellationToken = default)
+    public async Task<EtrRecordResponse> LockEtrAsync(int etrCourseRecordId, int userId, CancellationToken cancellationToken = default)
     {
-        var etr = await _unitOfWork.ETRRecordRepository.GetByIdAsync(etrRecordId, cancellationToken)
-            ?? throw new KeyNotFoundException($"Không tìm thấy hồ sơ ETR với ID {etrRecordId}.");
+        var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(etrCourseRecordId, cancellationToken)
+            ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
 
         etr.IsLocked = true;
         etr.UpdatedAt = DateTime.UtcNow;
         etr.UpdatedBy = userId;
 
-        _unitOfWork.ETRRecordRepository.Update(etr);
+        _unitOfWork.ETRCourseRecordRepository.Update(etr);
         await _unitOfWork.SaveAsync(cancellationToken);
 
-        return MapEtrToResponse(etr);
+        return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt);
     }
 
-    // 6. Mở khóa hồ sơ ETR
-    public async Task<EtrRecordResponse> UnlockEtrAsync(int etrRecordId, int userId, CancellationToken cancellationToken = default)
+    public async Task<EtrRecordResponse> UnlockEtrAsync(int etrCourseRecordId, int userId, CancellationToken cancellationToken = default)
     {
-        var etr = await _unitOfWork.ETRRecordRepository.GetByIdAsync(etrRecordId, cancellationToken)
-            ?? throw new KeyNotFoundException($"Không tìm thấy hồ sơ ETR với ID {etrRecordId}.");
+        var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(etrCourseRecordId, cancellationToken)
+            ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
 
         etr.IsLocked = false;
         etr.UpdatedAt = DateTime.UtcNow;
         etr.UpdatedBy = userId;
 
-        _unitOfWork.ETRRecordRepository.Update(etr);
+        _unitOfWork.ETRCourseRecordRepository.Update(etr);
         await _unitOfWork.SaveAsync(cancellationToken);
 
-        return MapEtrToResponse(etr);
-    }
-
-    private static EtrRecordResponse MapEtrToResponse(ETRRecord e)
-    {
-        return new EtrRecordResponse(
-            e.ETRRecordId,
-            e.EnrollmentId,
-            e.Status,
-            e.IsLocked,
-            e.SubmittedAt,
-            e.VerifiedAt,
-            e.CompletedAt);
+        return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt);
     }
 }

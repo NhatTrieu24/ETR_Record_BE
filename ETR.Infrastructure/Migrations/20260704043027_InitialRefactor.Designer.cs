@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ETR.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260628192519_AddForeignKeysAndConstraints")]
-    partial class AddForeignKeysAndConstraints
+    [Migration("20260704043027_InitialRefactor")]
+    partial class InitialRefactor
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -75,6 +75,8 @@ namespace ETR.Infrastructure.Migrations
 
                     b.HasKey("ApprovalHistoryId");
 
+                    b.HasIndex("ApprovalRequestId");
+
                     b.ToTable("ApprovalHistories");
                 });
 
@@ -105,7 +107,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("ETRRecordId")
+                    b.Property<int>("ETRCourseRecordId")
                         .HasColumnType("int");
 
                     b.Property<bool>("IsDeleted")
@@ -125,16 +127,18 @@ namespace ETR.Infrastructure.Migrations
 
                     b.HasKey("ApprovalRequestId");
 
+                    b.HasIndex("ETRCourseRecordId");
+
                     b.ToTable("ApprovalRequests");
                 });
 
-            modelBuilder.Entity("ETR.Domain.Entities.AssessmentComponent", b =>
+            modelBuilder.Entity("ETR.Domain.Entities.Assessment", b =>
                 {
-                    b.Property<int>("AssessmentComponentId")
+                    b.Property<int>("AssessmentId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AssessmentComponentId"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AssessmentId"));
 
                     b.Property<string>("AssessmentType")
                         .IsRequired()
@@ -168,6 +172,9 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<decimal>("PassingScore")
                         .HasColumnType("decimal(5,2)");
 
+                    b.Property<int>("SubjectId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -177,11 +184,11 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<decimal>("Weight")
                         .HasColumnType("decimal(5,2)");
 
-                    b.HasKey("AssessmentComponentId");
+                    b.HasKey("AssessmentId");
 
-                    b.HasIndex("CourseId");
+                    b.HasIndex("CourseId", "SubjectId");
 
-                    b.ToTable("AssessmentComponents");
+                    b.ToTable("Assessments");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.AssessmentResult", b =>
@@ -192,7 +199,7 @@ namespace ETR.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AssessmentResultId"));
 
-                    b.Property<int>("AssessmentComponentId")
+                    b.Property<int>("AssessmentId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
@@ -203,12 +210,6 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<int>("ETRRecordId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("InstructorComment")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
@@ -228,12 +229,21 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<int>("RecordedBy")
                         .HasColumnType("int");
 
+                    b.Property<string>("Remark")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("ResultStatus")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<decimal>("Score")
                         .HasColumnType("decimal(5,2)");
+
+                    b.Property<int>("SubjectResultId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("TakenAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -243,13 +253,11 @@ namespace ETR.Infrastructure.Migrations
 
                     b.HasKey("AssessmentResultId");
 
-                    b.HasIndex("ETRRecordId");
-
                     b.HasIndex("LearnerId");
 
-                    b.HasIndex("RecordedBy");
+                    b.HasIndex("SubjectResultId");
 
-                    b.HasIndex("AssessmentComponentId", "LearnerId")
+                    b.HasIndex("AssessmentId", "LearnerId")
                         .IsUnique();
 
                     b.ToTable("AssessmentResults");
@@ -263,9 +271,6 @@ namespace ETR.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AttendanceRecordId"));
 
-                    b.Property<int>("AttendanceSessionId")
-                        .HasColumnType("int");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -275,7 +280,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("ETRRecordId")
+                    b.Property<int>("EnrollmentId")
                         .HasColumnType("int");
 
                     b.Property<bool>("IsDeleted")
@@ -293,6 +298,9 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<string>("Remarks")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("SessionId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -305,75 +313,14 @@ namespace ETR.Infrastructure.Migrations
 
                     b.HasKey("AttendanceRecordId");
 
-                    b.HasIndex("ETRRecordId");
+                    b.HasIndex("EnrollmentId");
 
                     b.HasIndex("LearnerId");
 
-                    b.HasIndex("RecordedBy");
-
-                    b.HasIndex("AttendanceSessionId", "LearnerId")
+                    b.HasIndex("SessionId", "LearnerId")
                         .IsUnique();
 
                     b.ToTable("AttendanceRecords");
-                });
-
-            modelBuilder.Entity("ETR.Domain.Entities.AttendanceSession", b =>
-                {
-                    b.Property<int>("AttendanceSessionId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AttendanceSessionId"));
-
-                    b.Property<int>("ClassId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("ConfirmedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("ConfirmedBy")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CreatedBy")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsConfirmed")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Location")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("SessionDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SessionTitle")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("UpdatedBy")
-                        .HasColumnType("int");
-
-                    b.HasKey("AttendanceSessionId");
-
-                    b.HasIndex("ClassId");
-
-                    b.HasIndex("ConfirmedBy");
-
-                    b.HasIndex("CreatedBy");
-
-                    b.ToTable("AttendanceSessions");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.AuditLog", b =>
@@ -421,18 +368,26 @@ namespace ETR.Infrastructure.Migrations
                     b.ToTable("AuditLogs");
                 });
 
-            modelBuilder.Entity("ETR.Domain.Entities.ClassInstructor", b =>
+            modelBuilder.Entity("ETR.Domain.Entities.Class", b =>
                 {
-                    b.Property<int>("ClassInstructorId")
+                    b.Property<int>("ClassId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClassInstructorId"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClassId"));
 
-                    b.Property<DateTime>("AssignedAt")
-                        .HasColumnType("datetime2");
+                    b.Property<int>("Capacity")
+                        .HasColumnType("int");
 
-                    b.Property<int>("ClassId")
+                    b.Property<string>("ClassCode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ClassName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("CourseId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
@@ -444,11 +399,21 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime>("EndDate")
+                        .HasColumnType("datetime2");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
-                    b.Property<bool>("IsPrimaryInstructor")
-                        .HasColumnType("bit");
+                    b.Property<string>("Location")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -456,17 +421,14 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<int?>("UpdatedBy")
                         .HasColumnType("int");
 
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
+                    b.HasKey("ClassId");
 
-                    b.HasKey("ClassInstructorId");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("ClassId", "UserId")
+                    b.HasIndex("ClassCode")
                         .IsUnique();
 
-                    b.ToTable("ClassInstructors");
+                    b.HasIndex("CourseId");
+
+                    b.ToTable("Classes");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.CompletionRequirement", b =>
@@ -567,6 +529,112 @@ namespace ETR.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Courses");
+                });
+
+            modelBuilder.Entity("ETR.Domain.Entities.CourseEnrollment", b =>
+                {
+                    b.Property<int>("EnrollmentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EnrollmentId"));
+
+                    b.Property<DateTime?>("ActualCompletionDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ClassId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("EnrolledAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ExpectedCompletionDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("LearnerId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("StartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.HasKey("EnrollmentId");
+
+                    b.HasIndex("ClassId");
+
+                    b.HasIndex("LearnerId", "ClassId")
+                        .IsUnique();
+
+                    b.ToTable("CourseEnrollments");
+                });
+
+            modelBuilder.Entity("ETR.Domain.Entities.CourseSubject", b =>
+                {
+                    b.Property<int>("CourseId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SubjectId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsMandatory")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal>("PassingScore")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<int>("RequiredHours")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SequenceNo")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SubjectVersion")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.HasKey("CourseId", "SubjectId");
+
+                    b.HasIndex("SubjectId");
+
+                    b.ToTable("CourseSubjects");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.DashboardSnapshot", b =>
@@ -678,163 +746,13 @@ namespace ETR.Infrastructure.Migrations
                     b.ToTable("Departments");
                 });
 
-            modelBuilder.Entity("ETR.Domain.Entities.ETRChecklistItem", b =>
+            modelBuilder.Entity("ETR.Domain.Entities.ETRCourseRecord", b =>
                 {
-                    b.Property<int>("ChecklistItemId")
+                    b.Property<int>("ETRCourseRecordId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ChecklistItemId"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CreatedBy")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("DisplayOrder")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsRequired")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("ItemName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("TemplateId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("UpdatedBy")
-                        .HasColumnType("int");
-
-                    b.HasKey("ChecklistItemId");
-
-                    b.ToTable("ETRChecklistItems");
-                });
-
-            modelBuilder.Entity("ETR.Domain.Entities.ETRChecklistProgress", b =>
-                {
-                    b.Property<int>("ProgressId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ProgressId"));
-
-                    b.Property<int>("ChecklistItemId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CreatedBy")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("ETRRecordId")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsCompleted")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("UpdatedBy")
-                        .HasColumnType("int");
-
-                    b.Property<string>("VerificationComment")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int?>("VerifiedBy")
-                        .HasColumnType("int");
-
-                    b.HasKey("ProgressId");
-
-                    b.HasIndex("ChecklistItemId");
-
-                    b.HasIndex("VerifiedBy");
-
-                    b.HasIndex("ETRRecordId", "ChecklistItemId")
-                        .IsUnique();
-
-                    b.ToTable("ETRChecklistProgresses");
-                });
-
-            modelBuilder.Entity("ETR.Domain.Entities.ETRChecklistTemplate", b =>
-                {
-                    b.Property<int>("TemplateId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TemplateId"));
-
-                    b.Property<int>("CourseId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CreatedBy")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("TemplateName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("UpdatedBy")
-                        .HasColumnType("int");
-
-                    b.Property<int>("VersionNo")
-                        .HasColumnType("int");
-
-                    b.HasKey("TemplateId");
-
-                    b.ToTable("ETRChecklistTemplates");
-                });
-
-            modelBuilder.Entity("ETR.Domain.Entities.ETRRecord", b =>
-                {
-                    b.Property<int>("ETRRecordId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ETRRecordId"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ETRCourseRecordId"));
 
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("datetime2");
@@ -876,63 +794,12 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("VerifiedAt")
                         .HasColumnType("datetime2");
 
-                    b.HasKey("ETRRecordId");
+                    b.HasKey("ETRCourseRecordId");
 
                     b.HasIndex("EnrollmentId")
                         .IsUnique();
 
-                    b.ToTable("ETRRecords");
-                });
-
-            modelBuilder.Entity("ETR.Domain.Entities.Enrollment", b =>
-                {
-                    b.Property<int>("EnrollmentId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EnrollmentId"));
-
-                    b.Property<int>("ClassId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CreatedBy")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("EnrolledAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<int>("LearnerId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("UpdatedBy")
-                        .HasColumnType("int");
-
-                    b.HasKey("EnrollmentId");
-
-                    b.HasIndex("ClassId");
-
-                    b.HasIndex("CreatedBy");
-
-                    b.HasIndex("LearnerId", "ClassId")
-                        .IsUnique();
-
-                    b.ToTable("Enrollments");
+                    b.ToTable("ETRCourseRecords");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.EvidenceFile", b =>
@@ -957,9 +824,6 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<int>("ETRRecordId")
-                        .HasColumnType("int");
 
                     b.Property<int>("EvidenceTypeId")
                         .HasColumnType("int");
@@ -987,8 +851,8 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<string>("MimeType")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("QAComment")
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("SubjectResultId")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -1001,6 +865,9 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<int>("UploadedBy")
                         .HasColumnType("int");
+
+                    b.Property<string>("VerificationComment")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("VerificationStatus")
                         .IsRequired()
@@ -1018,13 +885,11 @@ namespace ETR.Infrastructure.Migrations
 
                     b.HasIndex("AttendanceRecordId");
 
-                    b.HasIndex("ETRRecordId");
-
                     b.HasIndex("EvidenceTypeId");
 
                     b.HasIndex("LearnerId");
 
-                    b.HasIndex("UploadedBy");
+                    b.HasIndex("SubjectResultId");
 
                     b.ToTable("EvidenceFiles");
                 });
@@ -1248,6 +1113,164 @@ namespace ETR.Infrastructure.Migrations
                     b.ToTable("LearnerTypes");
                 });
 
+            modelBuilder.Entity("ETR.Domain.Entities.PracticalChecklist", b =>
+                {
+                    b.Property<int>("PracticalChecklistId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PracticalChecklistId"));
+
+                    b.Property<int>("CourseId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ItemName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SubjectId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.HasKey("PracticalChecklistId");
+
+                    b.HasIndex("CourseId", "SubjectId");
+
+                    b.ToTable("PracticalChecklists");
+                });
+
+            modelBuilder.Entity("ETR.Domain.Entities.PracticalChecklistResult", b =>
+                {
+                    b.Property<int>("PracticalChecklistResultId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PracticalChecklistResultId"));
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsCompleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("PracticalChecklistId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SubjectResultId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<string>("VerificationComment")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("VerifiedBy")
+                        .HasColumnType("int");
+
+                    b.HasKey("PracticalChecklistResultId");
+
+                    b.HasIndex("PracticalChecklistId");
+
+                    b.HasIndex("SubjectResultId", "PracticalChecklistId")
+                        .IsUnique();
+
+                    b.ToTable("PracticalChecklistResults");
+                });
+
+            modelBuilder.Entity("ETR.Domain.Entities.RetakeHistory", b =>
+                {
+                    b.Property<int>("RetakeHistoryId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RetakeHistoryId"));
+
+                    b.Property<int>("AuthorizedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal>("NewScore")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<decimal>("PreviousScore")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("RetakeDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SubjectResultId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.HasKey("RetakeHistoryId");
+
+                    b.HasIndex("SubjectResultId");
+
+                    b.ToTable("RetakeHistories");
+                });
+
             modelBuilder.Entity("ETR.Domain.Entities.Role", b =>
                 {
                     b.Property<int>("RoleId")
@@ -1290,24 +1313,135 @@ namespace ETR.Infrastructure.Migrations
                     b.ToTable("Roles");
                 });
 
-            modelBuilder.Entity("ETR.Domain.Entities.TrainingClass", b =>
+            modelBuilder.Entity("ETR.Domain.Entities.Session", b =>
                 {
-                    b.Property<int>("ClassId")
+                    b.Property<int>("SessionId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClassId"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SessionId"));
 
-                    b.Property<int>("Capacity")
+                    b.Property<int>("ClassId")
                         .HasColumnType("int");
 
-                    b.Property<string>("ClassCode")
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ConfirmedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsConfirmed")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Location")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("SessionDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SessionTitle")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SubjectId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.HasKey("SessionId");
+
+                    b.HasIndex("ClassId");
+
+                    b.HasIndex("SubjectId");
+
+                    b.ToTable("Sessions");
+                });
+
+            modelBuilder.Entity("ETR.Domain.Entities.Subject", b =>
+                {
+                    b.Property<int>("SubjectId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SubjectId"));
+
+                    b.Property<string>("AssessmentMethod")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DefaultHours")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SubjectCode")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<string>("ClassName")
+                    b.Property<string>("SubjectName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SubjectType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.HasKey("SubjectId");
+
+                    b.HasIndex("SubjectCode")
+                        .IsUnique();
+
+                    b.ToTable("Subjects");
+                });
+
+            modelBuilder.Entity("ETR.Domain.Entities.SubjectResult", b =>
+                {
+                    b.Property<int>("SubjectResultId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SubjectResultId"));
+
+                    b.Property<decimal?>("AttendanceRate")
+                        .HasColumnType("decimal(5,2)");
 
                     b.Property<int>("CourseId")
                         .HasColumnType("int");
@@ -1321,21 +1455,27 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<DateTime>("EndDate")
+                    b.Property<int>("EnrollmentId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("EvaluatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<int?>("EvaluatedBy")
+                        .HasColumnType("int");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
-                    b.Property<string>("Location")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("StartDate")
-                        .HasColumnType("datetime2");
+                    b.Property<decimal?>("Score")
+                        .HasColumnType("decimal(5,2)");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SubjectId")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -1343,14 +1483,63 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<int?>("UpdatedBy")
                         .HasColumnType("int");
 
-                    b.HasKey("ClassId");
+                    b.HasKey("SubjectResultId");
 
-                    b.HasIndex("ClassCode")
+                    b.HasIndex("CourseId", "SubjectId");
+
+                    b.HasIndex("EnrollmentId", "CourseId", "SubjectId")
                         .IsUnique();
 
-                    b.HasIndex("CourseId");
+                    b.ToTable("SubjectResults");
+                });
 
-                    b.ToTable("TrainingClasses");
+            modelBuilder.Entity("ETR.Domain.Entities.SubjectSignoff", b =>
+                {
+                    b.Property<int>("SubjectSignoffId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SubjectSignoffId"));
+
+                    b.Property<string>("Comment")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("SignoffAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SignoffBy")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SubjectResultId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedBy")
+                        .HasColumnType("int");
+
+                    b.HasKey("SubjectSignoffId");
+
+                    b.HasIndex("SubjectResultId");
+
+                    b.ToTable("SubjectSignoffs");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.User", b =>
@@ -1422,7 +1611,76 @@ namespace ETR.Infrastructure.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("ETR.Domain.Entities.AssessmentComponent", b =>
+            modelBuilder.Entity("ETR.Domain.Entities.ApprovalHistory", b =>
+                {
+                    b.HasOne("ETR.Domain.Entities.ApprovalRequest", null)
+                        .WithMany()
+                        .HasForeignKey("ApprovalRequestId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ETR.Domain.Entities.ApprovalRequest", b =>
+                {
+                    b.HasOne("ETR.Domain.Entities.ETRCourseRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ETRCourseRecordId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ETR.Domain.Entities.Assessment", b =>
+                {
+                    b.HasOne("ETR.Domain.Entities.CourseSubject", null)
+                        .WithMany()
+                        .HasForeignKey("CourseId", "SubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ETR.Domain.Entities.AssessmentResult", b =>
+                {
+                    b.HasOne("ETR.Domain.Entities.Assessment", null)
+                        .WithMany()
+                        .HasForeignKey("AssessmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ETR.Domain.Entities.Learner", null)
+                        .WithMany()
+                        .HasForeignKey("LearnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ETR.Domain.Entities.SubjectResult", null)
+                        .WithMany()
+                        .HasForeignKey("SubjectResultId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ETR.Domain.Entities.AttendanceRecord", b =>
+                {
+                    b.HasOne("ETR.Domain.Entities.CourseEnrollment", null)
+                        .WithMany()
+                        .HasForeignKey("EnrollmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ETR.Domain.Entities.Learner", null)
+                        .WithMany()
+                        .HasForeignKey("LearnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ETR.Domain.Entities.Session", null)
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ETR.Domain.Entities.Class", b =>
                 {
                     b.HasOne("ETR.Domain.Entities.Course", null)
                         .WithMany()
@@ -1431,17 +1689,11 @@ namespace ETR.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("ETR.Domain.Entities.AssessmentResult", b =>
+            modelBuilder.Entity("ETR.Domain.Entities.CourseEnrollment", b =>
                 {
-                    b.HasOne("ETR.Domain.Entities.AssessmentComponent", null)
+                    b.HasOne("ETR.Domain.Entities.Class", null)
                         .WithMany()
-                        .HasForeignKey("AssessmentComponentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("ETR.Domain.Entities.ETRRecord", null)
-                        .WithMany()
-                        .HasForeignKey("ETRRecordId")
+                        .HasForeignKey("ClassId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -1450,120 +1702,28 @@ namespace ETR.Infrastructure.Migrations
                         .HasForeignKey("LearnerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
 
-                    b.HasOne("ETR.Domain.Entities.User", null)
+            modelBuilder.Entity("ETR.Domain.Entities.CourseSubject", b =>
+                {
+                    b.HasOne("ETR.Domain.Entities.Course", null)
                         .WithMany()
-                        .HasForeignKey("RecordedBy")
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ETR.Domain.Entities.Subject", null)
+                        .WithMany()
+                        .HasForeignKey("SubjectId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("ETR.Domain.Entities.AttendanceRecord", b =>
+            modelBuilder.Entity("ETR.Domain.Entities.ETRCourseRecord", b =>
                 {
-                    b.HasOne("ETR.Domain.Entities.AttendanceSession", null)
-                        .WithMany()
-                        .HasForeignKey("AttendanceSessionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("ETR.Domain.Entities.ETRRecord", null)
-                        .WithMany()
-                        .HasForeignKey("ETRRecordId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("ETR.Domain.Entities.Learner", null)
-                        .WithMany()
-                        .HasForeignKey("LearnerId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("ETR.Domain.Entities.User", null)
-                        .WithMany()
-                        .HasForeignKey("RecordedBy")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("ETR.Domain.Entities.AttendanceSession", b =>
-                {
-                    b.HasOne("ETR.Domain.Entities.TrainingClass", null)
-                        .WithMany()
-                        .HasForeignKey("ClassId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("ETR.Domain.Entities.User", null)
-                        .WithMany()
-                        .HasForeignKey("ConfirmedBy")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("ETR.Domain.Entities.User", null)
-                        .WithMany()
-                        .HasForeignKey("CreatedBy")
-                        .OnDelete(DeleteBehavior.Restrict);
-                });
-
-            modelBuilder.Entity("ETR.Domain.Entities.ClassInstructor", b =>
-                {
-                    b.HasOne("ETR.Domain.Entities.TrainingClass", null)
-                        .WithMany()
-                        .HasForeignKey("ClassId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("ETR.Domain.Entities.User", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("ETR.Domain.Entities.ETRChecklistProgress", b =>
-                {
-                    b.HasOne("ETR.Domain.Entities.ETRChecklistItem", null)
-                        .WithMany()
-                        .HasForeignKey("ChecklistItemId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("ETR.Domain.Entities.ETRRecord", null)
-                        .WithMany()
-                        .HasForeignKey("ETRRecordId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("ETR.Domain.Entities.User", null)
-                        .WithMany()
-                        .HasForeignKey("VerifiedBy")
-                        .OnDelete(DeleteBehavior.Restrict);
-                });
-
-            modelBuilder.Entity("ETR.Domain.Entities.ETRRecord", b =>
-                {
-                    b.HasOne("ETR.Domain.Entities.Enrollment", null)
+                    b.HasOne("ETR.Domain.Entities.CourseEnrollment", null)
                         .WithOne()
-                        .HasForeignKey("ETR.Domain.Entities.ETRRecord", "EnrollmentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("ETR.Domain.Entities.Enrollment", b =>
-                {
-                    b.HasOne("ETR.Domain.Entities.TrainingClass", null)
-                        .WithMany()
-                        .HasForeignKey("ClassId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("ETR.Domain.Entities.User", null)
-                        .WithMany()
-                        .HasForeignKey("CreatedBy")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("ETR.Domain.Entities.Learner", null)
-                        .WithMany()
-                        .HasForeignKey("LearnerId")
+                        .HasForeignKey("ETR.Domain.Entities.ETRCourseRecord", "EnrollmentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -1580,12 +1740,6 @@ namespace ETR.Infrastructure.Migrations
                         .HasForeignKey("AttendanceRecordId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("ETR.Domain.Entities.ETRRecord", null)
-                        .WithMany()
-                        .HasForeignKey("ETRRecordId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("ETR.Domain.Entities.EvidenceType", null)
                         .WithMany()
                         .HasForeignKey("EvidenceTypeId")
@@ -1598,9 +1752,9 @@ namespace ETR.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("ETR.Domain.Entities.User", null)
+                    b.HasOne("ETR.Domain.Entities.SubjectResult", null)
                         .WithMany()
-                        .HasForeignKey("UploadedBy")
+                        .HasForeignKey("SubjectResultId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -1614,11 +1768,74 @@ namespace ETR.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("ETR.Domain.Entities.TrainingClass", b =>
+            modelBuilder.Entity("ETR.Domain.Entities.PracticalChecklist", b =>
                 {
-                    b.HasOne("ETR.Domain.Entities.Course", null)
+                    b.HasOne("ETR.Domain.Entities.CourseSubject", null)
                         .WithMany()
-                        .HasForeignKey("CourseId")
+                        .HasForeignKey("CourseId", "SubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ETR.Domain.Entities.PracticalChecklistResult", b =>
+                {
+                    b.HasOne("ETR.Domain.Entities.PracticalChecklist", null)
+                        .WithMany()
+                        .HasForeignKey("PracticalChecklistId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ETR.Domain.Entities.SubjectResult", null)
+                        .WithMany()
+                        .HasForeignKey("SubjectResultId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ETR.Domain.Entities.RetakeHistory", b =>
+                {
+                    b.HasOne("ETR.Domain.Entities.SubjectResult", null)
+                        .WithMany()
+                        .HasForeignKey("SubjectResultId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ETR.Domain.Entities.Session", b =>
+                {
+                    b.HasOne("ETR.Domain.Entities.Class", null)
+                        .WithMany()
+                        .HasForeignKey("ClassId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ETR.Domain.Entities.Subject", null)
+                        .WithMany()
+                        .HasForeignKey("SubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ETR.Domain.Entities.SubjectResult", b =>
+                {
+                    b.HasOne("ETR.Domain.Entities.CourseEnrollment", null)
+                        .WithMany()
+                        .HasForeignKey("EnrollmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ETR.Domain.Entities.CourseSubject", null)
+                        .WithMany()
+                        .HasForeignKey("CourseId", "SubjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ETR.Domain.Entities.SubjectSignoff", b =>
+                {
+                    b.HasOne("ETR.Domain.Entities.SubjectResult", null)
+                        .WithMany()
+                        .HasForeignKey("SubjectResultId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
