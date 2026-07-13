@@ -5,5 +5,4 @@ public record CreateAttendanceRecordRequest(
     int LearnerId,
     int EnrollmentId,
     string Status,
-    string? Remarks,
-    int RecordedBy);
+    string? Remarks);

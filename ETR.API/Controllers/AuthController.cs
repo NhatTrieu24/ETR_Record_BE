@@ -10,24 +10,38 @@ namespace ETR.API.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ITokenService _tokenService;
 
-    public AuthController(IUnitOfWork unitOfWork)
+    public AuthController(IUnitOfWork unitOfWork, ITokenService tokenService)
     {
         _unitOfWork = unitOfWork;
+        _tokenService = tokenService;
     }
 
     [HttpPost("login")]
-    public async Task<ActionResult> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult> Login([FromBody] LoginRequestDto request, CancellationToken cancellationToken)
     {
         var users = await _unitOfWork.UserRepository.GetAllAsync(cancellationToken);
-        var user = users.FirstOrDefault(u => u.Username.Equals(request.Username, StringComparison.OrdinalIgnoreCase) && u.IsActive);
+        var user = users.FirstOrDefault(u => 
+            u.Username.Equals(request.Username, StringComparison.OrdinalIgnoreCase) && 
+            u.IsActive && 
+            !u.IsDeleted);
         
-        if (user == null || user.PasswordHash != request.Password) // Simple verification for demo/testing
+        // Note: For a real app, hash the request.Password and compare with PasswordHash. 
+        // Using plain comparison here based on existing code structure
+        if (user == null || user.PasswordHash != request.Password)
         {
             return Unauthorized("Tên đăng nhập hoặc mật khẩu không đúng.");
         }
 
-        return Ok(new AuthResponse(user.UserId, user.Username, user.FullName, "mock-jwt-token-xyz123", "mock-refresh-token-abc"));
+        var role = await _unitOfWork.RoleRepository.GetByIdAsync(user.RoleId, cancellationToken);
+        if (role == null)
+        {
+            return Unauthorized("Tài khoản không được cấu hình quyền hạn hợp lệ.");
+        }
+
+        var token = _tokenService.GenerateToken(user, role);
+        return Ok(new LoginResponseDto(user.UserId, user.Username, user.FullName, role.RoleName, token));
     }
 
     [HttpPost("google-login")]

@@ -5,5 +5,4 @@ public record CreateAssessmentResultRequest(
     int LearnerId,
     int SubjectResultId,
     decimal Score,
-    string? Remark,
-    int RecordedBy);
+    string? Remark);

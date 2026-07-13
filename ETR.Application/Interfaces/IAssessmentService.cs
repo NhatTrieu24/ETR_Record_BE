@@ -4,6 +4,6 @@ namespace ETR.Application.Interfaces;
 
 public interface IAssessmentService
 {
-    Task<AssessmentResultResponse> RecordAssessmentScoreAsync(CreateAssessmentResultRequest request, CancellationToken cancellationToken = default);
-    Task<SubjectSignoffResponse> SignoffSubjectResultAsync(CreateSubjectSignoffRequest request, CancellationToken cancellationToken = default);
+    Task<AssessmentResultResponse> RecordAssessmentScoreAsync(CreateAssessmentResultRequest request, int recordedByUserId, CancellationToken cancellationToken = default);
+    Task<SubjectSignoffResponse> SignoffSubjectResultAsync(CreateSubjectSignoffRequest request, int signoffByUserId, CancellationToken cancellationToken = default);
 }

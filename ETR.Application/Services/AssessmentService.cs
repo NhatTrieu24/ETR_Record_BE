@@ -14,7 +14,7 @@ public class AssessmentService : IAssessmentService
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<AssessmentResultResponse> RecordAssessmentScoreAsync(CreateAssessmentResultRequest request, CancellationToken cancellationToken = default)
+    public async Task<AssessmentResultResponse> RecordAssessmentScoreAsync(CreateAssessmentResultRequest request, int recordedByUserId, CancellationToken cancellationToken = default)
     {
         return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
         {
@@ -46,10 +46,10 @@ public class AssessmentService : IAssessmentService
                         Reason = "Retake Assessment",
                         PreviousScore = existingResult.Score,
                         NewScore = request.Score,
-                        AuthorizedBy = request.RecordedBy,
+                        AuthorizedBy = recordedByUserId,
                         AttemptNo = attemptNo,
                         CreatedAt = DateTime.UtcNow,
-                        CreatedBy = request.RecordedBy
+                        CreatedBy = recordedByUserId
                     };
                     await _unitOfWork.RetakeHistoryRepository.AddAsync(retakeHistory, ct);
 
@@ -59,11 +59,11 @@ public class AssessmentService : IAssessmentService
                     existingResult.Score = request.Score;
                     existingResult.ResultStatus = request.Score >= assessment.PassingScore ? "Passed" : "Failed";
                     existingResult.Remark = request.Remark;
-                    existingResult.RecordedBy = request.RecordedBy;
+                    existingResult.RecordedBy = recordedByUserId;
                     existingResult.RecordedAt = DateTime.UtcNow;
                     existingResult.AttemptNo = attemptNo;
                     existingResult.UpdatedAt = DateTime.UtcNow;
-                    existingResult.UpdatedBy = request.RecordedBy;
+                    existingResult.UpdatedBy = recordedByUserId;
                     
                     _unitOfWork.AssessmentResultRepository.Update(existingResult);
                 }
@@ -77,11 +77,11 @@ public class AssessmentService : IAssessmentService
                         Score = request.Score,
                         ResultStatus = request.Score >= assessment.PassingScore ? "Passed" : "Failed",
                         Remark = request.Remark,
-                        RecordedBy = request.RecordedBy,
+                        RecordedBy = recordedByUserId,
                         RecordedAt = DateTime.UtcNow,
                         AttemptNo = attemptNo,
                         CreatedAt = DateTime.UtcNow,
-                        CreatedBy = request.RecordedBy
+                        CreatedBy = recordedByUserId
                     };
                     await _unitOfWork.AssessmentResultRepository.AddAsync(result, ct);
                     existingResult = result;
@@ -135,7 +135,7 @@ public class AssessmentService : IAssessmentService
         }
     }
 
-    public async Task<SubjectSignoffResponse> SignoffSubjectResultAsync(CreateSubjectSignoffRequest request, CancellationToken cancellationToken = default)
+    public async Task<SubjectSignoffResponse> SignoffSubjectResultAsync(CreateSubjectSignoffRequest request, int signoffByUserId, CancellationToken cancellationToken = default)
     {
         return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
         {
@@ -148,12 +148,12 @@ public class AssessmentService : IAssessmentService
                 var signoff = new SubjectSignoff
                 {
                     SubjectResultId = request.SubjectResultId,
-                    SignoffBy = request.SignoffBy,
+                    SignoffBy = signoffByUserId,
                     Role = request.Role,
                     Comment = request.Comment,
                     SignoffAt = DateTime.UtcNow,
                     CreatedAt = DateTime.UtcNow,
-                    CreatedBy = request.SignoffBy
+                    CreatedBy = signoffByUserId
                 };
 
                 await _unitOfWork.SubjectSignoffRepository.AddAsync(signoff, ct);

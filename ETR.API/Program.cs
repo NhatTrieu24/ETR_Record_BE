@@ -13,7 +13,29 @@ try
     // 1. Thêm cấu hình Controllers và Swagger/Endpoints
     builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen();
+    // Cấu hình Swagger để hỗ trợ JWT Authentication
+    builder.Services.AddSwaggerGen(c =>
+    {
+        c.SwaggerDoc("v1", new Microsoft.OpenApi.OpenApiInfo { Title = "Aircraft Training ETR API", Version = "v1" });
+        
+        c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.OpenApiSecurityScheme
+        {
+            Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
+            Name = "Authorization",
+            In = Microsoft.OpenApi.ParameterLocation.Header,
+            Type = Microsoft.OpenApi.SecuritySchemeType.ApiKey,
+            Scheme = "Bearer"
+        });
+
+
+
+        var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+        if (File.Exists(xmlPath))
+        {
+            c.IncludeXmlComments(xmlPath);
+        }
+    });
 
     // Cấu hình JWT Authentication
     var jwtSettings = builder.Configuration.GetSection("JwtSettings");
@@ -68,6 +90,22 @@ try
     app.MapControllers();
 
     Console.WriteLine("=== HỆ THỐNG ETR ĐANG KHỞI CHẠY THÀNH CÔNG ===");
+    using (var scope = app.Services.CreateScope())
+    {
+        var services = scope.ServiceProvider;
+        try
+        {
+            var context = services.GetRequiredService<ETR.Infrastructure.Data.AppDbContext>();
+            await Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.MigrateAsync(context.Database);
+            await ETR.Infrastructure.Data.DataSeeder.SeedAsync(context);
+        }
+        catch (Exception ex)
+        {
+            var logger = services.GetRequiredService<ILogger<Program>>();
+            logger.LogError(ex, "An error occurred while migrating or seeding the database.");
+        }
+    }
+
     app.Run();
 }
 catch (Exception ex)

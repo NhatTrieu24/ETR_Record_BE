@@ -13,7 +13,7 @@ public class AttendanceService : IAttendanceService
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<AttendanceRecordResponse> RecordAttendanceAsync(CreateAttendanceRecordRequest request, CancellationToken cancellationToken = default)
+    public async Task<AttendanceRecordResponse> RecordAttendanceAsync(CreateAttendanceRecordRequest request, int recordedByUserId, CancellationToken cancellationToken = default)
     {
         return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
         {
@@ -31,10 +31,10 @@ public class AttendanceService : IAttendanceService
                     EnrollmentId = request.EnrollmentId,
                     Status = request.Status,
                     Remarks = request.Remarks,
-                    RecordedBy = request.RecordedBy,
+                    RecordedBy = recordedByUserId,
                     RecordedAt = DateTime.UtcNow,
                     CreatedAt = DateTime.UtcNow,
-                    CreatedBy = request.RecordedBy
+                    CreatedBy = recordedByUserId
                 };
 
                 await _unitOfWork.AttendanceRecordRepository.AddAsync(record, ct);
