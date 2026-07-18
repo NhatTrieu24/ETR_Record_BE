@@ -3,6 +3,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ETR.API.Controllers;
 
+/// <summary>
+/// [Module/Flow]: Reporting &amp; Analytics
+/// [Core Responsibility]: Aggregates high-level statistics for system dashboards.
+/// [Target Audience]: Admin, Management
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class DashboardController : ControllerBase

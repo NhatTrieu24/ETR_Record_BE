@@ -2,7 +2,7 @@ namespace ETR.Application.DTOs;
 
 public record ExportJobResponse(
     int ExportJobId,
-    int RequestedBy,
+    int RequestedByAccountId,
     string ExportType,
     string FileName,
     string FilePath,

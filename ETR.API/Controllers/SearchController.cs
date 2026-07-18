@@ -3,6 +3,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ETR.API.Controllers;
 
+/// <summary>
+/// [Module/Flow]: System Discovery
+/// [Core Responsibility]: Provides global search capabilities across classes and ETR records.
+/// [Target Audience]: All Roles
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class SearchController : ControllerBase

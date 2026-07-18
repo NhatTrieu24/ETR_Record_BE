@@ -14,7 +14,7 @@ public class AssessmentService : IAssessmentService
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<AssessmentResultResponse> RecordAssessmentScoreAsync(CreateAssessmentResultRequest request, int recordedByUserId, CancellationToken cancellationToken = default)
+    public async Task<AssessmentResultResponse> RecordAssessmentScoreAsync(CreateAssessmentResultRequest request, int recordedByAccountId, CancellationToken cancellationToken = default)
     {
         return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
         {
@@ -27,11 +27,10 @@ public class AssessmentService : IAssessmentService
                 var subjectResult = await _unitOfWork.SubjectResultRepository.GetByIdAsync(request.SubjectResultId, ct);
                 if (subjectResult == null) throw new InvalidOperationException("SubjectResult not found.");
 
-                // Retake Policy: Check if there's an existing result
                 var allResults = await _unitOfWork.AssessmentResultRepository.GetAllAsync(ct);
                 var existingResult = allResults.FirstOrDefault(r => 
-                    r.AssessmentId == request.AssessmentId && 
-                    r.LearnerId == request.LearnerId);
+                    r.AssessmentId == request.AssessmentId 
+                    && r.AccountId == request.AccountId);
 
                 int attemptNo = 1;
 
@@ -46,10 +45,10 @@ public class AssessmentService : IAssessmentService
                         Reason = "Retake Assessment",
                         PreviousScore = existingResult.Score,
                         NewScore = request.Score,
-                        AuthorizedBy = recordedByUserId,
+                        AuthorizedByAccountId = recordedByAccountId,
                         AttemptNo = attemptNo,
                         CreatedAt = DateTime.UtcNow,
-                        CreatedBy = recordedByUserId
+                        CreatedByAccountId = recordedByAccountId
                     };
                     await _unitOfWork.RetakeHistoryRepository.AddAsync(retakeHistory, ct);
 
@@ -59,11 +58,11 @@ public class AssessmentService : IAssessmentService
                     existingResult.Score = request.Score;
                     existingResult.ResultStatus = request.Score >= assessment.PassingScore ? "Passed" : "Failed";
                     existingResult.Remark = request.Remark;
-                    existingResult.RecordedBy = recordedByUserId;
+                    existingResult.GradedByAccountId = recordedByAccountId;
                     existingResult.RecordedAt = DateTime.UtcNow;
                     existingResult.AttemptNo = attemptNo;
                     existingResult.UpdatedAt = DateTime.UtcNow;
-                    existingResult.UpdatedBy = recordedByUserId;
+                    existingResult.UpdatedByAccountId = recordedByAccountId;
                     
                     _unitOfWork.AssessmentResultRepository.Update(existingResult);
                 }
@@ -72,16 +71,16 @@ public class AssessmentService : IAssessmentService
                     var result = new AssessmentResult
                     {
                         AssessmentId = request.AssessmentId,
-                        LearnerId = request.LearnerId,
+                        AccountId = request.AccountId,
                         SubjectResultId = request.SubjectResultId,
                         Score = request.Score,
                         ResultStatus = request.Score >= assessment.PassingScore ? "Passed" : "Failed",
                         Remark = request.Remark,
-                        RecordedBy = recordedByUserId,
+                        GradedByAccountId = recordedByAccountId,
                         RecordedAt = DateTime.UtcNow,
                         AttemptNo = attemptNo,
                         CreatedAt = DateTime.UtcNow,
-                        CreatedBy = recordedByUserId
+                        CreatedByAccountId = recordedByAccountId
                     };
                     await _unitOfWork.AssessmentResultRepository.AddAsync(result, ct);
                     existingResult = result;
@@ -95,7 +94,7 @@ public class AssessmentService : IAssessmentService
 
                 await _unitOfWork.CommitTransactionAsync(ct);
 
-                return new AssessmentResultResponse(existingResult.AssessmentResultId, existingResult.AssessmentId, existingResult.LearnerId, existingResult.SubjectResultId, existingResult.Score, existingResult.ResultStatus, existingResult.RecordedBy, existingResult.RecordedAt, existingResult.PublishedAt, existingResult.IsPublished, existingResult.TakenAt, existingResult.Remark);
+                return new AssessmentResultResponse(existingResult.AssessmentResultId, existingResult.AssessmentId, existingResult.AccountId, existingResult.SubjectResultId, existingResult.Score, existingResult.ResultStatus, existingResult.GradedByAccountId, existingResult.RecordedAt, existingResult.PublishedAt, existingResult.IsPublished, existingResult.TakenAt, existingResult.Remark);
             }
             catch
             {
@@ -135,7 +134,7 @@ public class AssessmentService : IAssessmentService
         }
     }
 
-    public async Task<SubjectSignoffResponse> SignoffSubjectResultAsync(CreateSubjectSignoffRequest request, int signoffByUserId, CancellationToken cancellationToken = default)
+    public async Task<SubjectSignoffResponse> SignoffSubjectResultAsync(CreateSubjectSignoffRequest request, int signoffByAccountId, CancellationToken cancellationToken = default)
     {
         return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
         {
@@ -148,12 +147,12 @@ public class AssessmentService : IAssessmentService
                 var signoff = new SubjectSignoff
                 {
                     SubjectResultId = request.SubjectResultId,
-                    SignoffBy = signoffByUserId,
+                    SignoffByAccountId = signoffByAccountId,
                     Role = request.Role,
                     Comment = request.Comment,
                     SignoffAt = DateTime.UtcNow,
                     CreatedAt = DateTime.UtcNow,
-                    CreatedBy = signoffByUserId
+                    CreatedByAccountId = signoffByAccountId
                 };
 
                 await _unitOfWork.SubjectSignoffRepository.AddAsync(signoff, ct);
@@ -165,7 +164,7 @@ public class AssessmentService : IAssessmentService
                 await _unitOfWork.SaveAsync(ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
 
-                return new SubjectSignoffResponse(signoff.SubjectSignoffId, signoff.SubjectResultId, signoff.SignoffBy, signoff.Role, signoff.SignoffAt, signoff.Comment);
+                return new SubjectSignoffResponse(signoff.SubjectSignoffId, signoff.SubjectResultId, signoff.SignoffByAccountId, signoff.Role, signoff.SignoffAt, signoff.Comment);
             }
             catch
             {

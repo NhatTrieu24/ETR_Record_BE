@@ -3,6 +3,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ETR.API.Controllers;
 
+/// <summary>
+/// [Module/Flow]: Document Management
+/// [Core Responsibility]: Manages uploaded evidence files for practical checklists and assessments.
+/// [Target Audience]: Instructor, Admin, Mentor
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class EvidencesController : ControllerBase

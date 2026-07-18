@@ -6,7 +6,9 @@ using Microsoft.AspNetCore.Mvc;
 namespace ETR.API.Controllers;
 
 /// <summary>
-/// Handles the workflow of the Electronic Training Record (ETR).
+/// [Module/Flow]: ETR Processing
+/// [Core Responsibility]: Handles the workflow and state transitions of the Electronic Training Record (ETR).
+/// [Target Audience]: Instructor, Verifier, Admin
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]

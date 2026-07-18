@@ -5,8 +5,8 @@ namespace ETR.Application.Interfaces;
 public interface IEnrollmentService
 {
     Task<CreateEnrollmentResponse> CreateEnrollmentAsync(
-        int learnerId,
+        int accountId,
         int classId,
-        int createdByUserId,
+        int createdByAccountId,
         CancellationToken cancellationToken = default);
 }

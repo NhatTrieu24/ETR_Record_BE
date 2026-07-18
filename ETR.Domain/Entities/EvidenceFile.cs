@@ -4,8 +4,8 @@ public class EvidenceFile : BaseEntity
 {
     public int EvidenceFileId { get; set; }
     public int EvidenceTypeId { get; set; }
-    public int UploadedBy { get; set; }
-    public int LearnerId { get; set; }
+    public int UploadedByAccountId { get; set; }
+    public int AccountId { get; set; }
     public int SubjectResultId { get; set; }
     public int? AttendanceRecordId { get; set; }
     public int? AssessmentResultId { get; set; }
@@ -15,7 +15,7 @@ public class EvidenceFile : BaseEntity
     public string? MimeType { get; set; }
     public long FileSize { get; set; }
     public string VerificationStatus { get; set; } = string.Empty;
-    public int? VerifiedBy { get; set; }
+    public int? VerifiedByAccountId { get; set; }
     public DateTime? VerifiedAt { get; set; }
     public string? VerificationComment { get; set; }
     public DateTime UploadedAt { get; set; }

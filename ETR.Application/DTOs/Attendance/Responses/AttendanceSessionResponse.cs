@@ -8,5 +8,5 @@ public record AttendanceSessionResponse(
     DateTime SessionDate,
     string? Location,
     bool IsConfirmed,
-    int? ConfirmedBy,
+    int? ConfirmedByAccountId,
     DateTime? ConfirmedAt);

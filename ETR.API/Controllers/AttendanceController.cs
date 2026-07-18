@@ -6,7 +6,9 @@ using Microsoft.AspNetCore.Mvc;
 namespace ETR.API.Controllers;
 
 /// <summary>
-/// Handles attendance recording and session confirmation.
+/// [Module/Flow]: Training Execution
+/// [Core Responsibility]: Records student attendance and confirms session completion.
+/// [Target Audience]: Instructor, Admin
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]

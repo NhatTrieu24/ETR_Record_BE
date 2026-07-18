@@ -6,7 +6,9 @@ using Microsoft.AspNetCore.Mvc;
 namespace ETR.API.Controllers;
 
 /// <summary>
-/// Handles enrollment operations for Learners.
+/// [Module/Flow]: ETR Processing
+/// [Core Responsibility]: Handles course enrollment operations.
+/// [Target Audience]: Admin
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
@@ -37,7 +39,7 @@ public class EnrollmentsController : ControllerBase
         var userId = _currentUserService.UserId 
             ?? throw new UnauthorizedAccessException("User is not authenticated.");
 
-        var response = await _enrollmentService.CreateEnrollmentAsync(request.LearnerId, request.ClassId, userId, cancellationToken);
+        var response = await _enrollmentService.CreateEnrollmentAsync(request.AccountId, request.ClassId, userId, cancellationToken);
         return Ok(response);
     }
 }

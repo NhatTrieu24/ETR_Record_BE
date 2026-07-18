@@ -2,7 +2,7 @@ namespace ETR.Application.DTOs;
 
 public record AuditLogResponse(
     long AuditLogId,
-    int? UserId,
+    int? AccountId,
     int? ETRRecordId,
     string ActionType,
     string EntityName,

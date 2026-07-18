@@ -13,7 +13,7 @@ public class ApprovalService : IApprovalService
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<ApprovalRequestResponse> ProcessApprovalActionAsync(int approvalRequestId, string action, int actionByUserId, string? comment, CancellationToken cancellationToken = default)
+    public async Task<ApprovalRequestResponse> ProcessApprovalActionAsync(int approvalRequestId, string action, int actionByAccountId, string? comment, CancellationToken cancellationToken = default)
     {
         return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
         {
@@ -35,7 +35,7 @@ public class ApprovalService : IApprovalService
 
                 request.CurrentStatus = newStatus;
                 request.UpdatedAt = DateTime.UtcNow;
-                request.UpdatedBy = actionByUserId;
+                request.UpdatedByAccountId = actionByAccountId;
                 if (newStatus == "Approved" || newStatus == "Rejected")
                 {
                     request.CompletedAt = DateTime.UtcNow;
@@ -46,14 +46,14 @@ public class ApprovalService : IApprovalService
                 var history = new ApprovalHistory
                 {
                     ApprovalRequestId = request.ApprovalRequestId,
-                    ActionBy = actionByUserId,
+                    ActionByAccountId = actionByAccountId,
                     ActionType = action,
                     PreviousStatus = prevStatus,
                     NewStatus = newStatus,
                     Comments = comment,
                     ActionAt = DateTime.UtcNow,
                     CreatedAt = DateTime.UtcNow,
-                    CreatedBy = actionByUserId
+                    CreatedByAccountId = actionByAccountId
                 };
                 
                 await _unitOfWork.ApprovalHistoryRepository.AddAsync(history, ct);
@@ -73,7 +73,7 @@ public class ApprovalService : IApprovalService
                 await _unitOfWork.SaveAsync(ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
 
-                return new ApprovalRequestResponse(request.ApprovalRequestId, request.ETRCourseRecordId, request.CurrentStatus, request.SubmittedBy, request.SubmittedAt, request.CurrentApproverId, request.CompletedAt);
+                return new ApprovalRequestResponse(request.ApprovalRequestId, request.ETRCourseRecordId, request.CurrentStatus, request.SubmittedByAccountId, request.SubmittedAt, request.CurrentApproverId, request.CompletedAt);
             }
             catch
             {

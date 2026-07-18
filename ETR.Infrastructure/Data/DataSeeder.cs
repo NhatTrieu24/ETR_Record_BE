@@ -31,38 +31,63 @@ public static class DataSeeder
             await context.SaveChangesAsync();
         }
 
-        // 2. Seed Users and Learners
-        if (!await context.Users.AnyAsync())
+        // 2. Seed Accounts and UserProfiles
+        if (!await context.Accounts.AnyAsync())
         {
             var adminRole = await context.Roles.FirstAsync(r => r.RoleName == "Admin");
             var itDept = await context.Departments.FirstAsync(d => d.DepartmentName == "IT");
 
-            context.Users.Add(new User
+            var adminAccount = new Account
             {
                 Username = "admin",
                 PasswordHash = "123456", // Mock plain text for testing only
-                FullName = "System Administrator",
-                Email = "admin@example.com",
-                IsActive = true,
+                Status = "Active",
                 RoleId = adminRole.RoleId,
                 DepartmentId = itDept.DepartmentId,
+                CreatedAt = now
+            };
+            context.Accounts.Add(adminAccount);
+            await context.SaveChangesAsync();
+
+            context.UserProfiles.Add(new UserProfile
+            {
+                AccountId = adminAccount.AccountId,
+                UserCode = "ADM-001",
+                FullName = "System Administrator",
+                Email = "admin@example.com",
+                DateOfBirth = new DateTime(1990, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                Gender = "Other",
                 CreatedAt = now
             });
             await context.SaveChangesAsync();
         }
 
-        if (!await context.Learners.AnyAsync())
+        if (await context.Accounts.CountAsync() < 2)
         {
+            var userRole = await context.Roles.FirstAsync(r => r.RoleName == "Instructor");
+            var hrDept = await context.Departments.FirstAsync(d => d.DepartmentName == "HR");
             var internalType = await context.LearnerTypes.FirstAsync(l => l.TypeName == "Internal");
 
-            context.Learners.Add(new Learner
+            var learnerAccount = new Account
             {
-                LearnerCode = "L-001",
+                Username = "learner_john",
+                PasswordHash = "123456",
+                Status = "Active",
+                RoleId = userRole.RoleId,
+                DepartmentId = hrDept.DepartmentId,
+                CreatedAt = now
+            };
+            context.Accounts.Add(learnerAccount);
+            await context.SaveChangesAsync();
+
+            context.UserProfiles.Add(new UserProfile
+            {
+                AccountId = learnerAccount.AccountId,
+                UserCode = "L-001",
                 FullName = "John Doe",
                 DateOfBirth = new DateTime(1990, 1, 1, 0, 0, 0, DateTimeKind.Utc),
                 Gender = "Male",
                 Email = "john.doe@example.com",
-                Status = "Active",
                 LearnerTypeId = internalType.LearnerTypeId,
                 CreatedAt = now
             });

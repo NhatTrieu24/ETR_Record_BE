@@ -5,8 +5,13 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ETR.API.Controllers;
 
+/// <summary>
+/// [Module/Flow]: System Auditing &amp; Compliance
+/// [Core Responsibility]: Retrieves system audit logs for administrative tracking.
+/// [Target Audience]: Admin
+/// </summary>
 [ApiController]
-[Route("api/audit")]
+[Route("api/[controller]")]
 public class AuditController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
@@ -45,7 +50,7 @@ public class AuditController : ControllerBase
     {
         return new AuditLogResponse(
             l.AuditLogId,
-            l.UserId,
+            l.AccountId,
             l.ETRRecordId,
             l.ActionType,
             l.EntityName,

@@ -9,6 +9,6 @@ public class Session : BaseEntity
     public DateTime SessionDate { get; set; }
     public string? Location { get; set; }
     public bool IsConfirmed { get; set; }
-    public int? ConfirmedBy { get; set; }
+    public int? ConfirmedByAccountId { get; set; }
     public DateTime? ConfirmedAt { get; set; }
 }

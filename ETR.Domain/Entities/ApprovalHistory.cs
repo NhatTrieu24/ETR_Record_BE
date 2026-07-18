@@ -4,7 +4,7 @@ public class ApprovalHistory : BaseEntity
 {
     public int ApprovalHistoryId { get; set; }
     public int ApprovalRequestId { get; set; }
-    public int ActionBy { get; set; }
+    public int ActionByAccountId { get; set; }
     public string ActionType { get; set; } = string.Empty;
     public string? PreviousStatus { get; set; }
     public string? NewStatus { get; set; }

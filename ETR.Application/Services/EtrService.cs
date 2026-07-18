@@ -13,7 +13,7 @@ public class EtrService : IEtrService
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<EtrRecordResponse> SubmitEtrAsync(int etrCourseRecordId, int userId, CancellationToken cancellationToken = default)
+    public async Task<EtrRecordResponse> SubmitEtrAsync(int etrCourseRecordId, int accountId, CancellationToken cancellationToken = default)
     {
         var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(etrCourseRecordId, cancellationToken)
             ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
@@ -23,7 +23,7 @@ public class EtrService : IEtrService
         etr.Status = "Submitted";
         etr.SubmittedAt = DateTime.UtcNow;
         etr.UpdatedAt = DateTime.UtcNow;
-        etr.UpdatedBy = userId;
+        etr.UpdatedByAccountId = accountId;
 
         _unitOfWork.ETRCourseRecordRepository.Update(etr);
         await _unitOfWork.SaveAsync(cancellationToken);
@@ -31,7 +31,7 @@ public class EtrService : IEtrService
         return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt);
     }
 
-    public async Task<EtrRecordResponse> VerifyEtrAsync(int etrCourseRecordId, int userId, CancellationToken cancellationToken = default)
+    public async Task<EtrRecordResponse> VerifyEtrAsync(int etrCourseRecordId, int accountId, CancellationToken cancellationToken = default)
     {
         var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(etrCourseRecordId, cancellationToken)
             ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
@@ -39,7 +39,7 @@ public class EtrService : IEtrService
         etr.Status = "Verified";
         etr.VerifiedAt = DateTime.UtcNow;
         etr.UpdatedAt = DateTime.UtcNow;
-        etr.UpdatedBy = userId;
+        etr.UpdatedByAccountId = accountId;
 
         _unitOfWork.ETRCourseRecordRepository.Update(etr);
         await _unitOfWork.SaveAsync(cancellationToken);
@@ -47,9 +47,9 @@ public class EtrService : IEtrService
         return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt);
     }
 
-    public async Task<EtrRecordResponse> CompleteEtrAsync(int etrCourseRecordId, int userId, CancellationToken cancellationToken = default)
+    public async Task<EtrRecordResponse> CompleteEtrAsync(int etrCourseRecordId, int accountId, CancellationToken cancellationToken = default)
     {
-        var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(etrCourseRecordId, cancellationToken)
+        var etr = await _unitOfWork.ETRCourseRecordRepository.GetWithSubjectResultsAsync(etrCourseRecordId, cancellationToken)
             ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
 
         var enrollment = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(etr.EnrollmentId, cancellationToken);
@@ -61,12 +61,9 @@ public class EtrService : IEtrService
         var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken))
             .Where(cs => cs.CourseId == trainingClass.CourseId && cs.IsMandatory).ToList();
 
-        var subjectResults = (await _unitOfWork.SubjectResultRepository.GetAllAsync(cancellationToken))
-            .Where(sr => sr.EnrollmentId == etr.EnrollmentId).ToList();
-
         foreach (var cs in courseSubjects)
         {
-            var sr = subjectResults.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
+            var sr = etr.SubjectResults.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
             if (sr == null || (sr.Status != "Passed" && sr.Status != "Exempted"))
             {
                 throw new InvalidOperationException($"Cannot complete ETR. Mandatory subject (ID: {cs.SubjectId}) is not Passed or Exempted.");
@@ -77,7 +74,7 @@ public class EtrService : IEtrService
         etr.CompletedAt = DateTime.UtcNow;
         etr.IsLocked = true;
         etr.UpdatedAt = DateTime.UtcNow;
-        etr.UpdatedBy = userId;
+        etr.UpdatedByAccountId = accountId;
 
         _unitOfWork.ETRCourseRecordRepository.Update(etr);
         await _unitOfWork.SaveAsync(cancellationToken);
@@ -85,14 +82,14 @@ public class EtrService : IEtrService
         return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt);
     }
 
-    public async Task<EtrRecordResponse> LockEtrAsync(int etrCourseRecordId, int userId, CancellationToken cancellationToken = default)
+    public async Task<EtrRecordResponse> LockEtrAsync(int etrCourseRecordId, int accountId, CancellationToken cancellationToken = default)
     {
         var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(etrCourseRecordId, cancellationToken)
             ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
 
         etr.IsLocked = true;
         etr.UpdatedAt = DateTime.UtcNow;
-        etr.UpdatedBy = userId;
+        etr.UpdatedByAccountId = accountId;
 
         _unitOfWork.ETRCourseRecordRepository.Update(etr);
         await _unitOfWork.SaveAsync(cancellationToken);
@@ -100,14 +97,14 @@ public class EtrService : IEtrService
         return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt);
     }
 
-    public async Task<EtrRecordResponse> UnlockEtrAsync(int etrCourseRecordId, int userId, CancellationToken cancellationToken = default)
+    public async Task<EtrRecordResponse> UnlockEtrAsync(int etrCourseRecordId, int accountId, CancellationToken cancellationToken = default)
     {
         var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(etrCourseRecordId, cancellationToken)
             ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
 
         etr.IsLocked = false;
         etr.UpdatedAt = DateTime.UtcNow;
-        etr.UpdatedBy = userId;
+        etr.UpdatedByAccountId = accountId;
 
         _unitOfWork.ETRCourseRecordRepository.Update(etr);
         await _unitOfWork.SaveAsync(cancellationToken);

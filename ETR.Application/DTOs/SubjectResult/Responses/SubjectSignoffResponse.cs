@@ -3,7 +3,7 @@ namespace ETR.Application.DTOs;
 public record SubjectSignoffResponse(
     int SubjectSignoffId,
     int SubjectResultId,
-    int SignoffBy,
+    int SignoffByAccountId,
     string Role,
     DateTime SignoffAt,
     string? Comment);

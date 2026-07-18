@@ -3,7 +3,7 @@ namespace ETR.Domain.Entities;
 public class ExportJob : BaseEntity
 {
     public int ExportJobId { get; set; }
-    public int RequestedBy { get; set; }
+    public int RequestedByAccountId { get; set; }
     public string ExportType { get; set; } = string.Empty;
     public string? FileName { get; set; }
     public string? FilePath { get; set; }

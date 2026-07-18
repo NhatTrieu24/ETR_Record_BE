@@ -8,6 +8,6 @@ public class RetakeHistory : BaseEntity
     public string Reason { get; set; } = string.Empty;
     public decimal PreviousScore { get; set; }
     public decimal NewScore { get; set; }
-    public int AuthorizedBy { get; set; }
+    public int AuthorizedByAccountId { get; set; }
     public int AttemptNo { get; set; }
 }

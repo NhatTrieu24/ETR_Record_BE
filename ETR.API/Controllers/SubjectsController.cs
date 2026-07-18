@@ -4,6 +4,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ETR.API.Controllers;
 
+/// <summary>
+/// [Module/Flow]: Master Data Management
+/// [Core Responsibility]: Manages subject catalogues.
+/// [Target Audience]: Admin, CROStaff
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class SubjectsController : ControllerBase

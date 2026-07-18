@@ -6,7 +6,9 @@ using Microsoft.AspNetCore.Mvc;
 namespace ETR.API.Controllers;
 
 /// <summary>
-/// Handles assessment recording and subject signoffs.
+/// [Module/Flow]: Training Execution
+/// [Core Responsibility]: Records assessment scores and handles subject signoffs.
+/// [Target Audience]: Instructor, Admin
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]

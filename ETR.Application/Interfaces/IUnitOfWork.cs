@@ -4,10 +4,11 @@ namespace ETR.Application.Interfaces;
 
 public interface IUnitOfWork
 {
-    IGenericRepository<User> UserRepository { get; }
-    IGenericRepository<Learner> LearnerRepository { get; }
+    IGenericRepository<Account> AccountRepository { get; }
+    IGenericRepository<UserProfile> UserProfileRepository { get; }
+    IGenericRepository<ClassStudent> ClassStudentRepository { get; }
     IGenericRepository<CourseEnrollment> CourseEnrollmentRepository { get; }
-    IGenericRepository<ETRCourseRecord> ETRCourseRecordRepository { get; }
+    IETRCourseRecordRepository ETRCourseRecordRepository { get; }
     IGenericRepository<Class> ClassRepository { get; }
     IGenericRepository<Subject> SubjectRepository { get; }
     IGenericRepository<CourseSubject> CourseSubjectRepository { get; }

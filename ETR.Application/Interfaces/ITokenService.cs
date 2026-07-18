@@ -4,5 +4,5 @@ namespace ETR.Application.Interfaces;
 
 public interface ITokenService
 {
-    string GenerateToken(User user, Role role);
+    string GenerateToken(Account account, Role role);
 }

@@ -22,6 +22,62 @@ namespace ETR.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("ETR.Domain.Entities.Account", b =>
+                {
+                    b.Property<int>("AccountId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AccountId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedByAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DepartmentId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("RoleId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedByAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("AccountId");
+
+                    b.HasIndex("DepartmentId");
+
+                    b.HasIndex("RoleId");
+
+                    b.HasIndex("Username")
+                        .IsUnique();
+
+                    b.ToTable("Accounts");
+                });
+
             modelBuilder.Entity("ETR.Domain.Entities.ApprovalHistory", b =>
                 {
                     b.Property<int>("ApprovalHistoryId")
@@ -33,7 +89,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("ActionAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("ActionBy")
+                    b.Property<int>("ActionByAccountId")
                         .HasColumnType("int");
 
                     b.Property<string>("ActionType")
@@ -49,7 +105,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletedAt")
@@ -67,10 +123,12 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("ApprovalHistoryId");
+
+                    b.HasIndex("ActionByAccountId");
 
                     b.HasIndex("ApprovalRequestId");
 
@@ -91,7 +149,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<int?>("CurrentApproverId")
@@ -113,13 +171,13 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("SubmittedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("SubmittedBy")
+                    b.Property<int>("SubmittedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("ApprovalRequestId");
@@ -151,7 +209,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletedAt")
@@ -175,7 +233,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<decimal>("Weight")
@@ -196,6 +254,9 @@ namespace ETR.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AssessmentResultId"));
 
+                    b.Property<int>("AccountId")
+                        .HasColumnType("int");
+
                     b.Property<int>("AssessmentId")
                         .HasColumnType("int");
 
@@ -205,11 +266,14 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<int>("GradedByAccountId")
+                        .HasColumnType("int");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
@@ -217,17 +281,11 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<bool>("IsPublished")
                         .HasColumnType("bit");
 
-                    b.Property<int>("LearnerId")
-                        .HasColumnType("int");
-
                     b.Property<DateTime?>("PublishedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<DateTime>("RecordedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<int>("RecordedBy")
-                        .HasColumnType("int");
 
                     b.Property<string>("Remark")
                         .HasColumnType("nvarchar(max)");
@@ -248,16 +306,18 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("AssessmentResultId");
 
-                    b.HasIndex("LearnerId");
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("GradedByAccountId");
 
                     b.HasIndex("SubjectResultId");
 
-                    b.HasIndex("AssessmentId", "LearnerId")
+                    b.HasIndex("AssessmentId", "AccountId")
                         .IsUnique();
 
                     b.ToTable("AssessmentResults");
@@ -271,28 +331,25 @@ namespace ETR.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AttendanceRecordId"));
 
+                    b.Property<int>("ClassStudentId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("EnrollmentId")
-                        .HasColumnType("int");
-
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
-
-                    b.Property<int>("LearnerId")
-                        .HasColumnType("int");
 
                     b.Property<DateTime>("RecordedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("RecordedBy")
+                    b.Property<int>("RecordedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<string>("Remarks")
@@ -308,16 +365,14 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("AttendanceRecordId");
 
-                    b.HasIndex("EnrollmentId");
+                    b.HasIndex("ClassStudentId");
 
-                    b.HasIndex("LearnerId");
-
-                    b.HasIndex("SessionId", "LearnerId")
+                    b.HasIndex("SessionId", "ClassStudentId")
                         .IsUnique();
 
                     b.ToTable("AttendanceRecords");
@@ -330,6 +385,9 @@ namespace ETR.Infrastructure.Migrations
                         .HasColumnType("bigint");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("AuditLogId"));
+
+                    b.Property<int?>("AccountId")
+                        .HasColumnType("int");
 
                     b.Property<string>("ActionType")
                         .IsRequired()
@@ -359,9 +417,6 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<string>("UserAgent")
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<int?>("UserId")
-                        .HasColumnType("int");
 
                     b.HasKey("AuditLogId");
 
@@ -393,7 +448,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletedAt")
@@ -418,7 +473,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("ClassId");
@@ -429,6 +484,54 @@ namespace ETR.Infrastructure.Migrations
                     b.HasIndex("CourseId");
 
                     b.ToTable("Classes");
+                });
+
+            modelBuilder.Entity("ETR.Domain.Entities.ClassStudent", b =>
+                {
+                    b.Property<int>("ClassStudentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClassStudentId"));
+
+                    b.Property<int>("AccountId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ClassId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CourseEnrollmentId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedByAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedByAccountId")
+                        .HasColumnType("int");
+
+                    b.HasKey("ClassStudentId");
+
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("CourseEnrollmentId");
+
+                    b.ToTable("ClassStudents");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.CompletionRequirement", b =>
@@ -445,7 +548,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletedAt")
@@ -470,7 +573,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("RequirementId");
@@ -497,7 +600,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletedAt")
@@ -520,7 +623,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("CourseId");
@@ -539,6 +642,9 @@ namespace ETR.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EnrollmentId"));
 
+                    b.Property<int>("AccountId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("ActualCompletionDate")
                         .HasColumnType("datetime2");
 
@@ -548,7 +654,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletedAt")
@@ -563,9 +669,6 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
-                    b.Property<int>("LearnerId")
-                        .HasColumnType("int");
-
                     b.Property<DateTime?>("StartDate")
                         .HasColumnType("datetime2");
 
@@ -576,14 +679,14 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("EnrollmentId");
 
                     b.HasIndex("ClassId");
 
-                    b.HasIndex("LearnerId", "ClassId")
+                    b.HasIndex("AccountId", "ClassId")
                         .IsUnique();
 
                     b.ToTable("CourseEnrollments");
@@ -600,7 +703,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletedAt")
@@ -627,7 +730,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("CourseId", "SubjectId");
@@ -660,7 +763,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletedAt")
@@ -696,7 +799,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("SnapshotId");
@@ -715,7 +818,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletedAt")
@@ -735,7 +838,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("DepartmentId");
@@ -760,7 +863,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<bool>("CreatedBySystem")
@@ -788,7 +891,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("VerifiedAt")
@@ -810,6 +913,9 @@ namespace ETR.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EvidenceFileId"));
 
+                    b.Property<int>("AccountId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("AssessmentResultId")
                         .HasColumnType("int");
 
@@ -819,7 +925,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletedAt")
@@ -845,9 +951,6 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
-                    b.Property<int>("LearnerId")
-                        .HasColumnType("int");
-
                     b.Property<string>("MimeType")
                         .HasColumnType("nvarchar(max)");
 
@@ -857,13 +960,13 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("UploadedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("UploadedBy")
+                    b.Property<int>("UploadedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<string>("VerificationComment")
@@ -876,10 +979,12 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("VerifiedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("VerifiedBy")
+                    b.Property<int?>("VerifiedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("EvidenceFileId");
+
+                    b.HasIndex("AccountId");
 
                     b.HasIndex("AssessmentResultId");
 
@@ -887,9 +992,11 @@ namespace ETR.Infrastructure.Migrations
 
                     b.HasIndex("EvidenceTypeId");
 
-                    b.HasIndex("LearnerId");
-
                     b.HasIndex("SubjectResultId");
+
+                    b.HasIndex("UploadedByAccountId");
+
+                    b.HasIndex("VerifiedByAccountId");
 
                     b.ToTable("EvidenceFiles");
                 });
@@ -905,7 +1012,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletedAt")
@@ -925,7 +1032,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("EvidenceTypeId");
@@ -950,7 +1057,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletedAt")
@@ -975,7 +1082,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("RequestedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("RequestedBy")
+                    b.Property<int>("RequestedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<string>("Status")
@@ -985,90 +1092,14 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("ExportJobId");
 
+                    b.HasIndex("RequestedByAccountId");
+
                     b.ToTable("ExportJobs");
-                });
-
-            modelBuilder.Entity("ETR.Domain.Entities.Learner", b =>
-                {
-                    b.Property<int>("LearnerId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("LearnerId"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CreatedBy")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("DateOfBirth")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Email")
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("FullName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Gender")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("IdentificationNumber")
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("LearnerCode")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<int>("LearnerTypeId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Organization")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Phone")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("UpdatedBy")
-                        .HasColumnType("int");
-
-                    b.HasKey("LearnerId");
-
-                    b.HasIndex("Email")
-                        .IsUnique()
-                        .HasFilter("[Email] IS NOT NULL");
-
-                    b.HasIndex("IdentificationNumber")
-                        .IsUnique()
-                        .HasFilter("[IdentificationNumber] IS NOT NULL");
-
-                    b.HasIndex("LearnerCode")
-                        .IsUnique();
-
-                    b.HasIndex("LearnerTypeId");
-
-                    b.ToTable("Learners");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.LearnerType", b =>
@@ -1082,7 +1113,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletedAt")
@@ -1102,7 +1133,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("LearnerTypeId");
@@ -1127,7 +1158,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletedAt")
@@ -1155,7 +1186,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("PracticalChecklistId");
@@ -1179,7 +1210,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletedAt")
@@ -1200,18 +1231,20 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<string>("VerificationComment")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int?>("VerifiedBy")
+                    b.Property<int?>("VerifiedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("PracticalChecklistResultId");
 
                     b.HasIndex("PracticalChecklistId");
+
+                    b.HasIndex("VerifiedByAccountId");
 
                     b.HasIndex("SubjectResultId", "PracticalChecklistId")
                         .IsUnique();
@@ -1230,13 +1263,13 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<int>("AttemptNo")
                         .HasColumnType("int");
 
-                    b.Property<int>("AuthorizedBy")
+                    b.Property<int>("AuthorizedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletedAt")
@@ -1264,7 +1297,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("RetakeHistoryId");
@@ -1285,7 +1318,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletedAt")
@@ -1305,7 +1338,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("RoleId");
@@ -1330,13 +1363,13 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("ConfirmedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("ConfirmedBy")
+                    b.Property<int?>("ConfirmedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletedAt")
@@ -1364,12 +1397,14 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("SessionId");
 
                     b.HasIndex("ClassId");
+
+                    b.HasIndex("ConfirmedByAccountId");
 
                     b.HasIndex("SubjectId");
 
@@ -1390,7 +1425,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<int>("DefaultHours")
@@ -1424,7 +1459,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("SubjectId");
@@ -1452,19 +1487,19 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("EnrollmentId")
+                    b.Property<int>("EtrId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("EvaluatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("EvaluatedBy")
+                    b.Property<int?>("EvaluatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<bool>("IsDeleted")
@@ -1483,14 +1518,14 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("SubjectResultId");
 
                     b.HasIndex("CourseId", "SubjectId");
 
-                    b.HasIndex("EnrollmentId", "CourseId", "SubjectId")
+                    b.HasIndex("EtrId", "CourseId", "SubjectId")
                         .IsUnique();
 
                     b.ToTable("SubjectResults");
@@ -1510,7 +1545,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("DeletedAt")
@@ -1526,7 +1561,7 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime>("SignoffAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("SignoffBy")
+                    b.Property<int>("SignoffByAccountId")
                         .HasColumnType("int");
 
                     b.Property<int>("SubjectResultId")
@@ -1535,35 +1570,34 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
                     b.HasKey("SubjectSignoffId");
+
+                    b.HasIndex("SignoffByAccountId");
 
                     b.HasIndex("SubjectResultId");
 
                     b.ToTable("SubjectSignoffs");
                 });
 
-            modelBuilder.Entity("ETR.Domain.Entities.User", b =>
+            modelBuilder.Entity("ETR.Domain.Entities.UserProfile", b =>
                 {
-                    b.Property<int>("UserId")
-                        .ValueGeneratedOnAdd()
+                    b.Property<int>("AccountId")
                         .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("UserId"));
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("CreatedBy")
+                    b.Property<int?>("CreatedByAccountId")
                         .HasColumnType("int");
+
+                    b.Property<DateTime>("DateOfBirth")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<int>("DepartmentId")
-                        .HasColumnType("int");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -1573,49 +1607,66 @@ namespace ETR.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
+                    b.Property<string>("Gender")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
-                    b.Property<string>("PasswordHash")
-                        .IsRequired()
+                    b.Property<int?>("LearnerTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Organization")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Phone")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("RoleId")
-                        .HasColumnType("int");
-
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("UpdatedBy")
+                    b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
 
-                    b.Property<string>("Username")
+                    b.Property<string>("UserCode")
                         .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(max)");
 
-                    b.HasKey("UserId");
-
-                    b.HasIndex("DepartmentId");
+                    b.HasKey("AccountId");
 
                     b.HasIndex("Email")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[Email] IS NOT NULL AND [Email] <> ''");
 
-                    b.HasIndex("RoleId");
+                    b.HasIndex("LearnerTypeId");
 
-                    b.HasIndex("Username")
-                        .IsUnique();
+                    b.ToTable("UserProfiles");
+                });
 
-                    b.ToTable("Users");
+            modelBuilder.Entity("ETR.Domain.Entities.Account", b =>
+                {
+                    b.HasOne("ETR.Domain.Entities.Department", null)
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ETR.Domain.Entities.Role", null)
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.ApprovalHistory", b =>
                 {
+                    b.HasOne("ETR.Domain.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("ActionByAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("ETR.Domain.Entities.ApprovalRequest", null)
                         .WithMany()
                         .HasForeignKey("ApprovalRequestId")
@@ -1643,15 +1694,21 @@ namespace ETR.Infrastructure.Migrations
 
             modelBuilder.Entity("ETR.Domain.Entities.AssessmentResult", b =>
                 {
+                    b.HasOne("ETR.Domain.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("ETR.Domain.Entities.Assessment", null)
                         .WithMany()
                         .HasForeignKey("AssessmentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("ETR.Domain.Entities.Learner", null)
+                    b.HasOne("ETR.Domain.Entities.Account", null)
                         .WithMany()
-                        .HasForeignKey("LearnerId")
+                        .HasForeignKey("GradedByAccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -1664,15 +1721,9 @@ namespace ETR.Infrastructure.Migrations
 
             modelBuilder.Entity("ETR.Domain.Entities.AttendanceRecord", b =>
                 {
-                    b.HasOne("ETR.Domain.Entities.CourseEnrollment", null)
+                    b.HasOne("ETR.Domain.Entities.ClassStudent", null)
                         .WithMany()
-                        .HasForeignKey("EnrollmentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("ETR.Domain.Entities.Learner", null)
-                        .WithMany()
-                        .HasForeignKey("LearnerId")
+                        .HasForeignKey("ClassStudentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -1692,17 +1743,32 @@ namespace ETR.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("ETR.Domain.Entities.CourseEnrollment", b =>
+            modelBuilder.Entity("ETR.Domain.Entities.ClassStudent", b =>
                 {
-                    b.HasOne("ETR.Domain.Entities.Class", null)
+                    b.HasOne("ETR.Domain.Entities.Account", null)
                         .WithMany()
-                        .HasForeignKey("ClassId")
+                        .HasForeignKey("AccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("ETR.Domain.Entities.Learner", null)
+                    b.HasOne("ETR.Domain.Entities.CourseEnrollment", null)
                         .WithMany()
-                        .HasForeignKey("LearnerId")
+                        .HasForeignKey("CourseEnrollmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ETR.Domain.Entities.CourseEnrollment", b =>
+                {
+                    b.HasOne("ETR.Domain.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ETR.Domain.Entities.Class", null)
+                        .WithMany()
+                        .HasForeignKey("ClassId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -1733,6 +1799,12 @@ namespace ETR.Infrastructure.Migrations
 
             modelBuilder.Entity("ETR.Domain.Entities.EvidenceFile", b =>
                 {
+                    b.HasOne("ETR.Domain.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("ETR.Domain.Entities.AssessmentResult", null)
                         .WithMany()
                         .HasForeignKey("AssessmentResultId")
@@ -1749,24 +1821,29 @@ namespace ETR.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("ETR.Domain.Entities.Learner", null)
-                        .WithMany()
-                        .HasForeignKey("LearnerId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("ETR.Domain.Entities.SubjectResult", null)
                         .WithMany()
                         .HasForeignKey("SubjectResultId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("ETR.Domain.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("UploadedByAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ETR.Domain.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("VerifiedByAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
-            modelBuilder.Entity("ETR.Domain.Entities.Learner", b =>
+            modelBuilder.Entity("ETR.Domain.Entities.ExportJob", b =>
                 {
-                    b.HasOne("ETR.Domain.Entities.LearnerType", null)
+                    b.HasOne("ETR.Domain.Entities.Account", null)
                         .WithMany()
-                        .HasForeignKey("LearnerTypeId")
+                        .HasForeignKey("RequestedByAccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -1793,6 +1870,11 @@ namespace ETR.Infrastructure.Migrations
                         .HasForeignKey("SubjectResultId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("ETR.Domain.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("VerifiedByAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.RetakeHistory", b =>
@@ -1812,6 +1894,11 @@ namespace ETR.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("ETR.Domain.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("ConfirmedByAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("ETR.Domain.Entities.Subject", null)
                         .WithMany()
                         .HasForeignKey("SubjectId")
@@ -1821,9 +1908,9 @@ namespace ETR.Infrastructure.Migrations
 
             modelBuilder.Entity("ETR.Domain.Entities.SubjectResult", b =>
                 {
-                    b.HasOne("ETR.Domain.Entities.CourseEnrollment", null)
-                        .WithMany()
-                        .HasForeignKey("EnrollmentId")
+                    b.HasOne("ETR.Domain.Entities.ETRCourseRecord", null)
+                        .WithMany("SubjectResults")
+                        .HasForeignKey("EtrId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -1836,6 +1923,12 @@ namespace ETR.Infrastructure.Migrations
 
             modelBuilder.Entity("ETR.Domain.Entities.SubjectSignoff", b =>
                 {
+                    b.HasOne("ETR.Domain.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("SignoffByAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("ETR.Domain.Entities.SubjectResult", null)
                         .WithMany()
                         .HasForeignKey("SubjectResultId")
@@ -1843,19 +1936,31 @@ namespace ETR.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("ETR.Domain.Entities.User", b =>
+            modelBuilder.Entity("ETR.Domain.Entities.UserProfile", b =>
                 {
-                    b.HasOne("ETR.Domain.Entities.Department", null)
-                        .WithMany()
-                        .HasForeignKey("DepartmentId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                    b.HasOne("ETR.Domain.Entities.Account", "Account")
+                        .WithOne("Profile")
+                        .HasForeignKey("ETR.Domain.Entities.UserProfile", "AccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("ETR.Domain.Entities.Role", null)
+                    b.HasOne("ETR.Domain.Entities.LearnerType", null)
                         .WithMany()
-                        .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasForeignKey("LearnerTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Account");
+                });
+
+            modelBuilder.Entity("ETR.Domain.Entities.Account", b =>
+                {
+                    b.Navigation("Profile")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("ETR.Domain.Entities.ETRCourseRecord", b =>
+                {
+                    b.Navigation("SubjectResults");
                 });
 #pragma warning restore 612, 618
         }

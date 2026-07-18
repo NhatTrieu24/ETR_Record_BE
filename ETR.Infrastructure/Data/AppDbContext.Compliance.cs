@@ -115,9 +115,29 @@ public partial class AppDbContext
     {
         if (entry.Entity is ETRCourseRecord record) return record.EnrollmentId;
         if (entry.Entity is CourseEnrollment enrollment) return enrollment.EnrollmentId;
-        if (entry.Entity is SubjectResult sr) return GetOriginalOrCurrent(entry, sr.EnrollmentId, nameof(SubjectResult.EnrollmentId));
-        if (entry.Entity is AttendanceRecord ar) return GetOriginalOrCurrent(entry, ar.EnrollmentId, nameof(AttendanceRecord.EnrollmentId));
         
+        int etrId = 0;
+        if (entry.Entity is SubjectResult sr) etrId = GetOriginalOrCurrent(entry, sr.EtrId, nameof(SubjectResult.EtrId));
+        
+        if (etrId > 0)
+        {
+            var etrEntry = ChangeTracker.Entries<ETRCourseRecord>().FirstOrDefault(e => e.Entity.ETRCourseRecordId == etrId);
+            if (etrEntry != null) return etrEntry.Entity.EnrollmentId;
+
+            var etrResult = await ETRCourseRecords.AsNoTracking().FirstOrDefaultAsync(e => e.ETRCourseRecordId == etrId, cancellationToken);
+            if (etrResult != null) return etrResult.EnrollmentId;
+        }
+
+        if (entry.Entity is AttendanceRecord ar)
+        {
+            var classStudentId = GetOriginalOrCurrent(entry, ar.ClassStudentId, nameof(AttendanceRecord.ClassStudentId));
+            var csEntry = ChangeTracker.Entries<ClassStudent>().FirstOrDefault(e => e.Entity.ClassStudentId == classStudentId);
+            if (csEntry != null) return csEntry.Entity.CourseEnrollmentId;
+
+            var classStudent = await ClassStudents.AsNoTracking().FirstOrDefaultAsync(cs => cs.ClassStudentId == classStudentId, cancellationToken);
+            if (classStudent != null) return classStudent.CourseEnrollmentId;
+        }
+
         int subjectResultId = 0;
         if (entry.Entity is AssessmentResult asr) subjectResultId = GetOriginalOrCurrent(entry, asr.SubjectResultId, nameof(AssessmentResult.SubjectResultId));
         else if (entry.Entity is PracticalChecklistResult pcr) subjectResultId = GetOriginalOrCurrent(entry, pcr.SubjectResultId, nameof(PracticalChecklistResult.SubjectResultId));
@@ -128,10 +148,22 @@ public partial class AppDbContext
         if (subjectResultId > 0)
         {
             var srEntry = ChangeTracker.Entries<SubjectResult>().FirstOrDefault(e => e.Entity.SubjectResultId == subjectResultId);
-            if (srEntry != null) return srEntry.Entity.EnrollmentId;
+            int resolvedEtrId = srEntry != null ? srEntry.Entity.EtrId : 0;
+            
+            if (resolvedEtrId == 0)
+            {
+                var result = await SubjectResults.AsNoTracking().FirstOrDefaultAsync(sr => sr.SubjectResultId == subjectResultId, cancellationToken);
+                resolvedEtrId = result?.EtrId ?? 0;
+            }
 
-            var result = await SubjectResults.AsNoTracking().FirstOrDefaultAsync(sr => sr.SubjectResultId == subjectResultId, cancellationToken);
-            if (result != null) return result.EnrollmentId;
+            if (resolvedEtrId > 0)
+            {
+                var etrEntry = ChangeTracker.Entries<ETRCourseRecord>().FirstOrDefault(e => e.Entity.ETRCourseRecordId == resolvedEtrId);
+                if (etrEntry != null) return etrEntry.Entity.EnrollmentId;
+
+                var etrResult = await ETRCourseRecords.AsNoTracking().FirstOrDefaultAsync(e => e.ETRCourseRecordId == resolvedEtrId, cancellationToken);
+                if (etrResult != null) return etrResult.EnrollmentId;
+            }
         }
 
         return 0;
@@ -170,12 +202,12 @@ public partial class AppDbContext
 
     private static int? ResolveAuditUserId(EntityEntry<BaseEntity> entry)
     {
-        if (entry.State == EntityState.Modified && entry.Entity.UpdatedBy.HasValue)
+        if (entry.State == EntityState.Modified && entry.Entity.UpdatedByAccountId.HasValue)
         {
-            return entry.Entity.UpdatedBy;
+            return entry.Entity.UpdatedByAccountId;
         }
 
-        return entry.Entity.CreatedBy;
+        return entry.Entity.CreatedByAccountId;
     }
 
     private static int GetPrimaryKeyValue(EntityEntry entry)
@@ -241,7 +273,7 @@ public partial class AppDbContext
         {
             return new AuditLog
             {
-                UserId = _userId,
+                AccountId = _userId,
                 ETRRecordId = _etrRecordId,
                 ActionType = _actionType,
                 EntityName = _entry.Entity.GetType().Name,

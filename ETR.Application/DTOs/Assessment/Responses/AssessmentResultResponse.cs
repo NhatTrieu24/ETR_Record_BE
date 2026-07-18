@@ -3,11 +3,11 @@ namespace ETR.Application.DTOs;
 public record AssessmentResultResponse(
     int AssessmentResultId,
     int AssessmentId,
-    int LearnerId,
+    int AccountId,
     int SubjectResultId,
     decimal Score,
     string ResultStatus,
-    int RecordedBy,
+    int GradedByAccountId,
     DateTime RecordedAt,
     DateTime? PublishedAt,
     bool IsPublished,

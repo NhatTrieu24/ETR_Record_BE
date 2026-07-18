@@ -5,8 +5,13 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ETR.API.Controllers;
 
+/// <summary>
+/// [Module/Flow]: System Auditing &amp; Compliance
+/// [Core Responsibility]: Triggers and retrieves data export jobs.
+/// [Target Audience]: Admin
+/// </summary>
 [ApiController]
-[Route("api/exports")]
+[Route("api/[controller]")]
 public class ExportsController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
@@ -60,7 +65,7 @@ public class ExportsController : ControllerBase
     {
         var job = new ExportJob
         {
-            RequestedBy = requestedBy,
+            RequestedByAccountId = requestedBy,
             ExportType = exportType,
             FileName = $"{exportType.ToLower()}_export_{DateTime.UtcNow:yyyyMMddHHmmss}.zip",
             FilePath = $"/exports/{Guid.NewGuid()}",
@@ -82,7 +87,7 @@ public class ExportsController : ControllerBase
     {
         return new ExportJobResponse(
             j.ExportJobId,
-            j.RequestedBy,
+            j.RequestedByAccountId,
             j.ExportType,
             j.FileName,
             j.FilePath,

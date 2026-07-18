@@ -17,13 +17,13 @@ public class TokenService : ITokenService
         _jwtOptions = jwtOptions.Value;
     }
 
-    public string GenerateToken(User user, Role role)
+    public string GenerateToken(Account account, Role role)
     {
         var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
-            new Claim(ClaimTypes.Name, user.Username),
-            new Claim(ClaimTypes.Email, user.Email),
+            new Claim(ClaimTypes.NameIdentifier, account.AccountId.ToString()),
+            new Claim(ClaimTypes.Name, account.Username),
+            new Claim(ClaimTypes.Email, ""), // Email moved to UserProfile
             new Claim(ClaimTypes.Role, role.RoleName)
         };
 

@@ -14,10 +14,11 @@ public class UnitOfWork : IUnitOfWork
     public UnitOfWork(AppDbContext context)
     {
         _context = context;
-        UserRepository = new GenericRepository<User>(_context);
-        LearnerRepository = new GenericRepository<Learner>(_context);
+        AccountRepository = new GenericRepository<Account>(_context);
+        UserProfileRepository = new GenericRepository<UserProfile>(_context);
+        ClassStudentRepository = new GenericRepository<ClassStudent>(_context);
         CourseEnrollmentRepository = new GenericRepository<CourseEnrollment>(_context);
-        ETRCourseRecordRepository = new GenericRepository<ETRCourseRecord>(_context);
+        ETRCourseRecordRepository = new ETRCourseRecordRepository(_context);
         ClassRepository = new GenericRepository<Class>(_context);
         SubjectRepository = new GenericRepository<Subject>(_context);
         CourseSubjectRepository = new GenericRepository<CourseSubject>(_context);
@@ -44,10 +45,11 @@ public class UnitOfWork : IUnitOfWork
         DashboardSnapshotRepository = new GenericRepository<DashboardSnapshot>(_context);
     }
 
-    public IGenericRepository<User> UserRepository { get; }
-    public IGenericRepository<Learner> LearnerRepository { get; }
+    public IGenericRepository<Account> AccountRepository { get; }
+    public IGenericRepository<UserProfile> UserProfileRepository { get; }
+    public IGenericRepository<ClassStudent> ClassStudentRepository { get; }
     public IGenericRepository<CourseEnrollment> CourseEnrollmentRepository { get; }
-    public IGenericRepository<ETRCourseRecord> ETRCourseRecordRepository { get; }
+    public IETRCourseRecordRepository ETRCourseRecordRepository { get; }
     public IGenericRepository<Class> ClassRepository { get; }
     public IGenericRepository<Subject> SubjectRepository { get; }
     public IGenericRepository<CourseSubject> CourseSubjectRepository { get; }

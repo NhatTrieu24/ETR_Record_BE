@@ -3,6 +3,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ETR.API.Controllers;
 
+/// <summary>
+/// [Module/Flow]: Reporting &amp; Analytics
+/// [Core Responsibility]: Generates summary reports for ETR and Class data.
+/// [Target Audience]: Admin, Management
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class ReportsController : ControllerBase

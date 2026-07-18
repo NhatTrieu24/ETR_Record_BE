@@ -2,7 +2,7 @@ namespace ETR.Application.DTOs;
 
 public record CreateAssessmentResultRequest(
     int AssessmentId,
-    int LearnerId,
+    int AccountId,
     int SubjectResultId,
     decimal Score,
     string? Remark);

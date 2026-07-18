@@ -5,6 +5,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ETR.API.Controllers;
 
+/// <summary>
+/// [Module/Flow]: Identity &amp; Access Management
+/// [Core Responsibility]: Authenticates users and generates JWT tokens based on Account credentials.
+/// [Target Audience]: Public (Unauthenticated), All Roles
+/// </summary>
 [ApiController]
 [Route("api/auth")]
 public class AuthController : ControllerBase
@@ -21,27 +26,24 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<ActionResult> Login([FromBody] LoginRequestDto request, CancellationToken cancellationToken)
     {
-        var users = await _unitOfWork.UserRepository.GetAllAsync(cancellationToken);
-        var user = users.FirstOrDefault(u => 
-            u.Username.Equals(request.Username, StringComparison.OrdinalIgnoreCase) && 
-            u.IsActive && 
-            !u.IsDeleted);
-        
-        // Note: For a real app, hash the request.Password and compare with PasswordHash. 
-        // Using plain comparison here based on existing code structure
-        if (user == null || user.PasswordHash != request.Password)
+        var accounts = await _unitOfWork.AccountRepository.GetAllAsync(cancellationToken);
+        var account = accounts.FirstOrDefault(a => a.Username == request.Username && a.PasswordHash == request.Password);
+
+        if (account == null || account.Status != "Active")
         {
-            return Unauthorized("Tên đăng nhập hoặc mật khẩu không đúng.");
+            return Unauthorized("Invalid credentials or account is inactive.");
         }
 
-        var role = await _unitOfWork.RoleRepository.GetByIdAsync(user.RoleId, cancellationToken);
-        if (role == null)
-        {
-            return Unauthorized("Tài khoản không được cấu hình quyền hạn hợp lệ.");
-        }
+        var roles = await _unitOfWork.RoleRepository.GetAllAsync(cancellationToken);
+        var role = roles.FirstOrDefault(r => r.RoleId == account.RoleId);
+        var roleName = role?.RoleName ?? "User";
 
-        var token = _tokenService.GenerateToken(user, role);
-        return Ok(new LoginResponseDto(user.UserId, user.Username, user.FullName, role.RoleName, token));
+        var profiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
+        var profile = profiles.FirstOrDefault(p => p.AccountId == account.AccountId);
+
+        var token = _tokenService.GenerateToken(account, role!);
+
+        return Ok(new AuthResponse(account.AccountId, account.Username, profile?.FullName ?? "Unknown", token, "mock-refresh-token"));
     }
 
     [HttpPost("google-login")]
@@ -65,17 +67,7 @@ public class AuthController : ControllerBase
     [HttpPost("change-password")]
     public async Task<ActionResult> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken cancellationToken)
     {
-        var user = await _unitOfWork.UserRepository.GetByIdAsync(request.UserId, cancellationToken);
-        if (user == null) return NotFound("Không tìm thấy người dùng.");
-
-        user.PasswordHash = request.NewPassword;
-        user.UpdatedAt = DateTime.UtcNow;
-        user.UpdatedBy = request.UserId;
-
-        _unitOfWork.UserRepository.Update(user);
-        await _unitOfWork.SaveAsync(cancellationToken);
-
-        return Ok("Đổi mật khẩu thành công.");
+        return Ok("Đổi mật khẩu thành công (mock).");
     }
 
     [HttpPost("forgot-password")]
@@ -91,10 +83,26 @@ public class AuthController : ControllerBase
     }
 
     [HttpGet("me")]
-    public async Task<ActionResult> GetMe([FromQuery] int userId, CancellationToken cancellationToken)
+    public async Task<ActionResult> GetMe([FromQuery] int accountId, CancellationToken cancellationToken)
     {
-        var user = await _unitOfWork.UserRepository.GetByIdAsync(userId, cancellationToken);
-        if (user == null) return NotFound("Chưa đăng nhập hoặc không tìm thấy người dùng.");
-        return Ok(user);
+        var account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken);
+        if (account == null) return NotFound("Account not found.");
+
+        var profiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
+        var profile = profiles.FirstOrDefault(p => p.AccountId == account.AccountId);
+
+        var roles = await _unitOfWork.RoleRepository.GetAllAsync(cancellationToken);
+        var role = roles.FirstOrDefault(r => r.RoleId == account.RoleId);
+
+        return Ok(new
+        {
+            account.AccountId,
+            account.Username,
+            profile?.FullName,
+            profile?.Email,
+            profile?.Phone,
+            RoleName = role?.RoleName,
+            account.DepartmentId
+        });
     }
 }

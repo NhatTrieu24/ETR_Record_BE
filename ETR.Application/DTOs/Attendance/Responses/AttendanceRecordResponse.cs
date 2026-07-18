@@ -3,9 +3,8 @@ namespace ETR.Application.DTOs;
 public record AttendanceRecordResponse(
     int AttendanceRecordId,
     int SessionId,
-    int LearnerId,
-    int EnrollmentId,
+    int ClassStudentId,
     string Status,
     string? Remarks,
-    int RecordedBy,
+    int RecordedByAccountId,
     DateTime RecordedAt);

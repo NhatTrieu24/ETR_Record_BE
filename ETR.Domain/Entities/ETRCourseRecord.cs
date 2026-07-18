@@ -10,4 +10,5 @@ public class ETRCourseRecord : BaseEntity
     public DateTime? CompletedAt { get; set; }
     public bool IsLocked { get; set; }
     public bool CreatedBySystem { get; set; }
+    public ICollection<SubjectResult> SubjectResults { get; set; } = new List<SubjectResult>();
 }

@@ -14,9 +14,9 @@ public class EnrollmentService : IEnrollmentService
     }
 
     public async Task<CreateEnrollmentResponse> CreateEnrollmentAsync(
-        int learnerId,
+        int accountId,
         int classId,
-        int createdByUserId,
+        int createdByAccountId,
         CancellationToken cancellationToken = default)
     {
         return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
@@ -30,7 +30,7 @@ public class EnrollmentService : IEnrollmentService
 
                 var activeEnrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct);
                 var activeLearnerEnrollments = activeEnrollments
-                    .Where(e => e.LearnerId == learnerId && e.Status == "Active")
+                    .Where(e => e.AccountId == accountId && e.Status == "Active")
                     .Select(e => e.ClassId)
                     .ToList();
                 
@@ -50,12 +50,12 @@ public class EnrollmentService : IEnrollmentService
 
                 var enrollment = new CourseEnrollment
                 {
-                    LearnerId = learnerId,
+                    AccountId = accountId,
                     ClassId = classId,
                     Status = "Active",
                     EnrolledAt = DateTime.UtcNow,
                     CreatedAt = DateTime.UtcNow,
-                    CreatedBy = createdByUserId
+                    CreatedByAccountId = createdByAccountId
                 };
 
                 await _unitOfWork.CourseEnrollmentRepository.AddAsync(enrollment, ct);
@@ -68,10 +68,21 @@ public class EnrollmentService : IEnrollmentService
                     IsLocked = false,
                     CreatedBySystem = true,
                     CreatedAt = DateTime.UtcNow,
-                    CreatedBy = createdByUserId
+                    CreatedByAccountId = createdByAccountId
                 };
 
                 await _unitOfWork.ETRCourseRecordRepository.AddAsync(etrRecord, ct);
+                await _unitOfWork.SaveAsync(ct);
+
+                var classStudent = new ClassStudent
+                {
+                    CourseEnrollmentId = enrollment.EnrollmentId,
+                    ClassId = classId,
+                    AccountId = accountId,
+                    Status = "Active"
+                };
+                
+                await _unitOfWork.ClassStudentRepository.AddAsync(classStudent, ct);
                 await _unitOfWork.SaveAsync(ct);
 
                 var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct))
@@ -81,12 +92,12 @@ public class EnrollmentService : IEnrollmentService
                 {
                     var subjectResult = new SubjectResult
                     {
-                        EnrollmentId = enrollment.EnrollmentId,
+                        EtrId = etrRecord.ETRCourseRecordId,
                         CourseId = cs.CourseId,
                         SubjectId = cs.SubjectId,
                         Status = "Pending",
                         CreatedAt = DateTime.UtcNow,
-                        CreatedBy = createdByUserId
+                        CreatedByAccountId = accountId
                     };
                     await _unitOfWork.SubjectResultRepository.AddAsync(subjectResult, ct);
                 }
@@ -96,7 +107,7 @@ public class EnrollmentService : IEnrollmentService
 
                 return new CreateEnrollmentResponse(
                     enrollment.EnrollmentId,
-                    enrollment.LearnerId,
+                    enrollment.AccountId,
                     enrollment.ClassId,
                     enrollment.Status,
                     enrollment.EnrolledAt,

@@ -3,7 +3,7 @@ namespace ETR.Domain.Entities;
 public class AuditLog
 {
     public long AuditLogId { get; set; }
-    public int? UserId { get; set; }
+    public int? AccountId { get; set; }
     public int? ETRRecordId { get; set; }
     public string ActionType { get; set; } = string.Empty;
     public string EntityName { get; set; } = string.Empty;
