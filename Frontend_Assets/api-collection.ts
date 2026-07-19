@@ -1,453 +1,870 @@
-/**
- * ALL-IN-ONE API DEFINITIONS
- * Automatically generated from Swagger/OpenAPI spec.
- */
+// Auto-generated API collection
 
-export interface AccountResponse {
-  accountId: number;
-  username?: string;
-  roleId: number;
-  departmentId: number;
-  status?: string;
+public interface AccountResponse {
+    accountId: number;
+    username?: string;
+    roleId: number;
+    departmentId: number;
+    status?: string;
 }
 
-export interface AuditLogResponse {
-  auditLogId: number;
-  accountId?: number;
-  etrRecordId?: number;
-  actionType?: string;
-  entityName?: string;
-  recordId: number;
-  oldValue?: string;
-  newValue?: string;
-  description?: string;
-  ipAddress?: string;
-  userAgent?: string;
+public interface ApprovalActionRequest {
+    userId: number;
+    comment?: string;
 }
 
-export interface ChangePasswordRequest {
-  userId: number;
-  oldPassword?: string;
-  newPassword?: string;
+public interface ApprovalHistoryResponse {
+    approvalHistoryId: number;
+    approvalRequestId: number;
+    actionBy: number;
+    actionType?: string;
+    previousStatus?: string;
+    newStatus?: string;
+    comments?: string;
+    actionAt: string;
 }
 
-export interface CreateAccountRequest {
-  username?: string;
-  password?: string;
-  roleId: number;
-  departmentId: number;
+public interface ApprovalRequestResponse {
+    approvalRequestId: number;
+    eTRCourseRecordId: number;
+    currentStatus?: string;
+    submittedBy: number;
+    submittedAt: string;
+    currentApproverId?: number;
+    completedAt?: string;
 }
 
-export interface CreateApprovalRequest {
-  etrCourseRecordId: number;
-  submittedBy: number;
-  currentApproverId?: number;
+public interface AssessmentComponentResponse {
+    assessmentComponentId: number;
+    courseId: number;
+    componentName?: string;
+    assessmentType?: string;
+    weight: number;
+    passingScore: number;
+    isRequired: boolean;
+    displayOrder: number;
 }
 
-export interface CreateAssessmentResultRequest {
-  assessmentId: number;
-  accountId: number;
-  subjectResultId: number;
-  score: number;
-  remark?: string;
+public interface AssessmentResultResponse {
+    assessmentResultId: number;
+    assessmentId: number;
+    accountId: number;
+    subjectResultId: number;
+    score: number;
+    resultStatus?: string;
+    gradedByAccountId: number;
+    recordedAt: string;
+    publishedAt?: string;
+    isPublished: boolean;
+    takenAt?: string;
+    remark?: string;
 }
 
-export interface CreateAttendanceRecordRequest {
-  sessionId: number;
-  classStudentId: number;
-  status?: string;
-  remarks?: string;
+public interface AssignInstructorRequest {
+    classId: number;
+    userId: number;
+    isPrimaryInstructor: boolean;
 }
 
-export interface CreateClassRequest {
-  classCode?: string;
-  className?: string;
-  courseId: number;
-  startDate: string;
-  endDate: string;
-  location?: string;
-  capacity: number;
-  status?: string;
+public interface AttendanceRecordResponse {
+    attendanceRecordId: number;
+    sessionId: number;
+    classStudentId: number;
+    status?: string;
+    remarks?: string;
+    recordedByAccountId: number;
+    recordedAt: string;
 }
 
-export interface CreateCompletionRequirementRequest {
-  courseId: number;
-  requirementName: string;
-  description?: string;
-  isMandatory: boolean;
-  displayOrder: number;
+public interface AttendanceSessionResponse {
+    sessionId: number;
+    classId: number;
+    subjectId: number;
+    sessionTitle?: string;
+    sessionDate: string;
+    location?: string;
+    isConfirmed: boolean;
+    confirmedByAccountId?: number;
+    confirmedAt?: string;
 }
 
-export interface CreateCourseRequest {
-  courseCode?: string;
-  courseName?: string;
-  description?: string;
-  durationHours: number;
-  status?: string;
+public interface AuditLogResponse {
+    auditLogId: number;
+    accountId?: number;
+    eTRRecordId?: number;
+    actionType?: string;
+    entityName?: string;
+    recordId: number;
+    oldValue?: string;
+    newValue?: string;
+    description?: string;
+    iPAddress?: string;
+    userAgent?: string;
 }
 
-export interface CreateDepartmentRequest {
-  departmentName: string;
-  description?: string;
+public interface AuthResponse {
+    accountId: number;
+    username?: string;
+    fullName?: string;
+    role?: string;
+    token?: string;
+    refreshToken?: string;
 }
 
-export interface CreateEnrollmentRequest {
-  accountId: number;
-  classId: number;
+public interface BulkAttendanceItemRequest {
+    attendanceSessionId: number;
+    learnerId: number;
+    etrRecordId: number;
+    status?: string;
+    remarks?: string;
 }
 
-export interface CreateEvidenceRequest {
-  evidenceTypeId: number;
-  accountId: number;
-  subjectResultId: number;
-  attendanceRecordId?: number;
-  assessmentResultId?: number;
-  fileName: string;
-  filePath: string;
-  fileExtension?: string;
-  mimeType?: string;
-  fileSize: number;
+public interface BulkAttendanceRequest {
+    records?: BulkAttendanceItemRequest[];
+    recordedByUserId: number;
 }
 
-export interface CreateEvidenceTypeRequest {
-  typeName: string;
-  description?: string;
+public interface ChangePasswordRequest {
+    userId: number;
+    oldPassword?: string;
+    newPassword?: string;
 }
 
-export interface CreatePracticalChecklistRequest {
-  courseId: number;
-  subjectId: number;
-  itemName: string;
-  description?: string;
-  isRequired: boolean;
-  displayOrder: number;
+public interface ChecklistItemResponse {
+    eTRChecklistItemId: number;
+    templateId: number;
+    itemName?: string;
+    description?: string;
+    isRequired: boolean;
+    displayOrder: number;
 }
 
-export interface CreateSessionRequest {
-  classId: number;
-  subjectId: number;
-  sessionTitle: string;
-  sessionDate: string;
-  location?: string;
+public interface ChecklistProgressResponse {
+    progressId: number;
+    eTRRecordId: number;
+    checklistItemId: number;
+    isCompleted: boolean;
+    verifiedBy?: number;
+    completedAt?: string;
+    verificationComment?: string;
 }
 
-export interface CreateSubjectRequest {
-  subjectCode?: string;
-  subjectName?: string;
-  subjectType?: string;
-  defaultHours: number;
-  assessmentMethod?: string;
-  description?: string;
-  status?: string;
+public interface ClassInstructorResponse {
+    classInstructorId: number;
+    classId: number;
+    userId: number;
+    isPrimaryInstructor: boolean;
+    assignedAt: string;
 }
 
-export interface CreateSubjectSignoffRequest {
-  subjectResultId: number;
-  role?: string;
-  comment?: string;
+public interface CompletionRequirementResponse {
+    requirementId: number;
+    courseId: number;
+    requirementName?: string;
+    description?: string;
+    isMandatory: boolean;
+    displayOrder: number;
 }
 
-export interface CreateUserProfileRequest {
-  userCode?: string;
-  fullName?: string;
-  email?: string;
-  phone?: string;
-  dateOfBirth: string;
-  gender?: string;
-  organization?: string;
+public interface CompletionRequirementResponse {
+    requirementId: number;
+    courseId: number;
+    requirementName?: string;
+    description?: string;
+    isMandatory: boolean;
+    displayOrder: number;
 }
 
-export interface EnrollmentResponse {
-  enrollmentId: number;
-  accountId: number;
-  classId: number;
-  status?: string;
-  enrolledAt: string;
+public interface ConfirmSessionRequest {
+    userId: number;
 }
 
-export interface EtrDetailsResponse {
-  etrCourseRecordId: number;
-  enrollmentId: number;
-  status?: string;
-  isLocked: boolean;
-  submittedAt?: string;
-  verifiedAt?: string;
-  completedAt?: string;
-  subjectResults?: SubjectResultResponse[];
+public interface CourseResponse {
+    courseId: number;
+    courseCode?: string;
+    courseName?: string;
+    description?: string;
+    durationHours: number;
+    status?: string;
 }
 
-export interface EtrRecordResponse {
-  etrCourseRecordId: number;
-  enrollmentId: number;
-  status?: string;
-  isLocked: boolean;
-  submittedAt?: string;
-  verifiedAt?: string;
-  completedAt?: string;
+public interface CreateAccountRequest {
+    username?: string;
+    password?: string;
+    roleId: number;
+    departmentId: number;
 }
 
-export interface ExportJobResponse {
-  exportJobId: number;
-  requestedByAccountId: number;
-  exportType?: string;
-  fileName?: string;
-  filePath?: string;
-  status?: string;
-  requestedAt: string;
-  completedAt?: string;
-  downloadExpiredAt?: string;
+public interface CreateApprovalRequest {
+    eTRCourseRecordId: number;
+    submittedBy: number;
+    currentApproverId?: number;
 }
 
-export interface ExportRequest {
-  userId: number;
+public interface CreateApprovalRequest {
+    eTRCourseRecordId: number;
+    currentApproverId?: number;
 }
 
-export interface ForgotPasswordRequest {
-  email?: string;
+public interface CreateAssessmentComponentRequest {
+    courseId: number;
+    componentName?: string;
+    assessmentType?: string;
+    weight: number;
+    passingScore: number;
+    isRequired: boolean;
+    displayOrder: number;
 }
 
-export interface GoogleLoginRequest {
-  idToken?: string;
+public interface CreateAssessmentResultRequest {
+    assessmentId: number;
+    accountId: number;
+    subjectResultId: number;
+    score: number;
+    remark?: string;
 }
 
-export interface LoginRequestDto {
-  username?: string;
-  password?: string;
+public interface CreateAttendanceRecordRequest {
+    sessionId: number;
+    classStudentId: number;
+    status?: string;
+    remarks?: string;
 }
 
-export interface RefreshTokenRequest {
-  refreshToken?: string;
+public interface CreateAttendanceSessionRequest {
+    classId: number;
+    sessionTitle?: string;
+    sessionDate: string;
+    location?: string;
 }
 
-export interface ResetPasswordRequest {
-  token?: string;
-  newPassword?: string;
+public interface CreateChecklistItemRequest {
+    templateId: number;
+    itemName?: string;
+    description?: string;
+    isRequired: boolean;
+    displayOrder: number;
 }
 
-export interface SubjectResultResponse {
-  subjectResultId: number;
-  subjectId: number;
-  status?: string;
-  createdAt: string;
+public interface CreateClassRequest {
+    classCode?: string;
+    className?: string;
+    courseId: number;
+    startDate: string;
+    endDate: string;
+    location?: string;
+    capacity: number;
+    status?: string;
 }
 
-export interface UpdateAccountStatusRequest {
-  status?: string;
+public interface CreateCompletionRequirementRequest {
+    courseId: number;
+    requirementName?: string;
+    description?: string;
+    isMandatory: boolean;
+    displayOrder: number;
 }
 
-export interface UpdateClassRequest {
-  classId: number;
-  classCode?: string;
-  className?: string;
-  courseId: number;
-  startDate: string;
-  endDate: string;
-  location?: string;
-  capacity: number;
-  status?: string;
+public interface CreateCompletionRequirementRequest {
+    courseId: number;
+    requirementName?: string;
+    description?: string;
+    isMandatory: boolean;
+    displayOrder: number;
 }
 
-export interface UpdateCompletionRequirementRequest {
-  requirementName: string;
-  description?: string;
-  isMandatory: boolean;
-  displayOrder: number;
+public interface CreateCourseRequest {
+    courseCode?: string;
+    courseName?: string;
+    description?: string;
+    durationHours: number;
+    status?: string;
 }
 
-export interface UpdateCourseRequest {
-  courseId: number;
-  courseCode?: string;
-  courseName?: string;
-  description?: string;
-  durationHours: number;
-  status?: string;
+public interface CreateDepartmentRequest {
+    departmentName?: string;
+    description?: string;
 }
 
-export interface UpdateDepartmentRequest {
-  departmentName: string;
-  description?: string;
+public interface CreateDepartmentRequest {
+    departmentName?: string;
+    description?: string;
 }
 
-export interface UpdateEvidenceTypeRequest {
-  typeName: string;
-  description?: string;
+public interface CreateEnrollmentRequest {
+    accountId: number;
+    classId: number;
 }
 
-export interface UpdatePracticalChecklistRequest {
-  itemName: string;
-  description?: string;
-  isRequired: boolean;
-  displayOrder: number;
+public interface CreateEnrollmentResponse {
+    enrollmentId: number;
+    accountId: number;
+    classId: number;
+    status?: string;
+    enrolledAt: string;
+    etrCourseRecordId: number;
+    etrStatus?: string;
+    etrIsLocked: boolean;
 }
 
-export interface UpdateSessionRequest {
-  sessionTitle: string;
-  sessionDate: string;
-  location?: string;
+public interface CreateEtrRecordRequest {
+    enrollmentId: number;
 }
 
-export interface UpdateSubjectRequest {
-  subjectId: number;
-  subjectCode?: string;
-  subjectName?: string;
-  subjectType?: string;
-  defaultHours: number;
-  assessmentMethod?: string;
-  description?: string;
-  status?: string;
+public interface CreateEvidenceRequest {
+    evidenceTypeId: number;
+    fileName?: string;
+    filePath?: string;
+    fileExtension?: string;
+    mimeType?: string;
+    fileSize: number;
+    uploadedBy: number;
+    learnerId: number;
+    eTRRecordId: number;
+    attendanceRecordId?: number;
+    assessmentResultId?: number;
 }
 
-export interface UpdateUserProfileRequest {
-  fullName?: string;
-  email?: string;
-  phone?: string;
-  dateOfBirth: string;
-  gender?: string;
-  organization?: string;
+public interface CreateEvidenceRequest {
+    evidenceTypeId: number;
+    accountId: number;
+    subjectResultId: number;
+    attendanceRecordId?: number;
+    assessmentResultId?: number;
+    fileName?: string;
+    filePath?: string;
+    fileExtension?: string;
+    mimeType?: string;
+    fileSize: number;
 }
 
-export interface UserProfileResponse {
-  accountId: number;
-  userCode?: string;
-  fullName?: string;
-  email?: string;
-  phone?: string;
-  dateOfBirth: string;
-  gender?: string;
-  organization?: string;
+public interface CreateEvidenceTypeRequest {
+    typeName?: string;
+    description?: string;
+}
+
+public interface CreateEvidenceTypeRequest {
+    typeName?: string;
+    description?: string;
+}
+
+public interface CreatePracticalChecklistRequest {
+    courseId: number;
+    subjectId: number;
+    itemName?: string;
+    description?: string;
+    isRequired: boolean;
+    displayOrder: number;
+}
+
+public interface CreateRoleRequest {
+    roleName?: string;
+    description?: string;
+}
+
+public interface CreateSessionRequest {
+    classId: number;
+    subjectId: number;
+    sessionTitle?: string;
+    sessionDate: string;
+    location?: string;
+}
+
+public interface CreateSubjectRequest {
+    subjectCode?: string;
+    subjectName?: string;
+    subjectType?: string;
+    defaultHours: number;
+    assessmentMethod?: string;
+    description?: string;
+    status?: string;
+}
+
+public interface CreateSubjectSignoffRequest {
+    subjectResultId: number;
+    role?: string;
+    comment?: string;
+}
+
+public interface CreateUserProfileRequest {
+    userCode?: string;
+    fullName?: string;
+    email?: string;
+    phone?: string;
+    dateOfBirth: string;
+    gender?: string;
+    organization?: string;
+}
+
+public interface CreateUserRequest {
+    username?: string;
+    passwordHash?: string;
+    fullName?: string;
+    email?: string;
+    roleId: number;
+    departmentId: number;
+}
+
+public interface DepartmentResponse {
+    departmentId: number;
+    departmentName?: string;
+    description?: string;
+}
+
+public interface DepartmentResponse {
+    departmentId: number;
+    departmentName?: string;
+    description?: string;
+}
+
+public interface EnrollmentResponse {
+    enrollmentId: number;
+    accountId: number;
+    classId: number;
+    status?: string;
+    enrolledAt: string;
+}
+
+public interface EtrActionRequest {
+    userId: number;
+}
+
+public interface EtrDetailsResponse {
+    eTRCourseRecordId: number;
+    enrollmentId: number;
+    status?: string;
+    isLocked: boolean;
+    submittedAt?: string;
+    verifiedAt?: string;
+    completedAt?: string;
+    subjectResults?: SubjectResultResponse[];
+}
+
+public interface EtrRecordResponse {
+    eTRCourseRecordId: number;
+    enrollmentId: number;
+    status?: string;
+    isLocked: boolean;
+    submittedAt?: string;
+    verifiedAt?: string;
+    completedAt?: string;
+}
+
+public interface EtrSummaryResponse {
+    etrRecordId: number;
+    status?: string;
+    isLocked: boolean;
+    totalItems: number;
+    completedItems: number;
+    progressPercentage: number;
+}
+
+public interface EvidenceActionRequest {
+    verifiedByUserId: number;
+    comment?: string;
+}
+
+public interface EvidenceFileResponse {
+    evidenceFileId: number;
+    evidenceTypeId: number;
+    fileName?: string;
+    filePath?: string;
+    fileExtension?: string;
+    mimeType?: string;
+    fileSize: number;
+    verificationStatus?: string;
+    qAComment?: string;
+    verifiedBy?: number;
+    verifiedAt?: string;
+    uploadedBy: number;
+    uploadedAt: string;
+}
+
+public interface EvidenceResponse {
+    evidenceFileId: number;
+    evidenceTypeId: number;
+    uploadedByAccountId: number;
+    accountId: number;
+    subjectResultId: number;
+    attendanceRecordId?: number;
+    assessmentResultId?: number;
+    fileName?: string;
+    filePath?: string;
+    fileExtension?: string;
+    mimeType?: string;
+    fileSize: number;
+    verificationStatus?: string;
+    verifiedByAccountId?: number;
+    verifiedAt?: string;
+    verificationComment?: string;
+    uploadedAt: string;
+}
+
+public interface EvidenceTypeResponse {
+    evidenceTypeId: number;
+    typeName?: string;
+    description?: string;
+}
+
+public interface EvidenceTypeResponse {
+    evidenceTypeId: number;
+    typeName?: string;
+    description?: string;
+}
+
+public interface ExportJobResponse {
+    exportJobId: number;
+    requestedByAccountId: number;
+    exportType?: string;
+    fileName?: string;
+    filePath?: string;
+    status?: string;
+    requestedAt: string;
+    completedAt?: string;
+    downloadExpiredAt?: string;
+}
+
+public interface ExportRequest {
+    userId: number;
+}
+
+public interface ForgotPasswordRequest {
+    email?: string;
+}
+
+public interface GoogleLoginRequest {
+    idToken?: string;
+}
+
+public interface LoginRequest {
+    username?: string;
+    password?: string;
+}
+
+public interface LoginRequestDto {
+    username?: string;
+    password?: string;
+}
+
+public interface LoginResponseDto {
+    userId: number;
+    username?: string;
+    fullName?: string;
+    roleName?: string;
+    token?: string;
+}
+
+public interface PracticalChecklistResponse {
+    practicalChecklistId: number;
+    courseId: number;
+    subjectId: number;
+    itemName?: string;
+    description?: string;
+    isRequired: boolean;
+    displayOrder: number;
+}
+
+public interface RefreshTokenRequest {
+    refreshToken?: string;
+}
+
+public interface ResetPasswordRequest {
+    token?: string;
+    newPassword?: string;
+}
+
+public interface RoleResponse {
+    roleId: number;
+    roleName?: string;
+    description?: string;
+}
+
+public interface SessionResponse {
+    sessionId: number;
+    classId: number;
+    subjectId: number;
+    sessionTitle?: string;
+    sessionDate: string;
+    location?: string;
+    isConfirmed: boolean;
+    confirmedByAccountId?: number;
+    confirmedAt?: string;
+}
+
+public interface SubjectResponse {
+    subjectId: number;
+    subjectCode?: string;
+    subjectName?: string;
+    subjectType?: string;
+    defaultHours: number;
+    assessmentMethod?: string;
+    description?: string;
+    status?: string;
+}
+
+public interface SubjectResultResponse {
+    subjectResultId: number;
+    subjectId: number;
+    status?: string;
+    createdAt: string;
+}
+
+public interface SubjectSignoffResponse {
+    subjectSignoffId: number;
+    subjectResultId: number;
+    signoffByAccountId: number;
+    role?: string;
+    signoffAt: string;
+    comment?: string;
+}
+
+public interface TrainingClassResponse {
+    classId: number;
+    classCode?: string;
+    className?: string;
+    courseId: number;
+    startDate: string;
+    endDate: string;
+    location?: string;
+    capacity: number;
+    status?: string;
+}
+
+public interface UpdateAccountStatusRequest {
+    status?: string;
+}
+
+public interface UpdateApprovalRequest {
+    currentApproverId?: number;
+}
+
+public interface UpdateAssessmentComponentRequest {
+    assessmentComponentId: number;
+    courseId: number;
+    componentName?: string;
+    assessmentType?: string;
+    weight: number;
+    passingScore: number;
+    isRequired: boolean;
+    displayOrder: number;
+}
+
+public interface UpdateAssessmentResultRequest {
+    score: number;
+    remark?: string;
+}
+
+public interface UpdateAttendanceRecordRequest {
+    status?: string;
+    remarks?: string;
+}
+
+public interface UpdateAttendanceSessionRequest {
+    attendanceSessionId: number;
+    classId: number;
+    sessionTitle?: string;
+    sessionDate: string;
+    location?: string;
+    isConfirmed: boolean;
+}
+
+public interface UpdateChecklistItemRequest {
+    eTRChecklistItemId: number;
+    templateId: number;
+    itemName?: string;
+    description?: string;
+    isRequired: boolean;
+    displayOrder: number;
+}
+
+public interface UpdateChecklistProgressRequest {
+    isCompleted: boolean;
+    verifiedByUserId?: number;
+    comment?: string;
+}
+
+public interface UpdateClassRequest {
+    classId: number;
+    classCode?: string;
+    className?: string;
+    courseId: number;
+    startDate: string;
+    endDate: string;
+    location?: string;
+    capacity: number;
+    status?: string;
+}
+
+public interface UpdateCompletionRequirementRequest {
+    requirementId: number;
+    courseId: number;
+    requirementName?: string;
+    description?: string;
+    isMandatory: boolean;
+    displayOrder: number;
+}
+
+public interface UpdateCompletionRequirementRequest {
+    requirementName?: string;
+    description?: string;
+    isMandatory: boolean;
+    displayOrder: number;
+}
+
+public interface UpdateCourseRequest {
+    courseId: number;
+    courseCode?: string;
+    courseName?: string;
+    description?: string;
+    durationHours: number;
+    status?: string;
+}
+
+public interface UpdateDepartmentRequest {
+    departmentId: number;
+    departmentName?: string;
+    description?: string;
+}
+
+public interface UpdateDepartmentRequest {
+    departmentName?: string;
+    description?: string;
+}
+
+public interface UpdateEnrollmentRequest {
+    enrollmentId: number;
+    learnerId: number;
+    classId: number;
+    status?: string;
+    enrolledAt: string;
+}
+
+public interface UpdateEtrRecordRequest {
+    status?: string;
+    isLocked: boolean;
+}
+
+public interface UpdateEvidenceRequest {
+    evidenceFileId: number;
+    evidenceTypeId: number;
+    fileName?: string;
+    filePath?: string;
+    fileExtension?: string;
+    mimeType?: string;
+    fileSize: number;
+}
+
+public interface UpdateEvidenceTypeRequest {
+    evidenceTypeId: number;
+    typeName?: string;
+    description?: string;
+}
+
+public interface UpdateEvidenceTypeRequest {
+    typeName?: string;
+    description?: string;
+}
+
+public interface UpdatePracticalChecklistRequest {
+    itemName?: string;
+    description?: string;
+    isRequired: boolean;
+    displayOrder: number;
+}
+
+public interface UpdateRoleRequest {
+    roleId: number;
+    roleName?: string;
+    description?: string;
+}
+
+public interface UpdateSessionRequest {
+    sessionTitle?: string;
+    sessionDate: string;
+    location?: string;
+}
+
+public interface UpdateSubjectRequest {
+    subjectId: number;
+    subjectCode?: string;
+    subjectName?: string;
+    subjectType?: string;
+    defaultHours: number;
+    assessmentMethod?: string;
+    description?: string;
+    status?: string;
+}
+
+public interface UpdateUserProfileRequest {
+    fullName?: string;
+    email?: string;
+    phone?: string;
+    dateOfBirth: string;
+    gender?: string;
+    organization?: string;
+}
+
+public interface UpdateUserRequest {
+    userId: number;
+    fullName?: string;
+    email?: string;
+    roleId: number;
+    departmentId: number;
+    isActive: boolean;
+}
+
+public interface UploadEvidenceRequest {
+    file?: IFormFile;
+    evidenceTypeId: number;
+    uploadedBy: number;
+    learnerId: number;
+    eTRRecordId: number;
+    attendanceRecordId?: number;
+    assessmentResultId?: number;
+}
+
+public interface UserProfileResponse {
+    accountId: number;
+    userCode?: string;
+    fullName?: string;
+    email?: string;
+    phone?: string;
+    dateOfBirth: string;
+    gender?: string;
+    organization?: string;
+}
+
+public interface UserResponse {
+    userId: number;
+    username?: string;
+    fullName?: string;
+    email?: string;
+    roleId: number;
+    departmentId: number;
+    isActive: boolean;
 }
 
 export const API_ENDPOINTS = {
-  GET_ACCOUNTS: '/api/Accounts',
-  POST_ACCOUNTS: '/api/Accounts',
-  GET_ACCOUNTS_BY_ID: (id: number | string) => `/api/Accounts/${id}`,
-  DELETE_ACCOUNTS_BY_ID: (id: number | string) => `/api/Accounts/${id}`,
-  PUT_ACCOUNTS_BY_ID_STATUS: (id: number | string) => `/api/Accounts/${id}/status`,
-  GET_APPROVALS: '/api/Approvals',
-  POST_APPROVALS: '/api/Approvals',
-  POST_APPROVALS_BY_ID_PROCESS: (id: number | string) => `/api/Approvals/${id}/process`,
-  POST_ASSESSMENTS_RECORD: '/api/Assessments/record',
-  POST_ASSESSMENTS_SIGNOFF: '/api/Assessments/signoff',
-  GET_ASSESSMENTS_STUDENT_BY_CLASSSTUDENTID: (classStudentId: number | string) => `/api/Assessments/student/${classStudentId}`,
-  POST_ATTENDANCE_RECORD: '/api/Attendance/record',
-  POST_ATTENDANCE_SESSIONS_BY_SESSIONID_CONFIRM: (sessionId: number | string) => `/api/Attendance/sessions/${sessionId}/confirm`,
-  GET_ATTENDANCE_STUDENT_BY_CLASSSTUDENTID: (classStudentId: number | string) => `/api/Attendance/student/${classStudentId}`,
-  GET_AUDIT: '/api/Audit',
-  GET_AUDIT_BY_ID: (id: number | string) => `/api/Audit/${id}`,
-  GET_AUDIT_SEARCH: '/api/Audit/search',
-  POST_AUTH_LOGIN: '/api/auth/login',
-  POST_AUTH_GOOGLE_LOGIN: '/api/auth/google-login',
-  POST_AUTH_REFRESH_TOKEN: '/api/auth/refresh-token',
-  POST_AUTH_LOGOUT: '/api/auth/logout',
-  POST_AUTH_CHANGE_PASSWORD: '/api/auth/change-password',
-  POST_AUTH_FORGOT_PASSWORD: '/api/auth/forgot-password',
-  POST_AUTH_RESET_PASSWORD: '/api/auth/reset-password',
-  GET_AUTH_ME: '/api/auth/me',
-  GET_CLASSES: '/api/Classes',
-  POST_CLASSES: '/api/Classes',
-  GET_CLASSES_BY_ID: (id: number | string) => `/api/Classes/${id}`,
-  PUT_CLASSES_BY_ID: (id: number | string) => `/api/Classes/${id}`,
-  DELETE_CLASSES_BY_ID: (id: number | string) => `/api/Classes/${id}`,
-  GET_COMPLETIONREQUIREMENTS: '/api/CompletionRequirements',
-  POST_COMPLETIONREQUIREMENTS: '/api/CompletionRequirements',
-  GET_COMPLETIONREQUIREMENTS_BY_ID: (id: number | string) => `/api/CompletionRequirements/${id}`,
-  PUT_COMPLETIONREQUIREMENTS_BY_ID: (id: number | string) => `/api/CompletionRequirements/${id}`,
-  DELETE_COMPLETIONREQUIREMENTS_BY_ID: (id: number | string) => `/api/CompletionRequirements/${id}`,
-  GET_COMPLETIONREQUIREMENTS_COURSE_BY_COURSEID: (courseId: number | string) => `/api/CompletionRequirements/course/${courseId}`,
-  GET_COURSES: '/api/Courses',
-  POST_COURSES: '/api/Courses',
-  GET_COURSES_BY_ID: (id: number | string) => `/api/Courses/${id}`,
-  PUT_COURSES_BY_ID: (id: number | string) => `/api/Courses/${id}`,
-  DELETE_COURSES_BY_ID: (id: number | string) => `/api/Courses/${id}`,
-  GET_DASHBOARD_STATS: '/api/Dashboard/stats',
-  GET_DEPARTMENTS: '/api/Departments',
-  POST_DEPARTMENTS: '/api/Departments',
-  GET_DEPARTMENTS_BY_ID: (id: number | string) => `/api/Departments/${id}`,
-  PUT_DEPARTMENTS_BY_ID: (id: number | string) => `/api/Departments/${id}`,
-  DELETE_DEPARTMENTS_BY_ID: (id: number | string) => `/api/Departments/${id}`,
-  GET_ENROLLMENTS: '/api/Enrollments',
-  POST_ENROLLMENTS: '/api/Enrollments',
-  GET_ENROLLMENTS_BY_ID: (id: number | string) => `/api/Enrollments/${id}`,
-  GET_ENROLLMENTS_STUDENT_BY_STUDENTID: (studentId: number | string) => `/api/Enrollments/student/${studentId}`,
-  GET_ETR: '/api/Etr',
-  GET_ETR_MY_ETR: '/api/Etr/my-etr',
-  GET_ETR_BY_ID: (id: number | string) => `/api/Etr/${id}`,
-  POST_ETR_BY_ID_SUBMIT: (id: number | string) => `/api/Etr/${id}/submit`,
-  POST_ETR_BY_ID_VERIFY: (id: number | string) => `/api/Etr/${id}/verify`,
-  POST_ETR_BY_ID_COMPLETE: (id: number | string) => `/api/Etr/${id}/complete`,
-  GET_EVIDENCES: '/api/Evidences',
-  POST_EVIDENCES: '/api/Evidences',
-  GET_EVIDENCES_BY_ID: (id: number | string) => `/api/Evidences/${id}`,
-  DELETE_EVIDENCES_BY_ID: (id: number | string) => `/api/Evidences/${id}`,
-  GET_EVIDENCETYPES: '/api/EvidenceTypes',
-  POST_EVIDENCETYPES: '/api/EvidenceTypes',
-  GET_EVIDENCETYPES_BY_ID: (id: number | string) => `/api/EvidenceTypes/${id}`,
-  PUT_EVIDENCETYPES_BY_ID: (id: number | string) => `/api/EvidenceTypes/${id}`,
-  DELETE_EVIDENCETYPES_BY_ID: (id: number | string) => `/api/EvidenceTypes/${id}`,
-  GET_EXPORTS_BY_ID: (id: number | string) => `/api/Exports/${id}`,
-  POST_EXPORTS_TRAINING_PACKAGE: '/api/Exports/training-package',
-  POST_EXPORTS_PDF: '/api/Exports/pdf',
-  POST_EXPORTS_DASHBOARD: '/api/Exports/dashboard',
-  GET_EXPORTS_DOWNLOAD_BY_ID: (id: number | string) => `/api/Exports/download/${id}`,
-  GET_PRACTICALCHECKLISTS: '/api/PracticalChecklists',
-  POST_PRACTICALCHECKLISTS: '/api/PracticalChecklists',
-  GET_PRACTICALCHECKLISTS_BY_ID: (id: number | string) => `/api/PracticalChecklists/${id}`,
-  PUT_PRACTICALCHECKLISTS_BY_ID: (id: number | string) => `/api/PracticalChecklists/${id}`,
-  DELETE_PRACTICALCHECKLISTS_BY_ID: (id: number | string) => `/api/PracticalChecklists/${id}`,
-  GET_PRACTICALCHECKLISTS_COURSE_BY_COURSEID_SUBJECT_BY_SUBJECTID: (courseId: number | string, subjectId: number | string) => `/api/PracticalChecklists/course/${courseId}/subject/${subjectId}`,
-  GET_REPORTS_SUMMARY: '/api/Reports/summary',
-  GET_SEARCH_CLASSES: '/api/Search/classes',
-  GET_SEARCH_ETRS: '/api/Search/etrs',
-  GET_SESSIONS: '/api/Sessions',
-  POST_SESSIONS: '/api/Sessions',
-  GET_SESSIONS_BY_ID: (id: number | string) => `/api/Sessions/${id}`,
-  PUT_SESSIONS_BY_ID: (id: number | string) => `/api/Sessions/${id}`,
-  DELETE_SESSIONS_BY_ID: (id: number | string) => `/api/Sessions/${id}`,
-  GET_SUBJECTS: '/api/Subjects',
-  POST_SUBJECTS: '/api/Subjects',
-  GET_SUBJECTS_BY_ID: (id: number | string) => `/api/Subjects/${id}`,
-  PUT_SUBJECTS_BY_ID: (id: number | string) => `/api/Subjects/${id}`,
-  DELETE_SUBJECTS_BY_ID: (id: number | string) => `/api/Subjects/${id}`,
-  GET_USERPROFILES: '/api/UserProfiles',
-  GET_USERPROFILES_LEARNERS: '/api/UserProfiles/learners',
-  GET_USERPROFILES_ME: '/api/UserProfiles/me',
-  PUT_USERPROFILES_ME: '/api/UserProfiles/me',
-  GET_USERPROFILES_BY_ACCOUNTID: (accountId: number | string) => `/api/UserProfiles/${accountId}`,
-  POST_USERPROFILES_BY_ACCOUNTID: (accountId: number | string) => `/api/UserProfiles/${accountId}`,
-  PUT_USERPROFILES_BY_ACCOUNTID: (accountId: number | string) => `/api/UserProfiles/${accountId}`,
+    ACCOUNTS: '/api/Accounts',
+    APPROVALS: '/api/Approvals',
+    ASSESSMENTS: '/api/Assessments',
+    ATTENDANCE: '/api/Attendance',
+    AUDIT: '/api/Audit',
+    AUTH: '/api/auth',
+    CLASSES: '/api/Classes',
+    COMPLETIONREQUIREMENTS: '/api/CompletionRequirements',
+    COURSES: '/api/Courses',
+    DASHBOARD: '/api/Dashboard',
+    DEPARTMENTS: '/api/Departments',
+    ENROLLMENTS: '/api/Enrollments',
+    ETR: '/api/Etr',
+    EVIDENCES: '/api/Evidences',
+    EVIDENCETYPES: '/api/EvidenceTypes',
+    EXPORTS: '/api/Exports',
+    PRACTICALCHECKLISTS: '/api/PracticalChecklists',
+    REPORTS: '/api/Reports',
+    SEARCH: '/api/Search',
+    SESSIONS: '/api/Sessions',
+    SUBJECTS: '/api/Subjects',
+    USERPROFILES: '/api/UserProfiles',
 };
-
-
-export const apiClient = {
-  async get<T>(url: string, token?: string): Promise<T> {
-    return request<T>(url, { method: 'GET' }, token);
-  },
-  async post<T>(url: string, body: any, token?: string): Promise<T> {
-    return request<T>(url, { method: 'POST', body: JSON.stringify(body) }, token);
-  },
-  async put<T>(url: string, body: any, token?: string): Promise<T> {
-    return request<T>(url, { method: 'PUT', body: JSON.stringify(body) }, token);
-  },
-  async delete<T>(url: string, token?: string): Promise<T> {
-    return request<T>(url, { method: 'DELETE' }, token);
-  }
-};
-
-async function request<T>(url: string, config: RequestInit, token?: string): Promise<T> {
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  
-  const response = await fetch(url, { ...config, headers });
-  if (!response.ok) {
-    throw new Error(`API Error: ${response.statusText}`);
-  }
-  
-  if (response.status === 204) return {} as T;
-  
-  return await response.json();
-}
