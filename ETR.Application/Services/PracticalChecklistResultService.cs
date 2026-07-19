@@ -20,6 +20,7 @@ public class PracticalChecklistResultService : IPracticalChecklistResultService
         var results = await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(cancellationToken);
         return results.Select(r => new PracticalChecklistResultResponse(
             r.PracticalChecklistResultId,
+            r.SessionId,
             r.SubjectResultId,
             r.PracticalChecklistId,
             r.IsCompleted,
@@ -39,6 +40,7 @@ public class PracticalChecklistResultService : IPracticalChecklistResultService
 
         return new PracticalChecklistResultResponse(
             result.PracticalChecklistResultId,
+            result.SessionId,
             result.SubjectResultId,
             result.PracticalChecklistId,
             result.IsCompleted,
@@ -56,6 +58,11 @@ public class PracticalChecklistResultService : IPracticalChecklistResultService
             throw new KeyNotFoundException($"PracticalChecklistResult with ID {id} not found.");
         }
 
+        if (request.SessionId.HasValue)
+        {
+            result.SessionId = request.SessionId;
+        }
+
         result.IsCompleted = request.IsCompleted;
         result.VerificationComment = request.VerificationComment;
         result.VerifiedByAccountId = verifiedByAccountId;
@@ -68,6 +75,7 @@ public class PracticalChecklistResultService : IPracticalChecklistResultService
 
         return new PracticalChecklistResultResponse(
             result.PracticalChecklistResultId,
+            result.SessionId,
             result.SubjectResultId,
             result.PracticalChecklistId,
             result.IsCompleted,

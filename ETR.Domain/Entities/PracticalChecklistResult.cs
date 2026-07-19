@@ -3,6 +3,7 @@ namespace ETR.Domain.Entities;
 public class PracticalChecklistResult : BaseEntity
 {
     public int PracticalChecklistResultId { get; set; }
+    public int? SessionId { get; set; }
     public int SubjectResultId { get; set; }
     public int PracticalChecklistId { get; set; }
     public bool IsCompleted { get; set; }

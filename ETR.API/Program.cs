@@ -78,6 +78,9 @@ try
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
 
+    // Explicitly add Authorization (critical for [Authorize] attributes to map policies)
+    builder.Services.AddAuthorization();
+
     // CẤU HÌNH CORS
     builder.Services.AddCors(options =>
     {
