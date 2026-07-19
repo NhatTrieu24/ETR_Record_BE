@@ -81,10 +81,10 @@ try
     // CẤU HÌNH CORS
     builder.Services.AddCors(options =>
     {
-        options.AddPolicy("AllowReactFrontend",
+        options.AddPolicy("AllowAll",
             policy =>
             {
-                policy.WithOrigins("http://localhost:5173") // Cho phép frontend ở port 5173
+                policy.AllowAnyOrigin()
                       .AllowAnyHeader()
                       .AllowAnyMethod();
             });
@@ -107,7 +107,7 @@ try
     app.UseHttpsRedirection();
 
     // ĐĂNG KÝ MIDDLEWARE CORS
-    app.UseCors("AllowReactFrontend");
+    app.UseCors("AllowAll");
 
     // Middleware xác thực (Authentication) phải nằm trước phân quyền (Authorization)
     app.UseAuthentication();
