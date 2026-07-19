@@ -48,7 +48,7 @@ public class AuthController : ControllerBase
 
         var token = _tokenService.GenerateToken(account, role!);
 
-        return Ok(new AuthResponse(account.AccountId, account.Username, profile?.FullName ?? "Unknown", token, "mock-refresh-token"));
+        return Ok(new AuthResponse(account.AccountId, account.Username, profile?.FullName ?? "Unknown", roleName, token, "mock-refresh-token"));
     }
 
     /// <summary>
@@ -59,7 +59,7 @@ public class AuthController : ControllerBase
     [HttpPost("google-login")]
     public ActionResult GoogleLogin([FromBody] GoogleLoginRequest request)
     {
-        return Ok(new AuthResponse(99, "google_user", "Google User", "mock-google-jwt-token", "mock-google-refresh-token"));
+        return Ok(new AuthResponse(99, "google_user", "Google User", "User", "mock-google-jwt-token", "mock-google-refresh-token"));
     }
 
     /// <summary>
@@ -70,7 +70,7 @@ public class AuthController : ControllerBase
     [HttpPost("refresh-token")]
     public ActionResult RefreshToken([FromBody] RefreshTokenRequest request)
     {
-        return Ok(new AuthResponse(1, "instructor_john", "John Doe", "new-mock-jwt-token", "new-mock-refresh-token"));
+        return Ok(new AuthResponse(1, "instructor_john", "John Doe", "Instructor", "new-mock-jwt-token", "new-mock-refresh-token"));
     }
 
     /// <summary>

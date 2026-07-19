@@ -1,3 +1,3 @@
 namespace ETR.Application.DTOs;
 
-public record AuthResponse(int UserId, string Username, string FullName, string Token, string RefreshToken);
+public record AuthResponse(int AccountId, string Username, string FullName, string Role, string Token, string RefreshToken);
