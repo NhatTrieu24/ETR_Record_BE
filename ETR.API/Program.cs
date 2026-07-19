@@ -1,11 +1,12 @@
-using System.Text;
-using Microsoft.Extensions.Hosting;
 using ETR.API.Services;
 using ETR.Application;
 using ETR.Application.Interfaces;
 using ETR.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
+using System.Text;
 
 try
 {
@@ -14,21 +15,29 @@ try
     // 1. Thêm cấu hình Controllers và Swagger/Endpoints
     builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
+
     // Cấu hình Swagger để hỗ trợ JWT Authentication
     builder.Services.AddSwaggerGen(c =>
     {
-        c.SwaggerDoc("v1", new Microsoft.OpenApi.OpenApiInfo { Title = "Aircraft Training ETR API", Version = "v1" });
-        
-        c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.OpenApiSecurityScheme
+        c.SwaggerDoc("v1", new OpenApiInfo { Title = "Aircraft Training ETR API", Version = "v1" });
+
+        // Tạo ô nhập token trên giao diện Swagger
+        c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
         {
             Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
             Name = "Authorization",
-            In = Microsoft.OpenApi.ParameterLocation.Header,
-            Type = Microsoft.OpenApi.SecuritySchemeType.ApiKey,
+            In = ParameterLocation.Header,
+            Type = SecuritySchemeType.ApiKey,
             Scheme = "Bearer"
         });
 
-
+        c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+        {
+            {
+                new OpenApiSecuritySchemeReference("Bearer", document, null),
+                new List<string>()
+            }
+        });
 
         var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
@@ -64,13 +73,11 @@ try
     // 2. Đăng ký các dịch vụ thuộc Clean Architecture các tầng
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
-    
+
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
 
-    // ==========================================
-    // THÊM CẤU HÌNH CORS TẠI ĐÂY
-    // ==========================================
+    // CẤU HÌNH CORS
     builder.Services.AddCors(options =>
     {
         options.AddPolicy("AllowReactFrontend",
@@ -98,15 +105,12 @@ try
 
     app.UseHttpsRedirection();
 
-    // ==========================================
-    // ĐĂNG KÝ MIDDLEWARE CORS TẠI ĐÂY
-    // Lưu ý: Phải nằm trước UseAuthentication()
-    // ==========================================
+    // ĐĂNG KÝ MIDDLEWARE CORS
     app.UseCors("AllowReactFrontend");
 
     // Middleware xác thực (Authentication) phải nằm trước phân quyền (Authorization)
     app.UseAuthentication();
-    app.UseAuthorization(); 
+    app.UseAuthorization();
 
     app.MapControllers();
 
