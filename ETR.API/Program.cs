@@ -68,6 +68,20 @@ try
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
 
+    // ==========================================
+    // THÊM CẤU HÌNH CORS TẠI ĐÂY
+    // ==========================================
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy("AllowReactFrontend",
+            policy =>
+            {
+                policy.WithOrigins("http://localhost:5173") // Cho phép frontend ở port 5173
+                      .AllowAnyHeader()
+                      .AllowAnyMethod();
+            });
+    });
+
     var app = builder.Build();
 
     // 3. Cấu hình HTTP request pipeline (Middleware)
@@ -83,6 +97,12 @@ try
     }
 
     app.UseHttpsRedirection();
+
+    // ==========================================
+    // ĐĂNG KÝ MIDDLEWARE CORS TẠI ĐÂY
+    // Lưu ý: Phải nằm trước UseAuthentication()
+    // ==========================================
+    app.UseCors("AllowReactFrontend");
 
     // Middleware xác thực (Authentication) phải nằm trước phân quyền (Authorization)
     app.UseAuthentication();
