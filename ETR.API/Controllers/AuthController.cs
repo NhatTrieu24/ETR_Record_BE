@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ETR.API.Controllers;
 
 /// <summary>
-/// [Module/Flow]: Identity &amp; Access Management
+/// [Module/Flow]: Quản lý Định danh &amp; Truy cập
 /// [Core Responsibility]: Authenticates users and generates JWT tokens based on Account credentials.
 /// [Target Audience]: Public (Unauthenticated), All Roles
 /// </summary>
@@ -24,8 +24,8 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Identity &amp; Access Management
-    /// [Core Responsibility]: Authenticates user and returns JWT token.
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Xác thực người dùng và trả về JWT token.
     /// [Target Audience]: Public (Unauthenticated)
     /// </summary>
     [HttpPost("login")]
@@ -52,8 +52,8 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Identity &amp; Access Management
-    /// [Core Responsibility]: Authenticates user via Google OAuth and returns JWT token.
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Xác thực người dùng qua Google OAuth và trả về JWT token.
     /// [Target Audience]: Public (Unauthenticated)
     /// </summary>
     [HttpPost("google-login")]
@@ -63,8 +63,8 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Identity &amp; Access Management
-    /// [Core Responsibility]: Refreshes an expired JWT token using a valid refresh token.
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Cấp lại (refresh) một JWT token đã hết hạn bằng cách sử dụng refresh token hợp lệ.
     /// [Target Audience]: Public (Unauthenticated)
     /// </summary>
     [HttpPost("refresh-token")]
@@ -74,8 +74,8 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Identity &amp; Access Management
-    /// [Core Responsibility]: Invalidates the current user session.
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Hủy phiên đăng nhập (session) hiện tại của người dùng.
     /// [Target Audience]: All Roles
     /// </summary>
     [HttpPost("logout")]
@@ -85,8 +85,8 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Identity &amp; Access Management
-    /// [Core Responsibility]: Changes the password for the currently authenticated user.
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Thay đổi mật khẩu cho người dùng hiện đang xác thực.
     /// [Target Audience]: All Roles
     /// </summary>
     [HttpPost("change-password")]
@@ -96,8 +96,8 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Identity &amp; Access Management
-    /// [Core Responsibility]: Initiates the forgot password flow.
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Khởi tạo luồng quên mật khẩu.
     /// [Target Audience]: Public (Unauthenticated)
     /// </summary>
     [HttpPost("forgot-password")]
@@ -107,8 +107,8 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Identity &amp; Access Management
-    /// [Core Responsibility]: Resets the user's password using a reset token.
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Đặt lại mật khẩu của người dùng bằng cách sử dụng reset token.
     /// [Target Audience]: Public (Unauthenticated)
     /// </summary>
     [HttpPost("reset-password")]
@@ -118,8 +118,8 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Identity &amp; Access Management
-    /// [Core Responsibility]: Retrieves the currently authenticated user's account and profile information.
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Lấy thông tin tài khoản và hồ sơ (profile) của người dùng hiện đang xác thực.
     /// [Target Audience]: All Roles
     /// </summary>
     [HttpGet("me")]

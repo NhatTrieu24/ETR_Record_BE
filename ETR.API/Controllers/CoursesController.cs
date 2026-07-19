@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ETR.API.Controllers;
 
 /// <summary>
-/// [Module/Flow]: Master Data Management
+/// [Module/Flow]: Quản lý Dữ liệu Gốc (Master Data)
 /// [Core Responsibility]: Manages course catalogues.
 /// [Target Audience]: Admin, Academic, TrainingManager
 /// </summary>
@@ -25,8 +25,8 @@ public class CoursesController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Master Data Management
-    /// [Core Responsibility]: Retrieves all courses.
+    /// [Module/Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    /// [Core Responsibility]: Lấy danh sách tất cả các khóa học.
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpGet]
@@ -37,8 +37,8 @@ public class CoursesController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Master Data Management
-    /// [Core Responsibility]: Retrieves a course by ID.
+    /// [Module/Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    /// [Core Responsibility]: Lấy thông tin một khóa học theo ID.
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpGet("{id}")]
@@ -49,8 +49,8 @@ public class CoursesController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Master Data Management
-    /// [Core Responsibility]: Creates a new course.
+    /// [Module/Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    /// [Core Responsibility]: Tạo một khóa học mới.
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpPost]
@@ -62,8 +62,8 @@ public class CoursesController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Master Data Management
-    /// [Core Responsibility]: Updates an existing course.
+    /// [Module/Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    /// [Core Responsibility]: Cập nhật một khóa học hiện có.
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpPut("{id}")]
@@ -75,8 +75,8 @@ public class CoursesController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Master Data Management
-    /// [Core Responsibility]: Soft deletes a course.
+    /// [Module/Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    /// [Core Responsibility]: Xóa mềm (soft delete) một khóa học.
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpDelete("{id}")]

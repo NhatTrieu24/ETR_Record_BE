@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ETR.API.Controllers;
 
 /// <summary>
-/// [Module/Flow]: Training Execution
+/// [Module/Flow]: Thực thi Đào tạo
 /// [Core Responsibility]: Records assessment scores and handles subject signoffs.
 /// [Target Audience]: Instructor, Admin
 /// </summary>
@@ -25,8 +25,8 @@ public class AssessmentsController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Training Execution
-    /// [Core Responsibility]: Records a score for a specific assessment.
+    /// [Module/Flow]: Thực thi Đào tạo
+    /// [Core Responsibility]: Ghi nhận điểm số cho một bài kiểm tra (assessment) cụ thể.
     /// [Target Audience]: Instructor, Admin
     /// </summary>
     /// <param name="request">The assessment result details.</param>
@@ -46,8 +46,8 @@ public class AssessmentsController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Training Execution
-    /// [Core Responsibility]: Signs off a subject result.
+    /// [Module/Flow]: Thực thi Đào tạo
+    /// [Core Responsibility]: Ký xác nhận (sign off) kết quả môn học.
     /// [Target Audience]: Instructor, Admin
     /// </summary>
     /// <param name="request">The signoff details.</param>
@@ -67,8 +67,8 @@ public class AssessmentsController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Training Execution
-    /// [Core Responsibility]: Retrieves assessment results for a specific student in a class.
+    /// [Module/Flow]: Thực thi Đào tạo
+    /// [Core Responsibility]: Lấy danh sách kết quả kiểm tra của một học viên cụ thể trong lớp.
     /// [Target Audience]: Instructor, Admin, Student
     /// </summary>
     /// <param name="classStudentId">The ClassStudent ID.</param>

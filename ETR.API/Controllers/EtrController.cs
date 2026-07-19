@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ETR.API.Controllers;
 
 /// <summary>
-/// [Module/Flow]: ETR Processing
+/// [Module/Flow]: Xử lý ETR
 /// [Core Responsibility]: Handles the workflow and state transitions of the Electronic Training Record (ETR).
 /// [Target Audience]: Instructor, QA, Admin
 /// </summary>
@@ -25,8 +25,8 @@ public class EtrController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: ETR Processing
-    /// [Core Responsibility]: Retrieves all ETR records.
+    /// [Module/Flow]: Xử lý ETR
+    /// [Core Responsibility]: Lấy danh sách tất cả các hồ sơ ETR.
     /// [Target Audience]: Instructor, QA, Admin
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -41,8 +41,8 @@ public class EtrController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: ETR Processing
-    /// [Core Responsibility]: Retrieves ETR records for the currently authenticated student.
+    /// [Module/Flow]: Xử lý ETR
+    /// [Core Responsibility]: Lấy danh sách hồ sơ ETR của học viên hiện đang xác thực.
     /// [Target Audience]: Student
     /// </summary>
     [HttpGet("my-etr")]
@@ -57,8 +57,8 @@ public class EtrController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: ETR Processing
-    /// [Core Responsibility]: Retrieves a specific ETR record by ID, including its Subject Results.
+    /// [Module/Flow]: Xử lý ETR
+    /// [Core Responsibility]: Lấy thông tin một hồ sơ ETR cụ thể theo ID, bao gồm cả Kết quả Môn học.
     /// [Target Audience]: Instructor, QA, Admin
     /// </summary>
     /// <param name="id">The ETR Course Record ID.</param>
@@ -75,7 +75,7 @@ public class EtrController : ControllerBase
     }
 
     /// <summary>
-    /// Submits an ETR for verification.
+    /// Gửi một ETR để chờ xác minh (verification).
     /// </summary>
     /// <param name="id">The ETR Course Record ID.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -95,7 +95,7 @@ public class EtrController : ControllerBase
     }
 
     /// <summary>
-    /// Verifies a submitted ETR.
+    /// Xác minh một ETR đã được gửi.
     /// </summary>
     /// <param name="id">The ETR Course Record ID.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -115,7 +115,7 @@ public class EtrController : ControllerBase
     }
 
     /// <summary>
-    /// Completes a verified ETR if all conditions are met.
+    /// Hoàn tất một ETR đã được xác minh nếu đáp ứng đủ mọi điều kiện.
     /// </summary>
     /// <param name="id">The ETR Course Record ID.</param>
     /// <param name="cancellationToken">Cancellation token.</param>

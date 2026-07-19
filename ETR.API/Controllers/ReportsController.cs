@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ETR.API.Controllers;
 
 /// <summary>
-/// [Module/Flow]: Reporting &amp; Analytics
+/// [Module/Flow]: Báo cáo &amp; Phân tích
 /// [Core Responsibility]: Generates summary reports for ETR and Class data.
 /// [Target Audience]: Admin, Management
 /// </summary>
@@ -20,8 +20,8 @@ public class ReportsController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Reporting &amp; Analytics
-    /// [Core Responsibility]: Retrieves summary reports for classes and ETRs.
+    /// [Module/Flow]: Báo cáo &amp; Phân tích
+    /// [Core Responsibility]: Lấy các báo cáo tổng hợp cho các lớp học và ETR.
     /// [Target Audience]: Admin, Management
     /// </summary>
     [HttpGet("summary")]

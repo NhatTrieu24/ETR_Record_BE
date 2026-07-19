@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ETR.API.Controllers;
 
 /// <summary>
-/// [Module/Flow]: System Auditing &amp; Compliance
+/// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
 /// [Core Responsibility]: Retrieves system audit logs for administrative tracking.
 /// [Target Audience]: Admin
 /// </summary>
@@ -22,8 +22,8 @@ public class AuditController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: System Auditing &amp; Compliance
-    /// [Core Responsibility]: Retrieves all audit logs.
+    /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
+    /// [Core Responsibility]: Lấy toàn bộ nhật ký hệ thống (audit logs).
     /// [Target Audience]: Admin
     /// </summary>
     [HttpGet]
@@ -34,8 +34,8 @@ public class AuditController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: System Auditing &amp; Compliance
-    /// [Core Responsibility]: Retrieves a specific audit log by ID.
+    /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
+    /// [Core Responsibility]: Lấy thông tin một audit log cụ thể theo ID.
     /// [Target Audience]: Admin
     /// </summary>
     [HttpGet("{id:long}")]
@@ -47,8 +47,8 @@ public class AuditController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: System Auditing &amp; Compliance
-    /// [Core Responsibility]: Searches audit logs by action type, entity name, or description.
+    /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
+    /// [Core Responsibility]: Tìm kiếm audit logs theo loại hành động, tên thực thể hoặc mô tả.
     /// [Target Audience]: Admin
     /// </summary>
     [HttpGet("search")]

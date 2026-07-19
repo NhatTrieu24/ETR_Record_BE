@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ETR.API.Controllers;
 
 /// <summary>
-/// [Module/Flow]: Identity &amp; Access Management
+/// [Module/Flow]: Quản lý Định danh &amp; Truy cập
 /// [Core Responsibility]: Manages core system authentication accounts, roles, departments, and statuses.
 /// [Target Audience]: Admin
 /// </summary>
@@ -25,8 +25,8 @@ public class AccountsController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Identity &amp; Access Management
-    /// [Core Responsibility]: Retrieves all accounts.
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Lấy danh sách tất cả các tài khoản.
     /// [Target Audience]: Admin
     /// </summary>
     [HttpGet]
@@ -37,8 +37,8 @@ public class AccountsController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Identity &amp; Access Management
-    /// [Core Responsibility]: Retrieves a specific account by ID.
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Lấy thông tin một tài khoản cụ thể theo ID.
     /// [Target Audience]: Admin
     /// </summary>
     [HttpGet("{id:int}")]
@@ -49,8 +49,8 @@ public class AccountsController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Identity &amp; Access Management
-    /// [Core Responsibility]: Creates a new system account.
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Tạo một tài khoản hệ thống mới.
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPost]
@@ -62,8 +62,8 @@ public class AccountsController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Identity &amp; Access Management
-    /// [Core Responsibility]: Updates the status of an existing account.
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Cập nhật trạng thái của một tài khoản hiện có.
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPut("{id:int}/status")]
@@ -75,8 +75,8 @@ public class AccountsController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Identity &amp; Access Management
-    /// [Core Responsibility]: Deletes an account from the system.
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Xóa một tài khoản khỏi hệ thống.
     /// [Target Audience]: Admin
     /// </summary>
     [HttpDelete("{id:int}")]

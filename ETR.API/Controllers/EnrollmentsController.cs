@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ETR.API.Controllers;
 
 /// <summary>
-/// [Module/Flow]: ETR Processing
+/// [Module/Flow]: Xử lý ETR
 /// [Core Responsibility]: Handles course enrollment operations.
 /// [Target Audience]: Admin
 /// </summary>
@@ -25,8 +25,8 @@ public class EnrollmentsController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: ETR Processing
-    /// [Core Responsibility]: Retrieves all course enrollments.
+    /// [Module/Flow]: Xử lý ETR
+    /// [Core Responsibility]: Lấy danh sách tất cả các đăng ký khóa học (enrollments).
     /// [Target Audience]: Admin
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -42,8 +42,8 @@ public class EnrollmentsController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: ETR Processing
-    /// [Core Responsibility]: Retrieves a specific course enrollment by ID.
+    /// [Module/Flow]: Xử lý ETR
+    /// [Core Responsibility]: Lấy thông tin một đăng ký khóa học cụ thể theo ID.
     /// [Target Audience]: Admin
     /// </summary>
     /// <param name="id">The Enrollment ID.</param>
@@ -61,7 +61,7 @@ public class EnrollmentsController : ControllerBase
     }
 
     /// <summary>
-    /// Retrieves enrollments for a specific student.
+    /// Lấy danh sách các đăng ký khóa học của một học viên cụ thể.
     /// </summary>
     [HttpGet("student/{studentId}")]
     public async Task<ActionResult<IEnumerable<EnrollmentResponse>>> GetEnrollmentsByStudentId(int studentId, CancellationToken cancellationToken)
@@ -71,7 +71,7 @@ public class EnrollmentsController : ControllerBase
     }
 
     /// <summary>
-    /// Creates a new course enrollment for a learner.
+    /// Tạo một đăng ký khóa học mới cho học viên.
     /// </summary>
     /// <param name="request">The enrollment details.</param>
     /// <param name="cancellationToken">Cancellation token.</param>

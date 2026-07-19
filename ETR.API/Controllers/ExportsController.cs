@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ETR.API.Controllers;
 
 /// <summary>
-/// [Module/Flow]: System Auditing &amp; Compliance
+/// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
 /// [Core Responsibility]: Triggers and retrieves data export jobs.
 /// [Target Audience]: Admin
 /// </summary>
@@ -24,8 +24,8 @@ public class ExportsController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: System Auditing &amp; Compliance
-    /// [Core Responsibility]: Retrieves a specific export job by ID.
+    /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
+    /// [Core Responsibility]: Lấy thông tin một công việc xuất tệp (export job) cụ thể theo ID.
     /// [Target Audience]: Admin
     /// </summary>
     [HttpGet("{id:int}")]
@@ -37,8 +37,8 @@ public class ExportsController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: System Auditing &amp; Compliance
-    /// [Core Responsibility]: Triggers an export job for a training package.
+    /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
+    /// [Core Responsibility]: Kích hoạt một công việc xuất tệp cho gói đào tạo (training package).
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPost("training-package")]
@@ -49,8 +49,8 @@ public class ExportsController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: System Auditing &amp; Compliance
-    /// [Core Responsibility]: Triggers an export job for a PDF report.
+    /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
+    /// [Core Responsibility]: Kích hoạt một công việc xuất tệp cho báo cáo PDF.
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPost("pdf")]
@@ -61,8 +61,8 @@ public class ExportsController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: System Auditing &amp; Compliance
-    /// [Core Responsibility]: Triggers an export job for a dashboard summary.
+    /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
+    /// [Core Responsibility]: Kích hoạt một công việc xuất tệp cho bản tóm tắt dashboard.
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPost("dashboard")]
@@ -73,8 +73,8 @@ public class ExportsController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: System Auditing &amp; Compliance
-    /// [Core Responsibility]: Downloads the generated file of a completed export job.
+    /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
+    /// [Core Responsibility]: Tải xuống tệp đã được tạo từ một công việc xuất tệp hoàn tất.
     /// [Target Audience]: Admin
     /// </summary>
     [HttpGet("download/{id:int}")]

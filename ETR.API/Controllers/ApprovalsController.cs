@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ETR.API.Controllers;
 
 /// <summary>
-/// [Module/Flow]: ETR Processing
+/// [Module/Flow]: Xử lý ETR
 /// [Core Responsibility]: Processes approval workflows and state transitions for ETR records.
 /// [Target Audience]: Admin, Instructor
 /// </summary>

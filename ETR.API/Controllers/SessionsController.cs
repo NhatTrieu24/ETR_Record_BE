@@ -24,7 +24,7 @@ public class SessionsController : ControllerBase
     }
 
     /// <summary>
-    /// Retrieves all sessions.
+    /// Lấy danh sách tất cả các buổi học (sessions).
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetAllSessions(CancellationToken cancellationToken)
@@ -34,7 +34,7 @@ public class SessionsController : ControllerBase
     }
 
     /// <summary>
-    /// Retrieves a session by ID.
+    /// Lấy thông tin một buổi học theo ID.
     /// </summary>
     [HttpGet("{id}")]
     public async Task<IActionResult> GetSession(int id, CancellationToken cancellationToken)
@@ -44,7 +44,7 @@ public class SessionsController : ControllerBase
     }
 
     /// <summary>
-    /// Creates a new session.
+    /// Tạo một buổi học mới.
     /// </summary>
     [HttpPost]
     public async Task<IActionResult> CreateSession([FromBody] CreateSessionRequest request, CancellationToken cancellationToken)
@@ -55,7 +55,7 @@ public class SessionsController : ControllerBase
     }
 
     /// <summary>
-    /// Updates an existing session.
+    /// Cập nhật một buổi học hiện có.
     /// </summary>
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateSession(int id, [FromBody] UpdateSessionRequest request, CancellationToken cancellationToken)
@@ -66,7 +66,7 @@ public class SessionsController : ControllerBase
     }
 
     /// <summary>
-    /// Deletes a session.
+    /// Xóa một buổi học.
     /// </summary>
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteSession(int id, CancellationToken cancellationToken)

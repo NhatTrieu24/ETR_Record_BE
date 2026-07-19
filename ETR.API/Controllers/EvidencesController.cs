@@ -24,7 +24,7 @@ public class EvidencesController : ControllerBase
     }
 
     /// <summary>
-    /// Retrieves all uploaded evidence files.
+    /// Lấy danh sách tất cả các tệp bằng chứng (evidence) đã tải lên.
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
@@ -34,7 +34,7 @@ public class EvidencesController : ControllerBase
     }
 
     /// <summary>
-    /// Retrieves a specific evidence file by ID.
+    /// Lấy thông tin một tệp bằng chứng cụ thể theo ID.
     /// </summary>
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
@@ -44,7 +44,7 @@ public class EvidencesController : ControllerBase
     }
 
     /// <summary>
-    /// Uploads a new evidence file record.
+    /// Tải lên một bản ghi tệp bằng chứng mới.
     /// </summary>
     [HttpPost]
     public async Task<IActionResult> UploadEvidence([FromBody] CreateEvidenceRequest request, CancellationToken cancellationToken)
@@ -55,7 +55,7 @@ public class EvidencesController : ControllerBase
     }
 
     /// <summary>
-    /// Soft deletes an evidence file.
+    /// Xóa mềm (soft delete) một tệp bằng chứng.
     /// </summary>
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteEvidence(int id, CancellationToken cancellationToken)

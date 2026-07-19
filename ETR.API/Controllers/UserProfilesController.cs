@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ETR.API.Controllers;
 
 /// <summary>
-/// [Module/Flow]: Identity &amp; Access Management
+/// [Module/Flow]: Quản lý Định danh &amp; Truy cập
 /// [Core Responsibility]: Manages demographic user profile data and handles user-specific views.
 /// [Target Audience]: All Roles (for own profile), Admin (for all profiles)
 /// </summary>
@@ -25,8 +25,8 @@ public class UserProfilesController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Identity &amp; Access Management
-    /// [Core Responsibility]: Retrieves all user profiles.
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Lấy danh sách tất cả các hồ sơ người dùng (user profiles).
     /// [Target Audience]: Admin
     /// </summary>
     [HttpGet]
@@ -38,8 +38,8 @@ public class UserProfilesController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Identity &amp; Access Management
-    /// [Core Responsibility]: Retrieves all learner profiles.
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Lấy danh sách tất cả các hồ sơ học viên (learner profiles).
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpGet("learners")]
@@ -50,8 +50,8 @@ public class UserProfilesController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Identity &amp; Access Management
-    /// [Core Responsibility]: Retrieves the profile of the currently authenticated user.
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Lấy hồ sơ của người dùng hiện đang xác thực.
     /// [Target Audience]: All Roles
     /// </summary>
     [HttpGet("me")]
@@ -63,8 +63,8 @@ public class UserProfilesController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Identity &amp; Access Management
-    /// [Core Responsibility]: Retrieves a user profile by account ID.
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Lấy hồ sơ người dùng theo ID tài khoản.
     /// [Target Audience]: Admin
     /// </summary>
     [HttpGet("{accountId:int}")]
@@ -75,8 +75,8 @@ public class UserProfilesController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Identity &amp; Access Management
-    /// [Core Responsibility]: Creates a new user profile for an account.
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Tạo một hồ sơ người dùng mới cho một tài khoản.
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPost("{accountId:int}")]
@@ -89,8 +89,8 @@ public class UserProfilesController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Identity &amp; Access Management
-    /// [Core Responsibility]: Updates the profile of the currently authenticated user.
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Cập nhật hồ sơ của người dùng hiện đang xác thực.
     /// [Target Audience]: All Roles
     /// </summary>
     [HttpPut("me")]
@@ -102,8 +102,8 @@ public class UserProfilesController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Identity &amp; Access Management
-    /// [Core Responsibility]: Updates a specific user profile by account ID.
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Cập nhật một hồ sơ người dùng cụ thể theo ID tài khoản.
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPut("{accountId:int}")]

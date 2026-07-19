@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ETR.API.Controllers;
 
 /// <summary>
-/// [Module/Flow]: Training Execution
+/// [Module/Flow]: Thực thi Đào tạo
 /// [Core Responsibility]: Records student attendance and confirms session completion.
 /// [Target Audience]: Instructor, Admin
 /// </summary>
@@ -25,8 +25,8 @@ public class AttendanceController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Training Execution
-    /// [Core Responsibility]: Records attendance for a specific session.
+    /// [Module/Flow]: Thực thi Đào tạo
+    /// [Core Responsibility]: Điểm danh cho một buổi học (session) cụ thể.
     /// [Target Audience]: Instructor, Admin
     /// </summary>
     /// <param name="request">The attendance record details.</param>
@@ -46,8 +46,8 @@ public class AttendanceController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Training Execution
-    /// [Core Responsibility]: Confirms that an attendance session has been finalized.
+    /// [Module/Flow]: Thực thi Đào tạo
+    /// [Core Responsibility]: Xác nhận phiên điểm danh đã được chốt (finalized).
     /// [Target Audience]: Instructor, Admin
     /// </summary>
     /// <param name="sessionId">The ID of the session to confirm.</param>
@@ -67,8 +67,8 @@ public class AttendanceController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Training Execution
-    /// [Core Responsibility]: Retrieves attendance records for a specific student in a class.
+    /// [Module/Flow]: Thực thi Đào tạo
+    /// [Core Responsibility]: Lấy lịch sử điểm danh của một học viên cụ thể trong lớp.
     /// [Target Audience]: Instructor, Admin, Student
     /// </summary>
     /// <param name="classStudentId">The ClassStudent ID.</param>

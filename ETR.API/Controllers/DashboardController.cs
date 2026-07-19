@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ETR.API.Controllers;
 
 /// <summary>
-/// [Module/Flow]: Reporting &amp; Analytics
+/// [Module/Flow]: Báo cáo &amp; Phân tích
 /// [Core Responsibility]: Aggregates high-level statistics for system dashboards.
 /// [Target Audience]: Admin, Management
 /// </summary>
@@ -20,8 +20,8 @@ public class DashboardController : ControllerBase
     }
 
     /// <summary>
-    /// [Module/Flow]: Reporting &amp; Analytics
-    /// [Core Responsibility]: Retrieves high-level dashboard statistics.
+    /// [Module/Flow]: Báo cáo &amp; Phân tích
+    /// [Core Responsibility]: Lấy các số liệu thống kê tổng quan cho dashboard.
     /// [Target Audience]: Admin, Management
     /// </summary>
     [HttpGet("stats")]
