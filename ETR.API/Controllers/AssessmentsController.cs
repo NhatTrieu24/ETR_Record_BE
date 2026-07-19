@@ -24,6 +24,12 @@ public class AssessmentsController : ControllerBase
         _currentUserService = currentUserService;
     }
 
+    [HttpGet]
+    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
+    {
+        return Ok(await _assessmentService.GetAllAssessmentResultsAsync(cancellationToken));
+    }
+
     /// <summary>
     /// [Module/Flow]: Thực thi Đào tạo
     /// [Core Responsibility]: Ghi nhận điểm số cho một bài kiểm tra (assessment) cụ thể.

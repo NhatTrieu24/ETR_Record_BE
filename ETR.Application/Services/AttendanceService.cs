@@ -13,6 +13,13 @@ public class AttendanceService : IAttendanceService
         _unitOfWork = unitOfWork;
     }
 
+    public async Task<IEnumerable<AttendanceRecordResponse>> GetAllAttendanceRecordsAsync(CancellationToken cancellationToken = default)
+    {
+        var records = await _unitOfWork.AttendanceRecordRepository.GetAllAsync(cancellationToken);
+        return records.Select(r => new AttendanceRecordResponse(
+            r.AttendanceRecordId, r.SessionId, r.ClassStudentId, r.Status, r.Remarks, r.RecordedByAccountId, r.RecordedAt));
+    }
+
     public async Task<IEnumerable<AttendanceRecordResponse>> GetAttendanceByClassStudentAsync(int classStudentId, int accountId, CancellationToken cancellationToken = default)
     {
         var classStudent = await _unitOfWork.ClassStudentRepository.GetByIdAsync(classStudentId, cancellationToken)

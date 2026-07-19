@@ -14,6 +14,13 @@ public class AssessmentService : IAssessmentService
         _unitOfWork = unitOfWork;
     }
 
+    public async Task<IEnumerable<AssessmentResultResponse>> GetAllAssessmentResultsAsync(CancellationToken cancellationToken = default)
+    {
+        var results = await _unitOfWork.AssessmentResultRepository.GetAllAsync(cancellationToken);
+        return results.Select(r => new AssessmentResultResponse(
+            r.AssessmentResultId, r.AssessmentId, r.AccountId, r.SubjectResultId, r.Score, r.ResultStatus, r.GradedByAccountId, r.RecordedAt, r.PublishedAt, r.IsPublished, r.TakenAt, r.Remark));
+    }
+
     public async Task<IEnumerable<AssessmentResultResponse>> GetAssessmentResultsByClassStudentAsync(int classStudentId, int accountId, CancellationToken cancellationToken = default)
     {
         var classStudent = await _unitOfWork.ClassStudentRepository.GetByIdAsync(classStudentId, cancellationToken)

@@ -24,6 +24,12 @@ public class AttendanceController : ControllerBase
         _currentUserService = currentUserService;
     }
 
+    [HttpGet]
+    public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
+    {
+        return Ok(await _attendanceService.GetAllAttendanceRecordsAsync(cancellationToken));
+    }
+
     /// <summary>
     /// [Module/Flow]: Thực thi Đào tạo
     /// [Core Responsibility]: Điểm danh cho một buổi học (session) cụ thể.
