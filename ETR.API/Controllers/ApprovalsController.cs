@@ -25,7 +25,7 @@ public class ApprovalsController : ControllerBase
     [HttpPost("{id}/process")]
     public async Task<IActionResult> ProcessApproval(int id, [FromQuery] string action, [FromQuery] string? comment, CancellationToken cancellationToken)
     {
-        var accountId = _currentUserService.UserId 
+        var accountId = _currentUserService.AccountId 
             ?? throw new UnauthorizedAccessException("User is not authenticated.");
             
         var response = await _approvalService.ProcessApprovalActionAsync(id, action, accountId, comment, cancellationToken);

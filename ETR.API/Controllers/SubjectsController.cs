@@ -1,5 +1,6 @@
+using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
-using ETR.Domain.Entities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ETR.API.Controllers;
@@ -11,27 +12,78 @@ namespace ETR.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = "Admin, CROStaff")]
 public class SubjectsController : ControllerBase
 {
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly ISubjectService _subjectService;
+    private readonly ICurrentUserService _currentUserService;
 
-    public SubjectsController(IUnitOfWork unitOfWork)
+    public SubjectsController(ISubjectService subjectService, ICurrentUserService currentUserService)
     {
-        _unitOfWork = unitOfWork;
+        _subjectService = subjectService;
+        _currentUserService = currentUserService;
     }
 
+    /// <summary>
+    /// [Module/Flow]: Master Data Management
+    /// [Core Responsibility]: Retrieves all subjects.
+    /// [Target Audience]: Admin, CROStaff
+    /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetAllSubjects(CancellationToken cancellationToken)
     {
-        var subjects = await _unitOfWork.SubjectRepository.GetAllAsync(cancellationToken);
+        var subjects = await _subjectService.GetAllSubjectsAsync(cancellationToken);
         return Ok(subjects);
     }
 
+    /// <summary>
+    /// [Module/Flow]: Master Data Management
+    /// [Core Responsibility]: Retrieves a subject by ID.
+    /// [Target Audience]: Admin, CROStaff
+    /// </summary>
     [HttpGet("{id}")]
     public async Task<IActionResult> GetSubject(int id, CancellationToken cancellationToken)
     {
-        var subject = await _unitOfWork.SubjectRepository.GetByIdAsync(id, cancellationToken);
-        if (subject == null) return NotFound();
+        var subject = await _subjectService.GetSubjectByIdAsync(id, cancellationToken);
         return Ok(subject);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Master Data Management
+    /// [Core Responsibility]: Creates a new subject.
+    /// [Target Audience]: Admin, CROStaff
+    /// </summary>
+    [HttpPost]
+    public async Task<IActionResult> CreateSubject([FromBody] CreateSubjectRequest request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        var subject = await _subjectService.CreateSubjectAsync(request, accountId, cancellationToken);
+        return CreatedAtAction(nameof(GetSubject), new { id = subject.SubjectId }, subject);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Master Data Management
+    /// [Core Responsibility]: Updates an existing subject.
+    /// [Target Audience]: Admin, CROStaff
+    /// </summary>
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateSubject(int id, [FromBody] UpdateSubjectRequest request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        var subject = await _subjectService.UpdateSubjectAsync(id, request, accountId, cancellationToken);
+        return Ok(subject);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Master Data Management
+    /// [Core Responsibility]: Soft deletes a subject.
+    /// [Target Audience]: Admin, CROStaff
+    /// </summary>
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteSubject(int id, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        await _subjectService.DeleteSubjectAsync(id, accountId, cancellationToken);
+        return NoContent();
     }
 }

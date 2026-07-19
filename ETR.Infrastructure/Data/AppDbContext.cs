@@ -13,7 +13,6 @@ public partial class AppDbContext : DbContext
 
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Department> Departments => Set<Department>();
-    public DbSet<LearnerType> LearnerTypes => Set<LearnerType>();
     public DbSet<Course> Courses => Set<Course>();
     public DbSet<EvidenceType> EvidenceTypes => Set<EvidenceType>();
     
@@ -58,7 +57,6 @@ public partial class AppDbContext : DbContext
     {
         modelBuilder.Entity<Role>().HasKey(e => e.RoleId);
         modelBuilder.Entity<Department>().HasKey(e => e.DepartmentId);
-        modelBuilder.Entity<LearnerType>().HasKey(e => e.LearnerTypeId);
         modelBuilder.Entity<Course>().HasKey(e => e.CourseId);
         modelBuilder.Entity<EvidenceType>().HasKey(e => e.EvidenceTypeId);
         
@@ -93,7 +91,6 @@ public partial class AppDbContext : DbContext
     {
         modelBuilder.Entity<Role>().HasIndex(r => r.RoleName).IsUnique();
         modelBuilder.Entity<Department>().HasIndex(d => d.DepartmentName).IsUnique();
-        modelBuilder.Entity<LearnerType>().HasIndex(lt => lt.TypeName).IsUnique();
         modelBuilder.Entity<EvidenceType>().HasIndex(et => et.TypeName).IsUnique();
         modelBuilder.Entity<Course>().HasIndex(c => c.CourseCode).IsUnique();
         modelBuilder.Entity<Subject>().HasIndex(s => s.SubjectCode).IsUnique();
@@ -154,7 +151,6 @@ public partial class AppDbContext : DbContext
 
         modelBuilder.Entity<Account>().HasOne<Role>().WithMany().HasForeignKey(u => u.RoleId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<Account>().HasOne<Department>().WithMany().HasForeignKey(u => u.DepartmentId).OnDelete(cascadeDeleteConfig);
-        modelBuilder.Entity<UserProfile>().HasOne<LearnerType>().WithMany().HasForeignKey(l => l.LearnerTypeId).OnDelete(cascadeDeleteConfig);
 
         // Course & Class Setup
         modelBuilder.Entity<CourseSubject>().HasOne<Course>().WithMany().HasForeignKey(cs => cs.CourseId).OnDelete(cascadeDeleteConfig);

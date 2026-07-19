@@ -25,6 +25,40 @@ public class EtrController : ControllerBase
     }
 
     /// <summary>
+    /// [Module/Flow]: ETR Processing
+    /// [Core Responsibility]: Retrieves all ETR records.
+    /// [Target Audience]: Instructor, Verifier, Admin
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of ETR records.</returns>
+    /// <response code="200">Returns the list of ETR records.</response>
+    /// <response code="401">If the user is not authenticated.</response>
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<EtrRecordResponse>>> GetAllEtrs(CancellationToken cancellationToken)
+    {
+        var etrs = await _etrService.GetAllEtrsAsync(cancellationToken);
+        return Ok(etrs);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: ETR Processing
+    /// [Core Responsibility]: Retrieves a specific ETR record by ID, including its Subject Results.
+    /// [Target Audience]: Instructor, Verifier, Admin
+    /// </summary>
+    /// <param name="id">The ETR Course Record ID.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The ETR details and subject results.</returns>
+    /// <response code="200">Returns the ETR details.</response>
+    /// <response code="401">If the user is not authenticated.</response>
+    /// <response code="404">If the ETR record is not found.</response>
+    [HttpGet("{id}")]
+    public async Task<ActionResult<EtrDetailsResponse>> GetEtrById(int id, CancellationToken cancellationToken)
+    {
+        var etr = await _etrService.GetEtrByIdAsync(id, cancellationToken);
+        return Ok(etr);
+    }
+
+    /// <summary>
     /// Submits an ETR for verification.
     /// </summary>
     /// <param name="id">The ETR Course Record ID.</param>
@@ -37,10 +71,10 @@ public class EtrController : ControllerBase
     [Authorize(Roles = "Instructor, Admin")]
     public async Task<IActionResult> SubmitEtr(int id, CancellationToken cancellationToken)
     {
-        var userId = _currentUserService.UserId 
+        var accountId = _currentUserService.AccountId 
             ?? throw new UnauthorizedAccessException("User is not authenticated.");
             
-        var response = await _etrService.SubmitEtrAsync(id, userId, cancellationToken);
+        var response = await _etrService.SubmitEtrAsync(id, accountId, cancellationToken);
         return Ok(response);
     }
 
@@ -57,10 +91,10 @@ public class EtrController : ControllerBase
     [Authorize(Roles = "Verifier, Admin")]
     public async Task<IActionResult> VerifyEtr(int id, CancellationToken cancellationToken)
     {
-        var userId = _currentUserService.UserId 
+        var accountId = _currentUserService.AccountId 
             ?? throw new UnauthorizedAccessException("User is not authenticated.");
             
-        var response = await _etrService.VerifyEtrAsync(id, userId, cancellationToken);
+        var response = await _etrService.VerifyEtrAsync(id, accountId, cancellationToken);
         return Ok(response);
     }
 
@@ -77,10 +111,10 @@ public class EtrController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> CompleteEtr(int id, CancellationToken cancellationToken)
     {
-        var userId = _currentUserService.UserId 
+        var accountId = _currentUserService.AccountId 
             ?? throw new UnauthorizedAccessException("User is not authenticated.");
             
-        var response = await _etrService.CompleteEtrAsync(id, userId, cancellationToken);
+        var response = await _etrService.CompleteEtrAsync(id, accountId, cancellationToken);
         return Ok(response);
     }
 }

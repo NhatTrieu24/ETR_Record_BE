@@ -13,6 +13,30 @@ public class EnrollmentService : IEnrollmentService
         _unitOfWork = unitOfWork;
     }
 
+    public async Task<IEnumerable<EnrollmentResponse>> GetAllEnrollmentsAsync(CancellationToken cancellationToken = default)
+    {
+        var enrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken);
+        return enrollments.Select(e => new EnrollmentResponse(
+            e.EnrollmentId,
+            e.AccountId,
+            e.ClassId,
+            e.Status,
+            e.EnrolledAt));
+    }
+
+    public async Task<EnrollmentResponse> GetEnrollmentByIdAsync(int enrollmentId, CancellationToken cancellationToken = default)
+    {
+        var e = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(enrollmentId, cancellationToken)
+            ?? throw new KeyNotFoundException("Enrollment not found");
+
+        return new EnrollmentResponse(
+            e.EnrollmentId,
+            e.AccountId,
+            e.ClassId,
+            e.Status,
+            e.EnrolledAt);
+    }
+
     public async Task<CreateEnrollmentResponse> CreateEnrollmentAsync(
         int accountId,
         int classId,

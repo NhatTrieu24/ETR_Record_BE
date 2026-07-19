@@ -24,6 +24,11 @@ public class AccountsController : ControllerBase
         _currentUserService = currentUserService;
     }
 
+    /// <summary>
+    /// [Module/Flow]: Identity &amp; Access Management
+    /// [Core Responsibility]: Retrieves all accounts.
+    /// [Target Audience]: Admin
+    /// </summary>
     [HttpGet]
     public async Task<ActionResult<IEnumerable<AccountResponse>>> GetAllAccounts(CancellationToken cancellationToken)
     {
@@ -31,6 +36,11 @@ public class AccountsController : ControllerBase
         return Ok(accounts);
     }
 
+    /// <summary>
+    /// [Module/Flow]: Identity &amp; Access Management
+    /// [Core Responsibility]: Retrieves a specific account by ID.
+    /// [Target Audience]: Admin
+    /// </summary>
     [HttpGet("{id:int}")]
     public async Task<ActionResult<AccountResponse>> GetAccountById(int id, CancellationToken cancellationToken)
     {
@@ -38,22 +48,37 @@ public class AccountsController : ControllerBase
         return Ok(account);
     }
 
+    /// <summary>
+    /// [Module/Flow]: Identity &amp; Access Management
+    /// [Core Responsibility]: Creates a new system account.
+    /// [Target Audience]: Admin
+    /// </summary>
     [HttpPost]
     public async Task<ActionResult<AccountResponse>> CreateAccount([FromBody] CreateAccountRequest request, CancellationToken cancellationToken)
     {
-        var userId = _currentUserService.UserId ?? throw new UnauthorizedAccessException();
-        var account = await _accountService.CreateAccountAsync(request, userId, cancellationToken);
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        var account = await _accountService.CreateAccountAsync(request, accountId, cancellationToken);
         return CreatedAtAction(nameof(GetAccountById), new { id = account.AccountId }, account);
     }
 
+    /// <summary>
+    /// [Module/Flow]: Identity &amp; Access Management
+    /// [Core Responsibility]: Updates the status of an existing account.
+    /// [Target Audience]: Admin
+    /// </summary>
     [HttpPut("{id:int}/status")]
     public async Task<ActionResult> UpdateAccountStatus(int id, [FromBody] UpdateAccountStatusRequest request, CancellationToken cancellationToken)
     {
-        var userId = _currentUserService.UserId ?? throw new UnauthorizedAccessException();
-        await _accountService.UpdateAccountStatusAsync(id, request.Status, userId, cancellationToken);
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        await _accountService.UpdateAccountStatusAsync(id, request.Status, accountId, cancellationToken);
         return NoContent();
     }
 
+    /// <summary>
+    /// [Module/Flow]: Identity &amp; Access Management
+    /// [Core Responsibility]: Deletes an account from the system.
+    /// [Target Audience]: Admin
+    /// </summary>
     [HttpDelete("{id:int}")]
     public async Task<ActionResult> DeleteAccount(int id, CancellationToken cancellationToken)
     {

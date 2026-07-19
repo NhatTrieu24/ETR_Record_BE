@@ -19,6 +19,11 @@ public class ReportsController : ControllerBase
         _unitOfWork = unitOfWork;
     }
 
+    /// <summary>
+    /// [Module/Flow]: Reporting &amp; Analytics
+    /// [Core Responsibility]: Retrieves summary reports for classes and ETRs.
+    /// [Target Audience]: Admin, Management
+    /// </summary>
     [HttpGet("summary")]
     public async Task<IActionResult> GetSummary(CancellationToken cancellationToken)
     {

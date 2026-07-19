@@ -21,6 +21,11 @@ public class AuditController : ControllerBase
         _unitOfWork = unitOfWork;
     }
 
+    /// <summary>
+    /// [Module/Flow]: System Auditing &amp; Compliance
+    /// [Core Responsibility]: Retrieves all audit logs.
+    /// [Target Audience]: Admin
+    /// </summary>
     [HttpGet]
     public async Task<ActionResult<IEnumerable<AuditLogResponse>>> GetAuditLogs(CancellationToken cancellationToken)
     {
@@ -28,6 +33,11 @@ public class AuditController : ControllerBase
         return Ok(list.Select(MapLogToResponse));
     }
 
+    /// <summary>
+    /// [Module/Flow]: System Auditing &amp; Compliance
+    /// [Core Responsibility]: Retrieves a specific audit log by ID.
+    /// [Target Audience]: Admin
+    /// </summary>
     [HttpGet("{id:long}")]
     public async Task<ActionResult<AuditLogResponse>> GetAuditLogById(long id, CancellationToken cancellationToken)
     {
@@ -36,6 +46,11 @@ public class AuditController : ControllerBase
         return Ok(MapLogToResponse(log));
     }
 
+    /// <summary>
+    /// [Module/Flow]: System Auditing &amp; Compliance
+    /// [Core Responsibility]: Searches audit logs by action type, entity name, or description.
+    /// [Target Audience]: Admin
+    /// </summary>
     [HttpGet("search")]
     public async Task<ActionResult<IEnumerable<AuditLogResponse>>> SearchAuditLogs([FromQuery] string query, CancellationToken cancellationToken)
     {

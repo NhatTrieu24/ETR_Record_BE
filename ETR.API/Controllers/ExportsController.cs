@@ -15,12 +15,19 @@ namespace ETR.API.Controllers;
 public class ExportsController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICurrentUserService _currentUserService;
 
-    public ExportsController(IUnitOfWork unitOfWork)
+    public ExportsController(IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
     {
         _unitOfWork = unitOfWork;
+        _currentUserService = currentUserService;
     }
 
+    /// <summary>
+    /// [Module/Flow]: System Auditing &amp; Compliance
+    /// [Core Responsibility]: Retrieves a specific export job by ID.
+    /// [Target Audience]: Admin
+    /// </summary>
     [HttpGet("{id:int}")]
     public async Task<ActionResult<ExportJobResponse>> GetExportJob(int id, CancellationToken cancellationToken)
     {
@@ -29,24 +36,47 @@ public class ExportsController : ControllerBase
         return Ok(MapJobToResponse(job));
     }
 
+    /// <summary>
+    /// [Module/Flow]: System Auditing &amp; Compliance
+    /// [Core Responsibility]: Triggers an export job for a training package.
+    /// [Target Audience]: Admin
+    /// </summary>
     [HttpPost("training-package")]
     public async Task<ActionResult<ExportJobResponse>> ExportTrainingPackage([FromBody] ExportRequest request, CancellationToken cancellationToken)
     {
-        return await CreateMockExportJob("TrainingPackage", request.UserId, cancellationToken);
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        return await CreateMockExportJob("TrainingPackage", accountId, cancellationToken);
     }
 
+    /// <summary>
+    /// [Module/Flow]: System Auditing &amp; Compliance
+    /// [Core Responsibility]: Triggers an export job for a PDF report.
+    /// [Target Audience]: Admin
+    /// </summary>
     [HttpPost("pdf")]
     public async Task<ActionResult<ExportJobResponse>> ExportPdf([FromBody] ExportRequest request, CancellationToken cancellationToken)
     {
-        return await CreateMockExportJob("PDF", request.UserId, cancellationToken);
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        return await CreateMockExportJob("PDF", accountId, cancellationToken);
     }
 
+    /// <summary>
+    /// [Module/Flow]: System Auditing &amp; Compliance
+    /// [Core Responsibility]: Triggers an export job for a dashboard summary.
+    /// [Target Audience]: Admin
+    /// </summary>
     [HttpPost("dashboard")]
     public async Task<ActionResult<ExportJobResponse>> ExportDashboard([FromBody] ExportRequest request, CancellationToken cancellationToken)
     {
-        return await CreateMockExportJob("Dashboard", request.UserId, cancellationToken);
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        return await CreateMockExportJob("Dashboard", accountId, cancellationToken);
     }
 
+    /// <summary>
+    /// [Module/Flow]: System Auditing &amp; Compliance
+    /// [Core Responsibility]: Downloads the generated file of a completed export job.
+    /// [Target Audience]: Admin
+    /// </summary>
     [HttpGet("download/{id:int}")]
     public async Task<IActionResult> DownloadExportFile(int id, CancellationToken cancellationToken)
     {

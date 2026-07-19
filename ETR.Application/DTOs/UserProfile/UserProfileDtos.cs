@@ -8,8 +8,7 @@ public record UserProfileResponse(
     string? Phone,
     DateTime DateOfBirth,
     string Gender,
-    string? Organization,
-    int? LearnerTypeId);
+    string? Organization);
 
 public record CreateUserProfileRequest(
     string UserCode,
@@ -18,8 +17,7 @@ public record CreateUserProfileRequest(
     string? Phone,
     DateTime DateOfBirth,
     string Gender,
-    string? Organization,
-    int? LearnerTypeId);
+    string? Organization);
 
 public record UpdateUserProfileRequest(
     string FullName,
@@ -27,5 +25,4 @@ public record UpdateUserProfileRequest(
     string? Phone,
     DateTime DateOfBirth,
     string Gender,
-    string? Organization,
-    int? LearnerTypeId);
+    string? Organization);

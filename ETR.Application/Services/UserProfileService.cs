@@ -22,7 +22,8 @@ public class UserProfileService : IUserProfileService
     public async Task<IEnumerable<UserProfileResponse>> GetLearnerProfilesAsync(CancellationToken cancellationToken = default)
     {
         var profiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
-        return profiles.Where(p => p.LearnerTypeId.HasValue).Select(MapToResponse);
+        // TODO: Refactor to filter by Account Role
+        return profiles.Select(MapToResponse);
     }
 
     public async Task<UserProfileResponse> GetProfileByAccountIdAsync(int accountId, CancellationToken cancellationToken = default)
@@ -46,7 +47,6 @@ public class UserProfileService : IUserProfileService
             DateOfBirth = request.DateOfBirth,
             Gender = request.Gender,
             Organization = request.Organization,
-            LearnerTypeId = request.LearnerTypeId,
             CreatedAt = DateTime.UtcNow,
             CreatedByAccountId = createdByAccountId
         };
@@ -69,7 +69,6 @@ public class UserProfileService : IUserProfileService
         profile.DateOfBirth = request.DateOfBirth;
         profile.Gender = request.Gender;
         profile.Organization = request.Organization;
-        profile.LearnerTypeId = request.LearnerTypeId;
         profile.UpdatedAt = DateTime.UtcNow;
         profile.UpdatedByAccountId = updatedByAccountId;
 
@@ -89,7 +88,6 @@ public class UserProfileService : IUserProfileService
             p.Phone, 
             p.DateOfBirth, 
             p.Gender, 
-            p.Organization, 
-            p.LearnerTypeId);
+            p.Organization);
     }
 }

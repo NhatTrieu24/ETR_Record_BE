@@ -14,7 +14,6 @@ public interface IUnitOfWork
     IGenericRepository<CourseSubject> CourseSubjectRepository { get; }
     IGenericRepository<Role> RoleRepository { get; }
     IGenericRepository<Department> DepartmentRepository { get; }
-    IGenericRepository<LearnerType> LearnerTypeRepository { get; }
     IGenericRepository<Course> CourseRepository { get; }
     IGenericRepository<EvidenceType> EvidenceTypeRepository { get; }
     IGenericRepository<Session> SessionRepository { get; }

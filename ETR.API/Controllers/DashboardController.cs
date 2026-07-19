@@ -19,6 +19,11 @@ public class DashboardController : ControllerBase
         _unitOfWork = unitOfWork;
     }
 
+    /// <summary>
+    /// [Module/Flow]: Reporting &amp; Analytics
+    /// [Core Responsibility]: Retrieves high-level dashboard statistics.
+    /// [Target Audience]: Admin, Management
+    /// </summary>
     [HttpGet("stats")]
     public async Task<IActionResult> GetStats(CancellationToken cancellationToken)
     {

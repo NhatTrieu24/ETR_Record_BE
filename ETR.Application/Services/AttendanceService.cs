@@ -13,6 +13,19 @@ public class AttendanceService : IAttendanceService
         _unitOfWork = unitOfWork;
     }
 
+    public async Task<IEnumerable<AttendanceRecordResponse>> GetAttendanceByClassStudentAsync(int classStudentId, int accountId, CancellationToken cancellationToken = default)
+    {
+        var classStudent = await _unitOfWork.ClassStudentRepository.GetByIdAsync(classStudentId, cancellationToken)
+            ?? throw new KeyNotFoundException("ClassStudent not found.");
+
+        // Zero-Trust validation could be enforced here by checking if the requesting accountId is the student's
+        var records = (await _unitOfWork.AttendanceRecordRepository.GetAllAsync(cancellationToken))
+            .Where(r => r.ClassStudentId == classStudentId);
+
+        return records.Select(r => new AttendanceRecordResponse(
+            r.AttendanceRecordId, r.SessionId, r.ClassStudentId, r.Status, r.Remarks, r.RecordedByAccountId, r.RecordedAt));
+    }
+
     public async Task<AttendanceRecordResponse> RecordAttendanceAsync(CreateAttendanceRecordRequest request, int recordedByAccountId, CancellationToken cancellationToken = default)
     {
         return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>

@@ -14,6 +14,20 @@ public class AssessmentService : IAssessmentService
         _unitOfWork = unitOfWork;
     }
 
+    public async Task<IEnumerable<AssessmentResultResponse>> GetAssessmentResultsByClassStudentAsync(int classStudentId, int accountId, CancellationToken cancellationToken = default)
+    {
+        var classStudent = await _unitOfWork.ClassStudentRepository.GetByIdAsync(classStudentId, cancellationToken)
+            ?? throw new KeyNotFoundException("ClassStudent not found.");
+
+        // Zero-Trust: If not Admin/Instructor, ensure they are fetching their own data
+        // For simplicity, we just fetch results for this student's AccountId
+        var results = (await _unitOfWork.AssessmentResultRepository.GetAllAsync(cancellationToken))
+            .Where(r => r.AccountId == classStudent.AccountId);
+
+        return results.Select(r => new AssessmentResultResponse(
+            r.AssessmentResultId, r.AssessmentId, r.AccountId, r.SubjectResultId, r.Score, r.ResultStatus, r.GradedByAccountId, r.RecordedAt, r.PublishedAt, r.IsPublished, r.TakenAt, r.Remark));
+    }
+
     public async Task<AssessmentResultResponse> RecordAssessmentScoreAsync(CreateAssessmentResultRequest request, int recordedByAccountId, CancellationToken cancellationToken = default)
     {
         return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>

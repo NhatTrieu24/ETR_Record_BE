@@ -19,6 +19,11 @@ public class SearchController : ControllerBase
         _unitOfWork = unitOfWork;
     }
 
+    /// <summary>
+    /// [Module/Flow]: System Discovery
+    /// [Core Responsibility]: Searches for classes by name.
+    /// [Target Audience]: All Roles
+    /// </summary>
     [HttpGet("classes")]
     public async Task<IActionResult> SearchClasses([FromQuery] string query, CancellationToken cancellationToken)
     {
@@ -27,6 +32,11 @@ public class SearchController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// [Module/Flow]: System Discovery
+    /// [Core Responsibility]: Searches for ETR records.
+    /// [Target Audience]: All Roles
+    /// </summary>
     [HttpGet("etrs")]
     public async Task<IActionResult> SearchEtrs([FromQuery] string query, CancellationToken cancellationToken)
     {

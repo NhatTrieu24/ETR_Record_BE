@@ -13,6 +13,41 @@ public class EtrService : IEtrService
         _unitOfWork = unitOfWork;
     }
 
+    public async Task<IEnumerable<EtrRecordResponse>> GetAllEtrsAsync(CancellationToken cancellationToken = default)
+    {
+        var etrs = await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken);
+        return etrs.Select(e => new EtrRecordResponse(
+            e.ETRCourseRecordId,
+            e.EnrollmentId,
+            e.Status,
+            e.IsLocked,
+            e.SubmittedAt,
+            e.VerifiedAt,
+            e.CompletedAt));
+    }
+
+    public async Task<EtrDetailsResponse> GetEtrByIdAsync(int etrCourseRecordId, CancellationToken cancellationToken = default)
+    {
+        var e = await _unitOfWork.ETRCourseRecordRepository.GetWithSubjectResultsAsync(etrCourseRecordId, cancellationToken)
+            ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
+
+        var subjectResults = e.SubjectResults?.Select(sr => new SubjectResultResponse(
+            sr.SubjectResultId,
+            sr.SubjectId,
+            sr.Status,
+            sr.CreatedAt)) ?? Array.Empty<SubjectResultResponse>();
+
+        return new EtrDetailsResponse(
+            e.ETRCourseRecordId,
+            e.EnrollmentId,
+            e.Status,
+            e.IsLocked,
+            e.SubmittedAt,
+            e.VerifiedAt,
+            e.CompletedAt,
+            subjectResults);
+    }
+
     public async Task<EtrRecordResponse> SubmitEtrAsync(int etrCourseRecordId, int accountId, CancellationToken cancellationToken = default)
     {
         var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(etrCourseRecordId, cancellationToken)

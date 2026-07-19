@@ -25,7 +25,9 @@ public class AssessmentsController : ControllerBase
     }
 
     /// <summary>
-    /// Records a score for a specific assessment.
+    /// [Module/Flow]: Training Execution
+    /// [Core Responsibility]: Records a score for a specific assessment.
+    /// [Target Audience]: Instructor, Admin
     /// </summary>
     /// <param name="request">The assessment result details.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -36,15 +38,17 @@ public class AssessmentsController : ControllerBase
     [HttpPost("record")]
     public async Task<IActionResult> RecordAssessment([FromBody] CreateAssessmentResultRequest request, CancellationToken cancellationToken)
     {
-        var userId = _currentUserService.UserId 
+        var accountId = _currentUserService.AccountId 
             ?? throw new UnauthorizedAccessException("User is not authenticated.");
 
-        var response = await _assessmentService.RecordAssessmentScoreAsync(request, userId, cancellationToken);
+        var response = await _assessmentService.RecordAssessmentScoreAsync(request, accountId, cancellationToken);
         return Ok(response);
     }
 
     /// <summary>
-    /// Signs off a subject result.
+    /// [Module/Flow]: Training Execution
+    /// [Core Responsibility]: Signs off a subject result.
+    /// [Target Audience]: Instructor, Admin
     /// </summary>
     /// <param name="request">The signoff details.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -55,10 +59,32 @@ public class AssessmentsController : ControllerBase
     [HttpPost("signoff")]
     public async Task<IActionResult> SignoffSubject([FromBody] CreateSubjectSignoffRequest request, CancellationToken cancellationToken)
     {
-        var userId = _currentUserService.UserId 
+        var accountId = _currentUserService.AccountId 
             ?? throw new UnauthorizedAccessException("User is not authenticated.");
 
-        var response = await _assessmentService.SignoffSubjectResultAsync(request, userId, cancellationToken);
+        var response = await _assessmentService.SignoffSubjectResultAsync(request, accountId, cancellationToken);
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Training Execution
+    /// [Core Responsibility]: Retrieves assessment results for a specific student in a class.
+    /// [Target Audience]: Instructor, Admin, Student
+    /// </summary>
+    /// <param name="classStudentId">The ClassStudent ID.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of assessment results.</returns>
+    /// <response code="200">Returns the list of assessment results.</response>
+    /// <response code="401">If the user is not authenticated.</response>
+    /// <response code="404">If the ClassStudent is not found.</response>
+    [HttpGet("student/{classStudentId}")]
+    [Authorize] // Allow students to also fetch their own results, validation inside service
+    public async Task<IActionResult> GetAssessmentResults(int classStudentId, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
+        var response = await _assessmentService.GetAssessmentResultsByClassStudentAsync(classStudentId, accountId, cancellationToken);
         return Ok(response);
     }
 }

@@ -25,7 +25,9 @@ public class AttendanceController : ControllerBase
     }
 
     /// <summary>
-    /// Records attendance for a specific session.
+    /// [Module/Flow]: Training Execution
+    /// [Core Responsibility]: Records attendance for a specific session.
+    /// [Target Audience]: Instructor, Admin
     /// </summary>
     /// <param name="request">The attendance record details.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -36,15 +38,17 @@ public class AttendanceController : ControllerBase
     [HttpPost("record")]
     public async Task<IActionResult> RecordAttendance([FromBody] CreateAttendanceRecordRequest request, CancellationToken cancellationToken)
     {
-        var userId = _currentUserService.UserId 
+        var accountId = _currentUserService.AccountId 
             ?? throw new UnauthorizedAccessException("User is not authenticated.");
 
-        var response = await _attendanceService.RecordAttendanceAsync(request, userId, cancellationToken);
+        var response = await _attendanceService.RecordAttendanceAsync(request, accountId, cancellationToken);
         return Ok(response);
     }
 
     /// <summary>
-    /// Confirms that an attendance session has been finalized.
+    /// [Module/Flow]: Training Execution
+    /// [Core Responsibility]: Confirms that an attendance session has been finalized.
+    /// [Target Audience]: Instructor, Admin
     /// </summary>
     /// <param name="sessionId">The ID of the session to confirm.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -55,10 +59,32 @@ public class AttendanceController : ControllerBase
     [HttpPost("sessions/{sessionId}/confirm")]
     public async Task<IActionResult> ConfirmSession(int sessionId, CancellationToken cancellationToken)
     {
-        var userId = _currentUserService.UserId 
+        var accountId = _currentUserService.AccountId 
             ?? throw new UnauthorizedAccessException("User is not authenticated.");
 
-        var response = await _attendanceService.ConfirmSessionAsync(sessionId, userId, cancellationToken);
+        var response = await _attendanceService.ConfirmSessionAsync(sessionId, accountId, cancellationToken);
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Training Execution
+    /// [Core Responsibility]: Retrieves attendance records for a specific student in a class.
+    /// [Target Audience]: Instructor, Admin, Student
+    /// </summary>
+    /// <param name="classStudentId">The ClassStudent ID.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of attendance records.</returns>
+    /// <response code="200">Returns the list of attendance records.</response>
+    /// <response code="401">If the user is not authenticated.</response>
+    /// <response code="404">If the ClassStudent is not found.</response>
+    [HttpGet("student/{classStudentId}")]
+    [Authorize] // Allow students to also fetch their own results, validation inside service
+    public async Task<IActionResult> GetAttendanceRecords(int classStudentId, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
+        var response = await _attendanceService.GetAttendanceByClassStudentAsync(classStudentId, accountId, cancellationToken);
         return Ok(response);
     }
 }
