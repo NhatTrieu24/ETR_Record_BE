@@ -1,0 +1,839 @@
+@baseUrl = http://localhost:5129
+@token = YOUR_TOKEN_HERE
+
+### Login to get token
+POST {{baseUrl}}/api/Auth/login
+Content-Type: application/json
+
+{"email": "admin@etr.com", "password": "123456"}
+
+### ----------------------------------------------------
+### ================= MODULE: Accounts =================
+### [Module/Flow]: Identity & Access Management
+[Core Responsibility]: Retrieves all accounts.
+[Target Audience]: Admin
+GET {{baseUrl}}/api/Accounts
+Authorization: Bearer {{token}}
+
+### [Module/Flow]: Identity & Access Management
+[Core Responsibility]: Creates a new system account.
+[Target Audience]: Admin
+POST {{baseUrl}}/api/Accounts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "username": "string",
+  "password": "string",
+  "roleId": 1,
+  "departmentId": 1
+}
+
+### [Module/Flow]: Identity & Access Management
+[Core Responsibility]: Retrieves a specific account by ID.
+[Target Audience]: Admin
+GET {{baseUrl}}/api/Accounts/1
+Authorization: Bearer {{token}}
+
+### [Module/Flow]: Identity & Access Management
+[Core Responsibility]: Deletes an account from the system.
+[Target Audience]: Admin
+DELETE {{baseUrl}}/api/Accounts/1
+Authorization: Bearer {{token}}
+
+### [Module/Flow]: Identity & Access Management
+[Core Responsibility]: Updates the status of an existing account.
+[Target Audience]: Admin
+PUT {{baseUrl}}/api/Accounts/1/status
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "string"
+}
+
+### ================= MODULE: Approvals =================
+### 
+GET {{baseUrl}}/api/Approvals
+Authorization: Bearer {{token}}
+
+### 
+POST {{baseUrl}}/api/Approvals
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "etrCourseRecordId": 1,
+  "submittedBy": 1,
+  "currentApproverId": 1
+}
+
+### 
+POST {{baseUrl}}/api/Approvals/1/process
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{}
+
+### ================= MODULE: Assessments =================
+### [Module/Flow]: Training Execution
+[Core Responsibility]: Records a score for a specific assessment.
+[Target Audience]: Instructor, Admin
+POST {{baseUrl}}/api/Assessments/record
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "assessmentId": 1,
+  "accountId": 1,
+  "subjectResultId": 1,
+  "score": 1,
+  "remark": "string"
+}
+
+### [Module/Flow]: Training Execution
+[Core Responsibility]: Signs off a subject result.
+[Target Audience]: Instructor, Admin
+POST {{baseUrl}}/api/Assessments/signoff
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "subjectResultId": 1,
+  "role": "string",
+  "comment": "string"
+}
+
+### [Module/Flow]: Training Execution
+[Core Responsibility]: Retrieves assessment results for a specific student in a class.
+[Target Audience]: Instructor, Admin, Student
+GET {{baseUrl}}/api/Assessments/student/1
+Authorization: Bearer {{token}}
+
+### ================= MODULE: Attendance =================
+### [Module/Flow]: Training Execution
+[Core Responsibility]: Records attendance for a specific session.
+[Target Audience]: Instructor, Admin
+POST {{baseUrl}}/api/Attendance/record
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "sessionId": 1,
+  "classStudentId": 1,
+  "status": "string",
+  "remarks": "string"
+}
+
+### [Module/Flow]: Training Execution
+[Core Responsibility]: Confirms that an attendance session has been finalized.
+[Target Audience]: Instructor, Admin
+POST {{baseUrl}}/api/Attendance/sessions/1/confirm
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{}
+
+### [Module/Flow]: Training Execution
+[Core Responsibility]: Retrieves attendance records for a specific student in a class.
+[Target Audience]: Instructor, Admin, Student
+GET {{baseUrl}}/api/Attendance/student/1
+Authorization: Bearer {{token}}
+
+### ================= MODULE: Audit =================
+### [Module/Flow]: System Auditing & Compliance
+[Core Responsibility]: Retrieves all audit logs.
+[Target Audience]: Admin
+GET {{baseUrl}}/api/Audit
+Authorization: Bearer {{token}}
+
+### [Module/Flow]: System Auditing & Compliance
+[Core Responsibility]: Retrieves a specific audit log by ID.
+[Target Audience]: Admin
+GET {{baseUrl}}/api/Audit/1
+Authorization: Bearer {{token}}
+
+### [Module/Flow]: System Auditing & Compliance
+[Core Responsibility]: Searches audit logs by action type, entity name, or description.
+[Target Audience]: Admin
+GET {{baseUrl}}/api/Audit/search
+Authorization: Bearer {{token}}
+
+### ================= MODULE: Auth =================
+### [Module/Flow]: Identity & Access Management
+[Core Responsibility]: Authenticates user and returns JWT token.
+[Target Audience]: Public (Unauthenticated)
+POST {{baseUrl}}/api/auth/login
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "username": "string",
+  "password": "string"
+}
+
+### [Module/Flow]: Identity & Access Management
+[Core Responsibility]: Authenticates user via Google OAuth and returns JWT token.
+[Target Audience]: Public (Unauthenticated)
+POST {{baseUrl}}/api/auth/google-login
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "idToken": "string"
+}
+
+### [Module/Flow]: Identity & Access Management
+[Core Responsibility]: Refreshes an expired JWT token using a valid refresh token.
+[Target Audience]: Public (Unauthenticated)
+POST {{baseUrl}}/api/auth/refresh-token
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "refreshToken": "string"
+}
+
+### [Module/Flow]: Identity & Access Management
+[Core Responsibility]: Invalidates the current user session.
+[Target Audience]: All Roles
+POST {{baseUrl}}/api/auth/logout
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{}
+
+### [Module/Flow]: Identity & Access Management
+[Core Responsibility]: Changes the password for the currently authenticated user.
+[Target Audience]: All Roles
+POST {{baseUrl}}/api/auth/change-password
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "userId": 1,
+  "oldPassword": "string",
+  "newPassword": "string"
+}
+
+### [Module/Flow]: Identity & Access Management
+[Core Responsibility]: Initiates the forgot password flow.
+[Target Audience]: Public (Unauthenticated)
+POST {{baseUrl}}/api/auth/forgot-password
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "email": "user@example.com"
+}
+
+### [Module/Flow]: Identity & Access Management
+[Core Responsibility]: Resets the user's password using a reset token.
+[Target Audience]: Public (Unauthenticated)
+POST {{baseUrl}}/api/auth/reset-password
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "token": "string",
+  "newPassword": "string"
+}
+
+### [Module/Flow]: Identity & Access Management
+[Core Responsibility]: Retrieves the currently authenticated user's account and profile information.
+[Target Audience]: All Roles
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{token}}
+
+### ================= MODULE: Classes =================
+### [Module/Flow]: Master Data Management
+[Core Responsibility]: Retrieves all classes.
+[Target Audience]: Admin, Academic, TrainingManager
+GET {{baseUrl}}/api/Classes
+Authorization: Bearer {{token}}
+
+### [Module/Flow]: Master Data Management
+[Core Responsibility]: Creates a new class.
+[Target Audience]: Admin, Academic, TrainingManager
+POST {{baseUrl}}/api/Classes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "classCode": "string",
+  "className": "string",
+  "courseId": 1,
+  "startDate": "2026-10-15T08:00:00Z",
+  "endDate": "2026-10-15T08:00:00Z",
+  "location": "string",
+  "capacity": 1,
+  "status": "string"
+}
+
+### [Module/Flow]: Master Data Management
+[Core Responsibility]: Retrieves a class by ID.
+[Target Audience]: Admin, Academic, TrainingManager
+GET {{baseUrl}}/api/Classes/1
+Authorization: Bearer {{token}}
+
+### [Module/Flow]: Master Data Management
+[Core Responsibility]: Updates an existing class.
+[Target Audience]: Admin, Academic, TrainingManager
+PUT {{baseUrl}}/api/Classes/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "classId": 1,
+  "classCode": "string",
+  "className": "string",
+  "courseId": 1,
+  "startDate": "2026-10-15T08:00:00Z",
+  "endDate": "2026-10-15T08:00:00Z",
+  "location": "string",
+  "capacity": 1,
+  "status": "string"
+}
+
+### [Module/Flow]: Master Data Management
+[Core Responsibility]: Soft deletes a class.
+[Target Audience]: Admin, Academic, TrainingManager
+DELETE {{baseUrl}}/api/Classes/1
+Authorization: Bearer {{token}}
+
+### ================= MODULE: CompletionRequirements =================
+### 
+GET {{baseUrl}}/api/CompletionRequirements
+Authorization: Bearer {{token}}
+
+### 
+POST {{baseUrl}}/api/CompletionRequirements
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "courseId": 1,
+  "requirementName": "string",
+  "description": "string",
+  "isMandatory": true,
+  "displayOrder": 1
+}
+
+### 
+GET {{baseUrl}}/api/CompletionRequirements/1
+Authorization: Bearer {{token}}
+
+### 
+PUT {{baseUrl}}/api/CompletionRequirements/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "requirementName": "string",
+  "description": "string",
+  "isMandatory": true,
+  "displayOrder": 1
+}
+
+### 
+DELETE {{baseUrl}}/api/CompletionRequirements/1
+Authorization: Bearer {{token}}
+
+### 
+GET {{baseUrl}}/api/CompletionRequirements/course/1
+Authorization: Bearer {{token}}
+
+### ================= MODULE: Courses =================
+### [Module/Flow]: Master Data Management
+[Core Responsibility]: Retrieves all courses.
+[Target Audience]: Admin, Academic, TrainingManager
+GET {{baseUrl}}/api/Courses
+Authorization: Bearer {{token}}
+
+### [Module/Flow]: Master Data Management
+[Core Responsibility]: Creates a new course.
+[Target Audience]: Admin, Academic, TrainingManager
+POST {{baseUrl}}/api/Courses
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "courseCode": "string",
+  "courseName": "string",
+  "description": "string",
+  "durationHours": 1,
+  "status": "string"
+}
+
+### [Module/Flow]: Master Data Management
+[Core Responsibility]: Retrieves a course by ID.
+[Target Audience]: Admin, Academic, TrainingManager
+GET {{baseUrl}}/api/Courses/1
+Authorization: Bearer {{token}}
+
+### [Module/Flow]: Master Data Management
+[Core Responsibility]: Updates an existing course.
+[Target Audience]: Admin, Academic, TrainingManager
+PUT {{baseUrl}}/api/Courses/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "courseId": 1,
+  "courseCode": "string",
+  "courseName": "string",
+  "description": "string",
+  "durationHours": 1,
+  "status": "string"
+}
+
+### [Module/Flow]: Master Data Management
+[Core Responsibility]: Soft deletes a course.
+[Target Audience]: Admin, Academic, TrainingManager
+DELETE {{baseUrl}}/api/Courses/1
+Authorization: Bearer {{token}}
+
+### ================= MODULE: Dashboard =================
+### [Module/Flow]: Reporting & Analytics
+[Core Responsibility]: Retrieves high-level dashboard statistics.
+[Target Audience]: Admin, Management
+GET {{baseUrl}}/api/Dashboard/stats
+Authorization: Bearer {{token}}
+
+### ================= MODULE: Departments =================
+### 
+GET {{baseUrl}}/api/Departments
+Authorization: Bearer {{token}}
+
+### 
+POST {{baseUrl}}/api/Departments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "departmentName": "string",
+  "description": "string"
+}
+
+### 
+GET {{baseUrl}}/api/Departments/1
+Authorization: Bearer {{token}}
+
+### 
+PUT {{baseUrl}}/api/Departments/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "departmentName": "string",
+  "description": "string"
+}
+
+### 
+DELETE {{baseUrl}}/api/Departments/1
+Authorization: Bearer {{token}}
+
+### ================= MODULE: Enrollments =================
+### [Module/Flow]: ETR Processing
+[Core Responsibility]: Retrieves all course enrollments.
+[Target Audience]: Admin
+GET {{baseUrl}}/api/Enrollments
+Authorization: Bearer {{token}}
+
+### Creates a new course enrollment for a learner.
+POST {{baseUrl}}/api/Enrollments
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "accountId": 1,
+  "classId": 1
+}
+
+### [Module/Flow]: ETR Processing
+[Core Responsibility]: Retrieves a specific course enrollment by ID.
+[Target Audience]: Admin
+GET {{baseUrl}}/api/Enrollments/1
+Authorization: Bearer {{token}}
+
+### Retrieves enrollments for a specific student.
+GET {{baseUrl}}/api/Enrollments/student/1
+Authorization: Bearer {{token}}
+
+### ================= MODULE: Etr =================
+### [Module/Flow]: ETR Processing
+[Core Responsibility]: Retrieves all ETR records.
+[Target Audience]: Instructor, QA, Admin
+GET {{baseUrl}}/api/Etr
+Authorization: Bearer {{token}}
+
+### [Module/Flow]: ETR Processing
+[Core Responsibility]: Retrieves ETR records for the currently authenticated student.
+[Target Audience]: Student
+GET {{baseUrl}}/api/Etr/my-etr
+Authorization: Bearer {{token}}
+
+### [Module/Flow]: ETR Processing
+[Core Responsibility]: Retrieves a specific ETR record by ID, including its Subject Results.
+[Target Audience]: Instructor, QA, Admin
+GET {{baseUrl}}/api/Etr/1
+Authorization: Bearer {{token}}
+
+### Submits an ETR for verification.
+POST {{baseUrl}}/api/Etr/1/submit
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{}
+
+### Verifies a submitted ETR.
+POST {{baseUrl}}/api/Etr/1/verify
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{}
+
+### Completes a verified ETR if all conditions are met.
+POST {{baseUrl}}/api/Etr/1/complete
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{}
+
+### ================= MODULE: Evidences =================
+### Retrieves all uploaded evidence files.
+GET {{baseUrl}}/api/Evidences
+Authorization: Bearer {{token}}
+
+### Uploads a new evidence file record.
+POST {{baseUrl}}/api/Evidences
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "evidenceTypeId": 1,
+  "accountId": 1,
+  "subjectResultId": 1,
+  "attendanceRecordId": 1,
+  "assessmentResultId": 1,
+  "fileName": "string",
+  "filePath": "string",
+  "fileExtension": "string",
+  "mimeType": "string",
+  "fileSize": 1
+}
+
+### Retrieves a specific evidence file by ID.
+GET {{baseUrl}}/api/Evidences/1
+Authorization: Bearer {{token}}
+
+### Soft deletes an evidence file.
+DELETE {{baseUrl}}/api/Evidences/1
+Authorization: Bearer {{token}}
+
+### ================= MODULE: EvidenceTypes =================
+### 
+GET {{baseUrl}}/api/EvidenceTypes
+Authorization: Bearer {{token}}
+
+### 
+POST {{baseUrl}}/api/EvidenceTypes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeName": "string",
+  "description": "string"
+}
+
+### 
+GET {{baseUrl}}/api/EvidenceTypes/1
+Authorization: Bearer {{token}}
+
+### 
+PUT {{baseUrl}}/api/EvidenceTypes/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "typeName": "string",
+  "description": "string"
+}
+
+### 
+DELETE {{baseUrl}}/api/EvidenceTypes/1
+Authorization: Bearer {{token}}
+
+### ================= MODULE: Exports =================
+### [Module/Flow]: System Auditing & Compliance
+[Core Responsibility]: Retrieves a specific export job by ID.
+[Target Audience]: Admin
+GET {{baseUrl}}/api/Exports/1
+Authorization: Bearer {{token}}
+
+### [Module/Flow]: System Auditing & Compliance
+[Core Responsibility]: Triggers an export job for a training package.
+[Target Audience]: Admin
+POST {{baseUrl}}/api/Exports/training-package
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "userId": 1
+}
+
+### [Module/Flow]: System Auditing & Compliance
+[Core Responsibility]: Triggers an export job for a PDF report.
+[Target Audience]: Admin
+POST {{baseUrl}}/api/Exports/pdf
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "userId": 1
+}
+
+### [Module/Flow]: System Auditing & Compliance
+[Core Responsibility]: Triggers an export job for a dashboard summary.
+[Target Audience]: Admin
+POST {{baseUrl}}/api/Exports/dashboard
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "userId": 1
+}
+
+### [Module/Flow]: System Auditing & Compliance
+[Core Responsibility]: Downloads the generated file of a completed export job.
+[Target Audience]: Admin
+GET {{baseUrl}}/api/Exports/download/1
+Authorization: Bearer {{token}}
+
+### ================= MODULE: PracticalChecklists =================
+### 
+GET {{baseUrl}}/api/PracticalChecklists
+Authorization: Bearer {{token}}
+
+### 
+POST {{baseUrl}}/api/PracticalChecklists
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "courseId": 1,
+  "subjectId": 1,
+  "itemName": "string",
+  "description": "string",
+  "isRequired": true,
+  "displayOrder": 1
+}
+
+### 
+GET {{baseUrl}}/api/PracticalChecklists/1
+Authorization: Bearer {{token}}
+
+### 
+PUT {{baseUrl}}/api/PracticalChecklists/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "itemName": "string",
+  "description": "string",
+  "isRequired": true,
+  "displayOrder": 1
+}
+
+### 
+DELETE {{baseUrl}}/api/PracticalChecklists/1
+Authorization: Bearer {{token}}
+
+### 
+GET {{baseUrl}}/api/PracticalChecklists/course/1/subject/1
+Authorization: Bearer {{token}}
+
+### ================= MODULE: Reports =================
+### [Module/Flow]: Reporting & Analytics
+[Core Responsibility]: Retrieves summary reports for classes and ETRs.
+[Target Audience]: Admin, Management
+GET {{baseUrl}}/api/Reports/summary
+Authorization: Bearer {{token}}
+
+### ================= MODULE: Search =================
+### [Module/Flow]: System Discovery
+[Core Responsibility]: Searches for classes by name.
+[Target Audience]: All Roles
+GET {{baseUrl}}/api/Search/classes
+Authorization: Bearer {{token}}
+
+### [Module/Flow]: System Discovery
+[Core Responsibility]: Searches for ETR records.
+[Target Audience]: All Roles
+GET {{baseUrl}}/api/Search/etrs
+Authorization: Bearer {{token}}
+
+### ================= MODULE: Sessions =================
+### Retrieves all sessions.
+GET {{baseUrl}}/api/Sessions
+Authorization: Bearer {{token}}
+
+### Creates a new session.
+POST {{baseUrl}}/api/Sessions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "classId": 1,
+  "subjectId": 1,
+  "sessionTitle": "string",
+  "sessionDate": "2026-10-15T08:00:00Z",
+  "location": "string"
+}
+
+### Retrieves a session by ID.
+GET {{baseUrl}}/api/Sessions/1
+Authorization: Bearer {{token}}
+
+### Updates an existing session.
+PUT {{baseUrl}}/api/Sessions/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "sessionTitle": "string",
+  "sessionDate": "2026-10-15T08:00:00Z",
+  "location": "string"
+}
+
+### Deletes a session.
+DELETE {{baseUrl}}/api/Sessions/1
+Authorization: Bearer {{token}}
+
+### ================= MODULE: Subjects =================
+### [Module/Flow]: Master Data Management
+[Core Responsibility]: Retrieves all subjects.
+[Target Audience]: Admin, Academic, TrainingManager
+GET {{baseUrl}}/api/Subjects
+Authorization: Bearer {{token}}
+
+### [Module/Flow]: Master Data Management
+[Core Responsibility]: Creates a new subject.
+[Target Audience]: Admin, Academic, TrainingManager
+POST {{baseUrl}}/api/Subjects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "subjectCode": "string",
+  "subjectName": "string",
+  "subjectType": "string",
+  "defaultHours": 1,
+  "assessmentMethod": "string",
+  "description": "string",
+  "status": "string"
+}
+
+### [Module/Flow]: Master Data Management
+[Core Responsibility]: Retrieves a subject by ID.
+[Target Audience]: Admin, Academic, TrainingManager
+GET {{baseUrl}}/api/Subjects/1
+Authorization: Bearer {{token}}
+
+### [Module/Flow]: Master Data Management
+[Core Responsibility]: Updates an existing subject.
+[Target Audience]: Admin, Academic, TrainingManager
+PUT {{baseUrl}}/api/Subjects/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "subjectId": 1,
+  "subjectCode": "string",
+  "subjectName": "string",
+  "subjectType": "string",
+  "defaultHours": 1,
+  "assessmentMethod": "string",
+  "description": "string",
+  "status": "string"
+}
+
+### [Module/Flow]: Master Data Management
+[Core Responsibility]: Soft deletes a subject.
+[Target Audience]: Admin, Academic, TrainingManager
+DELETE {{baseUrl}}/api/Subjects/1
+Authorization: Bearer {{token}}
+
+### ================= MODULE: UserProfiles =================
+### [Module/Flow]: Identity & Access Management
+[Core Responsibility]: Retrieves all user profiles.
+[Target Audience]: Admin
+GET {{baseUrl}}/api/UserProfiles
+Authorization: Bearer {{token}}
+
+### [Module/Flow]: Identity & Access Management
+[Core Responsibility]: Retrieves all learner profiles.
+[Target Audience]: Admin, Academic, TrainingManager
+GET {{baseUrl}}/api/UserProfiles/learners
+Authorization: Bearer {{token}}
+
+### [Module/Flow]: Identity & Access Management
+[Core Responsibility]: Retrieves the profile of the currently authenticated user.
+[Target Audience]: All Roles
+GET {{baseUrl}}/api/UserProfiles/me
+Authorization: Bearer {{token}}
+
+### [Module/Flow]: Identity & Access Management
+[Core Responsibility]: Updates the profile of the currently authenticated user.
+[Target Audience]: All Roles
+PUT {{baseUrl}}/api/UserProfiles/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fullName": "string",
+  "email": "user@example.com",
+  "phone": "string",
+  "dateOfBirth": "2026-10-15T08:00:00Z",
+  "gender": "string",
+  "organization": "string"
+}
+
+### [Module/Flow]: Identity & Access Management
+[Core Responsibility]: Retrieves a user profile by account ID.
+[Target Audience]: Admin
+GET {{baseUrl}}/api/UserProfiles/1
+Authorization: Bearer {{token}}
+
+### [Module/Flow]: Identity & Access Management
+[Core Responsibility]: Creates a new user profile for an account.
+[Target Audience]: Admin
+POST {{baseUrl}}/api/UserProfiles/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "userCode": "string",
+  "fullName": "string",
+  "email": "user@example.com",
+  "phone": "string",
+  "dateOfBirth": "2026-10-15T08:00:00Z",
+  "gender": "string",
+  "organization": "string"
+}
+
+### [Module/Flow]: Identity & Access Management
+[Core Responsibility]: Updates a specific user profile by account ID.
+[Target Audience]: Admin
+PUT {{baseUrl}}/api/UserProfiles/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fullName": "string",
+  "email": "user@example.com",
+  "phone": "string",
+  "dateOfBirth": "2026-10-15T08:00:00Z",
+  "gender": "string",
+  "organization": "string"
+}
