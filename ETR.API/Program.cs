@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.Extensions.Hosting;
 using ETR.API.Services;
 using ETR.Application;
 using ETR.Application.Interfaces;
@@ -107,6 +108,11 @@ try
     }
 
     app.Run();
+}
+catch (HostAbortedException)
+{
+    // Ignore EF Core tooling abort
+    throw;
 }
 catch (Exception ex)
 {
