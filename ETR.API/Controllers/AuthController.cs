@@ -51,6 +51,15 @@ public class AuthController : ControllerBase
         return Ok(new AuthResponse(account.AccountId, account.Username, profile?.FullName ?? "Unknown", roleName, token, "mock-refresh-token"));
     }
 
+    [HttpGet("mock-admin-token")]
+    public ActionResult GetMockAdminToken()
+    {
+        var account = new ETR.Domain.Entities.Account { AccountId = 1, Username = "admin", RoleId = 1 };
+        var role = new ETR.Domain.Entities.Role { RoleId = 1, RoleName = "Admin" };
+        var token = _tokenService.GenerateToken(account, role);
+        return Ok(new { token });
+    }
+
     /// <summary>
     /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
     /// [Core Responsibility]: Xác thực người dùng qua Google OAuth và trả về JWT token.

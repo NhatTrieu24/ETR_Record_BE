@@ -54,6 +54,8 @@ public class SessionService : ISessionService
             SessionDate = request.SessionDate,
             Location = request.Location,
             IsConfirmed = false, // Default value
+            IsAssessmentRequired = request.IsAssessmentRequired,
+            IsChecklistRequired = request.IsChecklistRequired,
             CreatedAt = DateTime.UtcNow,
             CreatedByAccountId = createdByAccountId
         };
@@ -73,6 +75,8 @@ public class SessionService : ISessionService
         session.SessionTitle = request.SessionTitle;
         session.SessionDate = request.SessionDate;
         session.Location = request.Location;
+        session.IsAssessmentRequired = request.IsAssessmentRequired;
+        session.IsChecklistRequired = request.IsChecklistRequired;
         session.UpdatedAt = DateTime.UtcNow;
         session.UpdatedByAccountId = updatedByAccountId;
 
@@ -107,7 +111,9 @@ public class SessionService : ISessionService
             Location = session.Location,
             IsConfirmed = session.IsConfirmed,
             ConfirmedByAccountId = session.ConfirmedByAccountId,
-            ConfirmedAt = session.ConfirmedAt
+            ConfirmedAt = session.ConfirmedAt,
+            IsAssessmentRequired = session.IsAssessmentRequired,
+            IsChecklistRequired = session.IsChecklistRequired
         };
     }
 }

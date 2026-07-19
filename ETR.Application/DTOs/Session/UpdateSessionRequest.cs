@@ -13,4 +13,7 @@ public class UpdateSessionRequest
 
     [MaxLength(200)]
     public string? Location { get; set; }
+
+    public bool IsAssessmentRequired { get; set; }
+    public bool IsChecklistRequired { get; set; }
 }

@@ -19,4 +19,7 @@ public class CreateSessionRequest
 
     [MaxLength(200)]
     public string? Location { get; set; }
+
+    public bool IsAssessmentRequired { get; set; } = false;
+    public bool IsChecklistRequired { get; set; } = false;
 }

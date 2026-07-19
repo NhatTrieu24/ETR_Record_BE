@@ -13,4 +13,6 @@ public class SessionResponse
     public bool IsConfirmed { get; set; }
     public int? ConfirmedByAccountId { get; set; }
     public DateTime? ConfirmedAt { get; set; }
+    public bool IsAssessmentRequired { get; set; }
+    public bool IsChecklistRequired { get; set; }
 }
