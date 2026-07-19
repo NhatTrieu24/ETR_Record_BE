@@ -24,11 +24,12 @@ try
         // Tạo ô nhập token trên giao diện Swagger
         c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
         {
-            Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
+            Description = "Nhập token của bạn vào đây (KHÔNG CẦN gõ chữ 'Bearer ' ở trước).",
             Name = "Authorization",
             In = ParameterLocation.Header,
-            Type = SecuritySchemeType.ApiKey,
-            Scheme = "Bearer"
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT"
         });
 
         c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
