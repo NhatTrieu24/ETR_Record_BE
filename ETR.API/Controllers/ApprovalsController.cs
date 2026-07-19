@@ -22,6 +22,23 @@ public class ApprovalsController : ControllerBase
         _currentUserService = currentUserService;
     }
 
+    [HttpGet]
+    public async Task<IActionResult> GetAllApprovalRequests(CancellationToken cancellationToken)
+    {
+        var requests = await _approvalService.GetAllApprovalRequestsAsync(cancellationToken);
+        return Ok(requests);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> CreateApprovalRequest([FromBody] CreateApprovalRequest request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+            
+        var response = await _approvalService.CreateApprovalRequestAsync(request.ETRCourseRecordId, request.CurrentApproverId, accountId, cancellationToken);
+        return Ok(response);
+    }
+
     [HttpPost("{id}/process")]
     public async Task<IActionResult> ProcessApproval(int id, [FromQuery] string action, [FromQuery] string? comment, CancellationToken cancellationToken)
     {

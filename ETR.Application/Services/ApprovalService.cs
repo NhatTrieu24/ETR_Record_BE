@@ -13,6 +13,34 @@ public class ApprovalService : IApprovalService
         _unitOfWork = unitOfWork;
     }
 
+    public async Task<IEnumerable<ApprovalRequestResponse>> GetAllApprovalRequestsAsync(CancellationToken cancellationToken = default)
+    {
+        var requests = await _unitOfWork.ApprovalRequestRepository.GetAllAsync(cancellationToken);
+        return requests.Select(r => new ApprovalRequestResponse(r.ApprovalRequestId, r.ETRCourseRecordId, r.CurrentStatus, r.SubmittedByAccountId, r.SubmittedAt, r.CurrentApproverId, r.CompletedAt));
+    }
+
+    public async Task<ApprovalRequestResponse> CreateApprovalRequestAsync(int etrCourseRecordId, int? currentApproverId, int submittedByAccountId, CancellationToken cancellationToken = default)
+    {
+        var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(etrCourseRecordId, cancellationToken);
+        if (etr == null) throw new InvalidOperationException("ETRCourseRecord not found.");
+
+        var request = new ApprovalRequest
+        {
+            ETRCourseRecordId = etrCourseRecordId,
+            CurrentStatus = "Pending",
+            SubmittedByAccountId = submittedByAccountId,
+            SubmittedAt = DateTime.UtcNow,
+            CurrentApproverId = currentApproverId,
+            CreatedAt = DateTime.UtcNow,
+            CreatedByAccountId = submittedByAccountId
+        };
+
+        await _unitOfWork.ApprovalRequestRepository.AddAsync(request, cancellationToken);
+        await _unitOfWork.SaveAsync(cancellationToken);
+
+        return new ApprovalRequestResponse(request.ApprovalRequestId, request.ETRCourseRecordId, request.CurrentStatus, request.SubmittedByAccountId, request.SubmittedAt, request.CurrentApproverId, request.CompletedAt);
+    }
+
     public async Task<ApprovalRequestResponse> ProcessApprovalActionAsync(int approvalRequestId, string action, int actionByAccountId, string? comment, CancellationToken cancellationToken = default)
     {
         return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
