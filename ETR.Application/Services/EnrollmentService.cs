@@ -159,4 +159,41 @@ public class EnrollmentService : IEnrollmentService
             }
         }, cancellationToken);
     }
+
+    public async Task<EnrollmentResponse> UpdateEnrollmentAsync(int id, UpdateEnrollmentRequest request, int updatedByAccountId, CancellationToken cancellationToken = default)
+    {
+        var item = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(id, cancellationToken);
+        if (item == null) throw new KeyNotFoundException("Enrollment not found.");
+
+        item.AccountId = request.LearnerId;
+        item.ClassId = request.ClassId;
+        item.Status = request.Status;
+        item.EnrolledAt = request.EnrolledAt;
+        item.UpdatedAt = DateTime.UtcNow;
+        item.UpdatedByAccountId = updatedByAccountId;
+
+        _unitOfWork.CourseEnrollmentRepository.Update(item);
+        await _unitOfWork.SaveAsync(cancellationToken);
+
+        return new EnrollmentResponse(
+            item.EnrollmentId,
+            item.AccountId,
+            item.ClassId,
+            item.Status,
+            item.EnrolledAt);
+    }
+
+    public async Task DeleteEnrollmentAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default)
+    {
+        var item = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(id, cancellationToken);
+        if (item == null) throw new KeyNotFoundException("Enrollment not found.");
+
+        item.IsDeleted = true;
+        item.DeletedAt = DateTime.UtcNow;
+        item.UpdatedAt = DateTime.UtcNow;
+        item.UpdatedByAccountId = deletedByAccountId;
+
+        _unitOfWork.CourseEnrollmentRepository.Update(item);
+        await _unitOfWork.SaveAsync(cancellationToken);
+    }
 }

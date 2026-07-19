@@ -48,6 +48,25 @@ public class ApprovalsController : ControllerBase
         var response = await _approvalService.ProcessApprovalActionAsync(id, action, accountId, comment, cancellationToken);
         return Ok(response);
     }
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateApprovalRequest(int id, [FromBody] UpdateApprovalRequest request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+            
+        var response = await _approvalService.UpdateApprovalRequestAsync(id, request, accountId, cancellationToken);
+        return Ok(response);
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteApprovalRequest(int id, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+            
+        await _approvalService.DeleteApprovalRequestAsync(id, accountId, cancellationToken);
+        return NoContent();
+    }
 }
 
 

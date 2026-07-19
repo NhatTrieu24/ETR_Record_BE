@@ -13,4 +13,7 @@ public interface IEnrollmentService
         int classId,
         int createdByAccountId,
         CancellationToken cancellationToken = default);
+
+    Task<EnrollmentResponse> UpdateEnrollmentAsync(int id, UpdateEnrollmentRequest request, int updatedByAccountId, CancellationToken cancellationToken = default);
+    Task DeleteEnrollmentAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default);
 }

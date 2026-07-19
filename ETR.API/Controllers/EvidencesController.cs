@@ -54,6 +54,14 @@ public class EvidencesController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = response.EvidenceFileId }, response);
     }
 
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateEvidence(int id, [FromBody] ETR.Application.DTOs.UpdateEvidenceRequest request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        var response = await _evidenceService.UpdateEvidenceAsync(id, request, accountId, cancellationToken);
+        return Ok(response);
+    }
+
     /// <summary>
     /// Xóa mềm (soft delete) một tệp bằng chứng.
     /// </summary>

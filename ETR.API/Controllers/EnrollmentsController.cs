@@ -88,6 +88,25 @@ public class EnrollmentsController : ControllerBase
         var response = await _enrollmentService.CreateEnrollmentAsync(request.AccountId, request.ClassId, accountId, cancellationToken);
         return Ok(response);
     }
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateEnrollment(int id, [FromBody] UpdateEnrollmentRequest request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
+        var response = await _enrollmentService.UpdateEnrollmentAsync(id, request, accountId, cancellationToken);
+        return Ok(response);
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteEnrollment(int id, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
+        await _enrollmentService.DeleteEnrollmentAsync(id, accountId, cancellationToken);
+        return NoContent();
+    }
 }
 
 

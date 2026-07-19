@@ -56,6 +56,28 @@ public class EvidenceService : IEvidenceService
         return MapToResponse(evidence);
     }
 
+    public async Task<EvidenceResponse> UpdateEvidenceAsync(int id, ETR.Application.DTOs.UpdateEvidenceRequest request, int updatedByAccountId, CancellationToken cancellationToken = default)
+    {
+        var evidence = await _unitOfWork.EvidenceFileRepository.GetByIdAsync(id, cancellationToken);
+        if (evidence == null)
+            throw new KeyNotFoundException($"Evidence with ID {id} not found.");
+
+        evidence.EvidenceTypeId = request.EvidenceTypeId;
+        evidence.FileName = request.FileName;
+        evidence.FilePath = request.FilePath;
+        evidence.FileExtension = request.FileExtension;
+        evidence.MimeType = request.MimeType;
+        evidence.FileSize = request.FileSize;
+        
+        evidence.UpdatedAt = DateTime.UtcNow;
+        evidence.UpdatedByAccountId = updatedByAccountId;
+
+        _unitOfWork.EvidenceFileRepository.Update(evidence);
+        await _unitOfWork.SaveAsync(cancellationToken);
+
+        return MapToResponse(evidence);
+    }
+
     public async Task DeleteEvidenceAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default)
     {
         var evidence = await _unitOfWork.EvidenceFileRepository.GetByIdAsync(id, cancellationToken);

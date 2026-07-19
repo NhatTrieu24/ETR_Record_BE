@@ -110,4 +110,39 @@ public class ApprovalService : IApprovalService
             }
         }, cancellationToken);
     }
+
+    public async Task<ApprovalRequestResponse> UpdateApprovalRequestAsync(int id, UpdateApprovalRequest request, int updatedByAccountId, CancellationToken cancellationToken = default)
+    {
+        var item = await _unitOfWork.ApprovalRequestRepository.GetByIdAsync(id, cancellationToken);
+        if (item == null) throw new KeyNotFoundException("ApprovalRequest not found.");
+
+        if (item.CurrentStatus != "Pending")
+            throw new InvalidOperationException("Cannot update an ApprovalRequest that is not in Pending status.");
+
+        item.CurrentApproverId = request.CurrentApproverId;
+        item.UpdatedAt = DateTime.UtcNow;
+        item.UpdatedByAccountId = updatedByAccountId;
+
+        _unitOfWork.ApprovalRequestRepository.Update(item);
+        await _unitOfWork.SaveAsync(cancellationToken);
+
+        return new ApprovalRequestResponse(item.ApprovalRequestId, item.ETRCourseRecordId, item.CurrentStatus, item.SubmittedByAccountId, item.SubmittedAt, item.CurrentApproverId, item.CompletedAt);
+    }
+
+    public async Task DeleteApprovalRequestAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default)
+    {
+        var item = await _unitOfWork.ApprovalRequestRepository.GetByIdAsync(id, cancellationToken);
+        if (item == null) throw new KeyNotFoundException("ApprovalRequest not found.");
+
+        if (item.CurrentStatus != "Pending")
+            throw new InvalidOperationException("Cannot delete an ApprovalRequest that is not in Pending status.");
+
+        item.IsDeleted = true;
+        item.DeletedAt = DateTime.UtcNow;
+        item.UpdatedAt = DateTime.UtcNow;
+        item.UpdatedByAccountId = deletedByAccountId;
+
+        _unitOfWork.ApprovalRequestRepository.Update(item);
+        await _unitOfWork.SaveAsync(cancellationToken);
+    }
 }
