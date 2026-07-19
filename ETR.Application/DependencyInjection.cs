@@ -20,6 +20,11 @@ public static class DependencyInjection
         services.AddScoped<ISubjectService, SubjectService>();
         services.AddScoped<ISessionService, SessionService>();
         services.AddScoped<IEvidenceService, EvidenceService>();
+        services.AddScoped<IApprovalService, ApprovalService>();
+        services.AddScoped<IDepartmentService, DepartmentService>();
+        services.AddScoped<IEvidenceTypeService, EvidenceTypeService>();
+        services.AddScoped<IPracticalChecklistService, PracticalChecklistService>();
+        services.AddScoped<ICompletionRequirementService, CompletionRequirementService>();
 
         return services;
     }
