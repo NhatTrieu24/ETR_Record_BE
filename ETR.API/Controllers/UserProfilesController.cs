@@ -30,7 +30,7 @@ public class UserProfilesController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public async Task<ActionResult<IEnumerable<UserProfileResponse>>> GetAllProfiles(CancellationToken cancellationToken)
     {
         var profiles = await _userProfileService.GetAllProfilesAsync(cancellationToken);
@@ -80,7 +80,7 @@ public class UserProfilesController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPost("{accountId:int}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public async Task<ActionResult<UserProfileResponse>> CreateProfile(int accountId, [FromBody] CreateUserProfileRequest request, CancellationToken cancellationToken)
     {
         var currentAccountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -107,7 +107,7 @@ public class UserProfilesController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPut("{accountId:int}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public async Task<ActionResult<UserProfileResponse>> UpdateProfile(int accountId, [FromBody] UpdateUserProfileRequest request, CancellationToken cancellationToken)
     {
         var currentAccountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -115,3 +115,5 @@ public class UserProfilesController : ControllerBase
         return Ok(profile);
     }
 }
+
+

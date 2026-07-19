@@ -12,7 +12,7 @@ namespace ETR.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin,QA,Student,Instructor")] // Secure all endpoints in this controller by default
+[Authorize] // Secure all endpoints in this controller by default
 public class EtrController : ControllerBase
 {
     private readonly IEtrService _etrService;
@@ -46,7 +46,7 @@ public class EtrController : ControllerBase
     /// [Target Audience]: Student
     /// </summary>
     [HttpGet("my-etr")]
-    [Authorize(Roles = "Student")]
+    [Authorize]
     public async Task<ActionResult<IEnumerable<EtrRecordResponse>>> GetMyEtrs(CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -84,7 +84,7 @@ public class EtrController : ControllerBase
     /// <response code="401">If the user is not authenticated.</response>
     /// <response code="403">If the user is not an Instructor or Admin.</response>
     [HttpPost("{id}/submit")]
-    [Authorize(Roles = "Admin,Instructor")]
+    [Authorize]
     public async Task<IActionResult> SubmitEtr(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -104,7 +104,7 @@ public class EtrController : ControllerBase
     /// <response code="401">If the user is not authenticated.</response>
     /// <response code="403">If the user is not a QA or Admin.</response>
     [HttpPost("{id}/verify")]
-    [Authorize(Roles = "Admin,QA")]
+    [Authorize]
     public async Task<IActionResult> VerifyEtr(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -124,7 +124,7 @@ public class EtrController : ControllerBase
     /// <response code="401">If the user is not authenticated.</response>
     /// <response code="403">If the user is not an Admin.</response>
     [HttpPost("{id}/complete")]
-    [Authorize(Roles = "Admin")]
+    [Authorize]
     public async Task<IActionResult> CompleteEtr(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -134,3 +134,5 @@ public class EtrController : ControllerBase
         return Ok(response);
     }
 }
+
+

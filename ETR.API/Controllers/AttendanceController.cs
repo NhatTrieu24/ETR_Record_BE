@@ -12,7 +12,7 @@ namespace ETR.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin,Instructor")]
+[Authorize]
 public class AttendanceController : ControllerBase
 {
     private readonly IAttendanceService _attendanceService;
@@ -88,3 +88,5 @@ public class AttendanceController : ControllerBase
         return Ok(response);
     }
 }
+
+

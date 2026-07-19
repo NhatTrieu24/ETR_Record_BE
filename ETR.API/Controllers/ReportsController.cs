@@ -32,3 +32,5 @@ public class ReportsController : ControllerBase
         return Ok(new { TotalClasses = classes.Count(), TotalEtrs = etrs.Count() });
     }
 }
+
+

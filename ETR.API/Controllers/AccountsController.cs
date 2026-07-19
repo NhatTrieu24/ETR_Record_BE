@@ -12,7 +12,7 @@ namespace ETR.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin")]
+[Authorize]
 public class AccountsController : ControllerBase
 {
     private readonly IAccountService _accountService;
@@ -86,3 +86,5 @@ public class AccountsController : ControllerBase
         return NoContent();
     }
 }
+
+

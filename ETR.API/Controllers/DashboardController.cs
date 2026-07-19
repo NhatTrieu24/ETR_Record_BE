@@ -32,3 +32,5 @@ public class DashboardController : ControllerBase
         return Ok(new { TotalClasses = classes.Count(), TotalEtrs = etrs.Count() });
     }
 }
+
+
