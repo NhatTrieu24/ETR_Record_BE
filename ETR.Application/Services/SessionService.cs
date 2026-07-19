@@ -1,7 +1,6 @@
 using ETR.Application.DTOs.Session;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
-using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 
 namespace ETR.Application.Services;
@@ -23,8 +22,8 @@ public class SessionService : ISessionService
 
     public async Task<IEnumerable<SessionResponse>> GetSessionsByClassIdAsync(int classId, CancellationToken cancellationToken = default)
     {
-        var sessions = await _unitOfWork.SessionRepository.GetQueryable().Where(s => s.ClassId == classId).ToListAsync(cancellationToken);
-        return sessions.Select(MapToResponse).ToList();
+        var sessions = await _unitOfWork.SessionRepository.GetAllAsync(cancellationToken);
+        return sessions.Where(s => s.ClassId == classId).Select(MapToResponse).ToList();
     }
 
     public async Task<SessionResponse> GetSessionByIdAsync(int id, CancellationToken cancellationToken = default)
