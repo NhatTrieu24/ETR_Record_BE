@@ -651,6 +651,7 @@ INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
 VALUES (N'20260719063606_InitialCreate', N'9.0.0');
 
 
+                SET QUOTED_IDENTIFIER ON;
                 DECLARE @Now DATETIME2 = GETUTCDATE();
 
                 -- Disable all constraints
@@ -658,6 +659,7 @@ VALUES (N'20260719063606_InitialCreate', N'9.0.0');
 
                 -- Delete all data except MigrationsHistory
                 EXEC sp_MSForEachTable '
+                    SET QUOTED_IDENTIFIER ON;
                     IF ''?'' NOT LIKE ''%__EFMigrationsHistory%''
                     BEGIN
                         DELETE FROM ?

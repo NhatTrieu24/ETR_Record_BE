@@ -11,6 +11,7 @@ namespace ETR.Infrastructure.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.Sql(@"
+                SET QUOTED_IDENTIFIER ON;
                 DECLARE @Now DATETIME2 = GETUTCDATE();
 
                 -- Disable all constraints
@@ -18,6 +19,7 @@ namespace ETR.Infrastructure.Migrations
 
                 -- Delete all data except MigrationsHistory
                 EXEC sp_MSForEachTable '
+                    SET QUOTED_IDENTIFIER ON;
                     IF ''?'' NOT LIKE ''%__EFMigrationsHistory%''
                     BEGIN
                         DELETE FROM ?
