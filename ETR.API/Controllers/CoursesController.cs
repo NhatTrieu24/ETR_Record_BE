@@ -8,11 +8,11 @@ namespace ETR.API.Controllers;
 /// <summary>
 /// [Module/Flow]: Master Data Management
 /// [Core Responsibility]: Manages course catalogues.
-/// [Target Audience]: Admin, CROStaff
+/// [Target Audience]: Admin, Academic, TrainingManager
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin, CROStaff")]
+[Authorize(Roles = "Admin,Academic,TrainingManager")]
 public class CoursesController : ControllerBase
 {
     private readonly ICourseService _courseService;
@@ -27,7 +27,7 @@ public class CoursesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Master Data Management
     /// [Core Responsibility]: Retrieves all courses.
-    /// [Target Audience]: Admin, CROStaff
+    /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetAllCourses(CancellationToken cancellationToken)
@@ -39,7 +39,7 @@ public class CoursesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Master Data Management
     /// [Core Responsibility]: Retrieves a course by ID.
-    /// [Target Audience]: Admin, CROStaff
+    /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpGet("{id}")]
     public async Task<IActionResult> GetCourse(int id, CancellationToken cancellationToken)
@@ -51,7 +51,7 @@ public class CoursesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Master Data Management
     /// [Core Responsibility]: Creates a new course.
-    /// [Target Audience]: Admin, CROStaff
+    /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpPost]
     public async Task<IActionResult> CreateCourse([FromBody] CreateCourseRequest request, CancellationToken cancellationToken)
@@ -64,7 +64,7 @@ public class CoursesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Master Data Management
     /// [Core Responsibility]: Updates an existing course.
-    /// [Target Audience]: Admin, CROStaff
+    /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateCourse(int id, [FromBody] UpdateCourseRequest request, CancellationToken cancellationToken)
@@ -77,7 +77,7 @@ public class CoursesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Master Data Management
     /// [Core Responsibility]: Soft deletes a course.
-    /// [Target Audience]: Admin, CROStaff
+    /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteCourse(int id, CancellationToken cancellationToken)

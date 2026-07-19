@@ -8,11 +8,11 @@ namespace ETR.API.Controllers;
 /// <summary>
 /// [Module/Flow]: Master Data Management
 /// [Core Responsibility]: Manages classes and scheduling.
-/// [Target Audience]: Admin, CROStaff
+/// [Target Audience]: Admin, Academic, TrainingManager
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin, CROStaff")]
+[Authorize(Roles = "Admin,Academic,TrainingManager")]
 public class ClassesController : ControllerBase
 {
     private readonly IClassService _classService;
@@ -27,7 +27,7 @@ public class ClassesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Master Data Management
     /// [Core Responsibility]: Retrieves all classes.
-    /// [Target Audience]: Admin, CROStaff
+    /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetAllClasses(CancellationToken cancellationToken)
@@ -39,7 +39,7 @@ public class ClassesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Master Data Management
     /// [Core Responsibility]: Retrieves a class by ID.
-    /// [Target Audience]: Admin, CROStaff
+    /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpGet("{id}")]
     public async Task<IActionResult> GetClass(int id, CancellationToken cancellationToken)
@@ -51,7 +51,7 @@ public class ClassesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Master Data Management
     /// [Core Responsibility]: Creates a new class.
-    /// [Target Audience]: Admin, CROStaff
+    /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpPost]
     public async Task<IActionResult> CreateClass([FromBody] CreateClassRequest request, CancellationToken cancellationToken)
@@ -64,7 +64,7 @@ public class ClassesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Master Data Management
     /// [Core Responsibility]: Updates an existing class.
-    /// [Target Audience]: Admin, CROStaff
+    /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateClass(int id, [FromBody] UpdateClassRequest request, CancellationToken cancellationToken)
@@ -77,7 +77,7 @@ public class ClassesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Master Data Management
     /// [Core Responsibility]: Soft deletes a class.
-    /// [Target Audience]: Admin, CROStaff
+    /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteClass(int id, CancellationToken cancellationToken)

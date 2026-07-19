@@ -8,11 +8,11 @@ namespace ETR.API.Controllers;
 /// <summary>
 /// [Module/Flow]: Master Data Management
 /// [Core Responsibility]: Manages subject catalogues.
-/// [Target Audience]: Admin, CROStaff
+/// [Target Audience]: Admin, Academic, TrainingManager
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin, CROStaff")]
+[Authorize(Roles = "Admin,Academic,TrainingManager")]
 public class SubjectsController : ControllerBase
 {
     private readonly ISubjectService _subjectService;
@@ -27,7 +27,7 @@ public class SubjectsController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Master Data Management
     /// [Core Responsibility]: Retrieves all subjects.
-    /// [Target Audience]: Admin, CROStaff
+    /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetAllSubjects(CancellationToken cancellationToken)
@@ -39,7 +39,7 @@ public class SubjectsController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Master Data Management
     /// [Core Responsibility]: Retrieves a subject by ID.
-    /// [Target Audience]: Admin, CROStaff
+    /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpGet("{id}")]
     public async Task<IActionResult> GetSubject(int id, CancellationToken cancellationToken)
@@ -51,7 +51,7 @@ public class SubjectsController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Master Data Management
     /// [Core Responsibility]: Creates a new subject.
-    /// [Target Audience]: Admin, CROStaff
+    /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpPost]
     public async Task<IActionResult> CreateSubject([FromBody] CreateSubjectRequest request, CancellationToken cancellationToken)
@@ -64,7 +64,7 @@ public class SubjectsController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Master Data Management
     /// [Core Responsibility]: Updates an existing subject.
-    /// [Target Audience]: Admin, CROStaff
+    /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateSubject(int id, [FromBody] UpdateSubjectRequest request, CancellationToken cancellationToken)
@@ -77,7 +77,7 @@ public class SubjectsController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Master Data Management
     /// [Core Responsibility]: Soft deletes a subject.
-    /// [Target Audience]: Admin, CROStaff
+    /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteSubject(int id, CancellationToken cancellationToken)

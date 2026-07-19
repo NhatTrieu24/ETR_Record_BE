@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace ETR.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialRefactor : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -17,7 +17,7 @@ namespace ETR.Infrastructure.Migrations
                 {
                     AuditLogId = table.Column<long>(type: "bigint", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    UserId = table.Column<int>(type: "int", nullable: true),
+                    AccountId = table.Column<int>(type: "int", nullable: true),
                     ETRRecordId = table.Column<int>(type: "int", nullable: true),
                     ActionType = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     EntityName = table.Column<string>(type: "nvarchar(max)", nullable: false),
@@ -45,9 +45,9 @@ namespace ETR.Infrastructure.Migrations
                     IsMandatory = table.Column<bool>(type: "bit", nullable: false),
                     DisplayOrder = table.Column<int>(type: "int", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
@@ -68,9 +68,9 @@ namespace ETR.Infrastructure.Migrations
                     DurationHours = table.Column<int>(type: "int", nullable: false),
                     Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
@@ -98,9 +98,9 @@ namespace ETR.Infrastructure.Migrations
                     AverageAssessmentScore = table.Column<decimal>(type: "decimal(5,2)", nullable: false),
                     GeneratedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
@@ -118,9 +118,9 @@ namespace ETR.Infrastructure.Migrations
                     DepartmentName = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
@@ -138,61 +138,15 @@ namespace ETR.Infrastructure.Migrations
                     TypeName = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_EvidenceTypes", x => x.EvidenceTypeId);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "ExportJobs",
-                columns: table => new
-                {
-                    ExportJobId = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    RequestedBy = table.Column<int>(type: "int", nullable: false),
-                    ExportType = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    FileName = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    FilePath = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    RequestedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CompletedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    DownloadExpiredAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
-                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
-                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
-                    DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ExportJobs", x => x.ExportJobId);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "LearnerTypes",
-                columns: table => new
-                {
-                    LearnerTypeId = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    TypeName = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
-                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
-                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
-                    DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_LearnerTypes", x => x.LearnerTypeId);
                 });
 
             migrationBuilder.CreateTable(
@@ -204,9 +158,9 @@ namespace ETR.Infrastructure.Migrations
                     RoleName = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     Description = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
@@ -229,9 +183,9 @@ namespace ETR.Infrastructure.Migrations
                     Description = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
@@ -255,9 +209,9 @@ namespace ETR.Infrastructure.Migrations
                     Capacity = table.Column<int>(type: "int", nullable: false),
                     Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
@@ -273,71 +227,34 @@ namespace ETR.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Learners",
+                name: "Accounts",
                 columns: table => new
                 {
-                    LearnerId = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    LearnerCode = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    FullName = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    DateOfBirth = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    Gender = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Phone = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    Email = table.Column<string>(type: "nvarchar(450)", nullable: true),
-                    IdentificationNumber = table.Column<string>(type: "nvarchar(450)", nullable: true),
-                    Organization = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    LearnerTypeId = table.Column<int>(type: "int", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
-                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
-                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
-                    DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Learners", x => x.LearnerId);
-                    table.ForeignKey(
-                        name: "FK_Learners_LearnerTypes_LearnerTypeId",
-                        column: x => x.LearnerTypeId,
-                        principalTable: "LearnerTypes",
-                        principalColumn: "LearnerTypeId",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Users",
-                columns: table => new
-                {
-                    UserId = table.Column<int>(type: "int", nullable: false)
+                    AccountId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     Username = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     PasswordHash = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    FullName = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Email = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    Phone = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false),
                     RoleId = table.Column<int>(type: "int", nullable: false),
                     DepartmentId = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Users", x => x.UserId);
+                    table.PrimaryKey("PK_Accounts", x => x.AccountId);
                     table.ForeignKey(
-                        name: "FK_Users_Departments_DepartmentId",
+                        name: "FK_Accounts_Departments_DepartmentId",
                         column: x => x.DepartmentId,
                         principalTable: "Departments",
                         principalColumn: "DepartmentId",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "FK_Users_Roles_RoleId",
+                        name: "FK_Accounts_Roles_RoleId",
                         column: x => x.RoleId,
                         principalTable: "Roles",
                         principalColumn: "RoleId",
@@ -356,9 +273,9 @@ namespace ETR.Infrastructure.Migrations
                     IsMandatory = table.Column<bool>(type: "bit", nullable: false),
                     SubjectVersion = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
@@ -380,6 +297,75 @@ namespace ETR.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "CourseEnrollments",
+                columns: table => new
+                {
+                    EnrollmentId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    AccountId = table.Column<int>(type: "int", nullable: false),
+                    ClassId = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    EnrolledAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    StartDate = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    ExpectedCompletionDate = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    ActualCompletionDate = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
+                    DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CourseEnrollments", x => x.EnrollmentId);
+                    table.ForeignKey(
+                        name: "FK_CourseEnrollments_Accounts_AccountId",
+                        column: x => x.AccountId,
+                        principalTable: "Accounts",
+                        principalColumn: "AccountId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_CourseEnrollments_Classes_ClassId",
+                        column: x => x.ClassId,
+                        principalTable: "Classes",
+                        principalColumn: "ClassId",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ExportJobs",
+                columns: table => new
+                {
+                    ExportJobId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    RequestedByAccountId = table.Column<int>(type: "int", nullable: false),
+                    ExportType = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    FileName = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    FilePath = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    RequestedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CompletedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    DownloadExpiredAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
+                    DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ExportJobs", x => x.ExportJobId);
+                    table.ForeignKey(
+                        name: "FK_ExportJobs_Accounts_RequestedByAccountId",
+                        column: x => x.RequestedByAccountId,
+                        principalTable: "Accounts",
+                        principalColumn: "AccountId",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Sessions",
                 columns: table => new
                 {
@@ -391,18 +377,24 @@ namespace ETR.Infrastructure.Migrations
                     SessionDate = table.Column<DateTime>(type: "datetime2", nullable: false),
                     Location = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     IsConfirmed = table.Column<bool>(type: "bit", nullable: false),
-                    ConfirmedBy = table.Column<int>(type: "int", nullable: true),
+                    ConfirmedByAccountId = table.Column<int>(type: "int", nullable: true),
                     ConfirmedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Sessions", x => x.SessionId);
+                    table.ForeignKey(
+                        name: "FK_Sessions_Accounts_ConfirmedByAccountId",
+                        column: x => x.ConfirmedByAccountId,
+                        principalTable: "Accounts",
+                        principalColumn: "AccountId",
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_Sessions_Classes_ClassId",
                         column: x => x.ClassId,
@@ -418,40 +410,33 @@ namespace ETR.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "CourseEnrollments",
+                name: "UserProfiles",
                 columns: table => new
                 {
-                    EnrollmentId = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    LearnerId = table.Column<int>(type: "int", nullable: false),
-                    ClassId = table.Column<int>(type: "int", nullable: false),
-                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    EnrolledAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    StartDate = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    ExpectedCompletionDate = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    ActualCompletionDate = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    AccountId = table.Column<int>(type: "int", nullable: false),
+                    UserCode = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    FullName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Email = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    Phone = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    DateOfBirth = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    Gender = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Organization = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_CourseEnrollments", x => x.EnrollmentId);
+                    table.PrimaryKey("PK_UserProfiles", x => x.AccountId);
                     table.ForeignKey(
-                        name: "FK_CourseEnrollments_Classes_ClassId",
-                        column: x => x.ClassId,
-                        principalTable: "Classes",
-                        principalColumn: "ClassId",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_CourseEnrollments_Learners_LearnerId",
-                        column: x => x.LearnerId,
-                        principalTable: "Learners",
-                        principalColumn: "LearnerId",
-                        onDelete: ReferentialAction.Restrict);
+                        name: "FK_UserProfiles_Accounts_AccountId",
+                        column: x => x.AccountId,
+                        principalTable: "Accounts",
+                        principalColumn: "AccountId",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -469,9 +454,9 @@ namespace ETR.Infrastructure.Migrations
                     IsRequired = table.Column<bool>(type: "bit", nullable: false),
                     DisplayOrder = table.Column<int>(type: "int", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
@@ -499,9 +484,9 @@ namespace ETR.Infrastructure.Migrations
                     IsRequired = table.Column<bool>(type: "bit", nullable: false),
                     DisplayOrder = table.Column<int>(type: "int", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
@@ -517,45 +502,36 @@ namespace ETR.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "AttendanceRecords",
+                name: "ClassStudents",
                 columns: table => new
                 {
-                    AttendanceRecordId = table.Column<int>(type: "int", nullable: false)
+                    ClassStudentId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    SessionId = table.Column<int>(type: "int", nullable: false),
-                    LearnerId = table.Column<int>(type: "int", nullable: false),
-                    EnrollmentId = table.Column<int>(type: "int", nullable: false),
+                    CourseEnrollmentId = table.Column<int>(type: "int", nullable: false),
+                    ClassId = table.Column<int>(type: "int", nullable: false),
+                    AccountId = table.Column<int>(type: "int", nullable: false),
                     Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Remarks = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    RecordedBy = table.Column<int>(type: "int", nullable: false),
-                    RecordedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_AttendanceRecords", x => x.AttendanceRecordId);
+                    table.PrimaryKey("PK_ClassStudents", x => x.ClassStudentId);
                     table.ForeignKey(
-                        name: "FK_AttendanceRecords_CourseEnrollments_EnrollmentId",
-                        column: x => x.EnrollmentId,
+                        name: "FK_ClassStudents_Accounts_AccountId",
+                        column: x => x.AccountId,
+                        principalTable: "Accounts",
+                        principalColumn: "AccountId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_ClassStudents_CourseEnrollments_CourseEnrollmentId",
+                        column: x => x.CourseEnrollmentId,
                         principalTable: "CourseEnrollments",
                         principalColumn: "EnrollmentId",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_AttendanceRecords_Learners_LearnerId",
-                        column: x => x.LearnerId,
-                        principalTable: "Learners",
-                        principalColumn: "LearnerId",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_AttendanceRecords_Sessions_SessionId",
-                        column: x => x.SessionId,
-                        principalTable: "Sessions",
-                        principalColumn: "SessionId",
                         onDelete: ReferentialAction.Restrict);
                 });
 
@@ -573,9 +549,9 @@ namespace ETR.Infrastructure.Migrations
                     IsLocked = table.Column<bool>(type: "bit", nullable: false),
                     CreatedBySystem = table.Column<bool>(type: "bit", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
@@ -591,40 +567,38 @@ namespace ETR.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "SubjectResults",
+                name: "AttendanceRecords",
                 columns: table => new
                 {
-                    SubjectResultId = table.Column<int>(type: "int", nullable: false)
+                    AttendanceRecordId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    EnrollmentId = table.Column<int>(type: "int", nullable: false),
-                    CourseId = table.Column<int>(type: "int", nullable: false),
-                    SubjectId = table.Column<int>(type: "int", nullable: false),
-                    AttendanceRate = table.Column<decimal>(type: "decimal(5,2)", nullable: true),
-                    Score = table.Column<decimal>(type: "decimal(5,2)", nullable: true),
+                    SessionId = table.Column<int>(type: "int", nullable: false),
+                    ClassStudentId = table.Column<int>(type: "int", nullable: false),
                     Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    EvaluatedBy = table.Column<int>(type: "int", nullable: true),
-                    EvaluatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    Remarks = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    RecordedByAccountId = table.Column<int>(type: "int", nullable: false),
+                    RecordedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_SubjectResults", x => x.SubjectResultId);
+                    table.PrimaryKey("PK_AttendanceRecords", x => x.AttendanceRecordId);
                     table.ForeignKey(
-                        name: "FK_SubjectResults_CourseEnrollments_EnrollmentId",
-                        column: x => x.EnrollmentId,
-                        principalTable: "CourseEnrollments",
-                        principalColumn: "EnrollmentId",
+                        name: "FK_AttendanceRecords_ClassStudents_ClassStudentId",
+                        column: x => x.ClassStudentId,
+                        principalTable: "ClassStudents",
+                        principalColumn: "ClassStudentId",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "FK_SubjectResults_CourseSubjects_CourseId_SubjectId",
-                        columns: x => new { x.CourseId, x.SubjectId },
-                        principalTable: "CourseSubjects",
-                        principalColumns: new[] { "CourseId", "SubjectId" },
+                        name: "FK_AttendanceRecords_Sessions_SessionId",
+                        column: x => x.SessionId,
+                        principalTable: "Sessions",
+                        principalColumn: "SessionId",
                         onDelete: ReferentialAction.Restrict);
                 });
 
@@ -636,14 +610,14 @@ namespace ETR.Infrastructure.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     ETRCourseRecordId = table.Column<int>(type: "int", nullable: false),
                     CurrentStatus = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    SubmittedBy = table.Column<int>(type: "int", nullable: false),
+                    SubmittedByAccountId = table.Column<int>(type: "int", nullable: false),
                     SubmittedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CurrentApproverId = table.Column<int>(type: "int", nullable: true),
                     CompletedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
@@ -659,26 +633,102 @@ namespace ETR.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "SubjectResults",
+                columns: table => new
+                {
+                    SubjectResultId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    EtrId = table.Column<int>(type: "int", nullable: false),
+                    CourseId = table.Column<int>(type: "int", nullable: false),
+                    SubjectId = table.Column<int>(type: "int", nullable: false),
+                    AttendanceRate = table.Column<decimal>(type: "decimal(5,2)", nullable: true),
+                    Score = table.Column<decimal>(type: "decimal(5,2)", nullable: true),
+                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    EvaluatedByAccountId = table.Column<int>(type: "int", nullable: true),
+                    EvaluatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
+                    DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SubjectResults", x => x.SubjectResultId);
+                    table.ForeignKey(
+                        name: "FK_SubjectResults_CourseSubjects_CourseId_SubjectId",
+                        columns: x => new { x.CourseId, x.SubjectId },
+                        principalTable: "CourseSubjects",
+                        principalColumns: new[] { "CourseId", "SubjectId" },
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_SubjectResults_ETRCourseRecords_EtrId",
+                        column: x => x.EtrId,
+                        principalTable: "ETRCourseRecords",
+                        principalColumn: "ETRCourseRecordId",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ApprovalHistories",
+                columns: table => new
+                {
+                    ApprovalHistoryId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    ApprovalRequestId = table.Column<int>(type: "int", nullable: false),
+                    ActionByAccountId = table.Column<int>(type: "int", nullable: false),
+                    ActionType = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    PreviousStatus = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    NewStatus = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Comments = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ActionAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
+                    DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ApprovalHistories", x => x.ApprovalHistoryId);
+                    table.ForeignKey(
+                        name: "FK_ApprovalHistories_Accounts_ActionByAccountId",
+                        column: x => x.ActionByAccountId,
+                        principalTable: "Accounts",
+                        principalColumn: "AccountId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_ApprovalHistories_ApprovalRequests_ApprovalRequestId",
+                        column: x => x.ApprovalRequestId,
+                        principalTable: "ApprovalRequests",
+                        principalColumn: "ApprovalRequestId",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "AssessmentResults",
                 columns: table => new
                 {
                     AssessmentResultId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     AssessmentId = table.Column<int>(type: "int", nullable: false),
-                    LearnerId = table.Column<int>(type: "int", nullable: false),
+                    AccountId = table.Column<int>(type: "int", nullable: false),
                     SubjectResultId = table.Column<int>(type: "int", nullable: false),
                     Score = table.Column<decimal>(type: "decimal(5,2)", nullable: false),
                     ResultStatus = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    RecordedBy = table.Column<int>(type: "int", nullable: false),
+                    GradedByAccountId = table.Column<int>(type: "int", nullable: false),
                     RecordedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     PublishedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     IsPublished = table.Column<bool>(type: "bit", nullable: false),
                     TakenAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     Remark = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    AttemptNo = table.Column<int>(type: "int", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
@@ -686,16 +736,22 @@ namespace ETR.Infrastructure.Migrations
                 {
                     table.PrimaryKey("PK_AssessmentResults", x => x.AssessmentResultId);
                     table.ForeignKey(
+                        name: "FK_AssessmentResults_Accounts_AccountId",
+                        column: x => x.AccountId,
+                        principalTable: "Accounts",
+                        principalColumn: "AccountId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_AssessmentResults_Accounts_GradedByAccountId",
+                        column: x => x.GradedByAccountId,
+                        principalTable: "Accounts",
+                        principalColumn: "AccountId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
                         name: "FK_AssessmentResults_Assessments_AssessmentId",
                         column: x => x.AssessmentId,
                         principalTable: "Assessments",
                         principalColumn: "AssessmentId",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_AssessmentResults_Learners_LearnerId",
-                        column: x => x.LearnerId,
-                        principalTable: "Learners",
-                        principalColumn: "LearnerId",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_AssessmentResults_SubjectResults_SubjectResultId",
@@ -714,19 +770,25 @@ namespace ETR.Infrastructure.Migrations
                     SubjectResultId = table.Column<int>(type: "int", nullable: false),
                     PracticalChecklistId = table.Column<int>(type: "int", nullable: false),
                     IsCompleted = table.Column<bool>(type: "bit", nullable: false),
-                    VerifiedBy = table.Column<int>(type: "int", nullable: true),
+                    VerifiedByAccountId = table.Column<int>(type: "int", nullable: true),
                     CompletedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     VerificationComment = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_PracticalChecklistResults", x => x.PracticalChecklistResultId);
+                    table.ForeignKey(
+                        name: "FK_PracticalChecklistResults_Accounts_VerifiedByAccountId",
+                        column: x => x.VerifiedByAccountId,
+                        principalTable: "Accounts",
+                        principalColumn: "AccountId",
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_PracticalChecklistResults_PracticalChecklists_PracticalChecklistId",
                         column: x => x.PracticalChecklistId,
@@ -752,11 +814,12 @@ namespace ETR.Infrastructure.Migrations
                     Reason = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     PreviousScore = table.Column<decimal>(type: "decimal(5,2)", nullable: false),
                     NewScore = table.Column<decimal>(type: "decimal(5,2)", nullable: false),
-                    AuthorizedBy = table.Column<int>(type: "int", nullable: false),
+                    AuthorizedByAccountId = table.Column<int>(type: "int", nullable: false),
+                    AttemptNo = table.Column<int>(type: "int", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
@@ -778,14 +841,14 @@ namespace ETR.Infrastructure.Migrations
                     SubjectSignoffId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     SubjectResultId = table.Column<int>(type: "int", nullable: false),
-                    SignoffBy = table.Column<int>(type: "int", nullable: false),
+                    SignoffByAccountId = table.Column<int>(type: "int", nullable: false),
                     Role = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     SignoffAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     Comment = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
@@ -793,41 +856,16 @@ namespace ETR.Infrastructure.Migrations
                 {
                     table.PrimaryKey("PK_SubjectSignoffs", x => x.SubjectSignoffId);
                     table.ForeignKey(
+                        name: "FK_SubjectSignoffs_Accounts_SignoffByAccountId",
+                        column: x => x.SignoffByAccountId,
+                        principalTable: "Accounts",
+                        principalColumn: "AccountId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
                         name: "FK_SubjectSignoffs_SubjectResults_SubjectResultId",
                         column: x => x.SubjectResultId,
                         principalTable: "SubjectResults",
                         principalColumn: "SubjectResultId",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "ApprovalHistories",
-                columns: table => new
-                {
-                    ApprovalHistoryId = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    ApprovalRequestId = table.Column<int>(type: "int", nullable: false),
-                    ActionBy = table.Column<int>(type: "int", nullable: false),
-                    ActionType = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    PreviousStatus = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    NewStatus = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    Comments = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    ActionAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
-                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
-                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
-                    DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ApprovalHistories", x => x.ApprovalHistoryId);
-                    table.ForeignKey(
-                        name: "FK_ApprovalHistories_ApprovalRequests_ApprovalRequestId",
-                        column: x => x.ApprovalRequestId,
-                        principalTable: "ApprovalRequests",
-                        principalColumn: "ApprovalRequestId",
                         onDelete: ReferentialAction.Restrict);
                 });
 
@@ -838,8 +876,8 @@ namespace ETR.Infrastructure.Migrations
                     EvidenceFileId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     EvidenceTypeId = table.Column<int>(type: "int", nullable: false),
-                    UploadedBy = table.Column<int>(type: "int", nullable: false),
-                    LearnerId = table.Column<int>(type: "int", nullable: false),
+                    UploadedByAccountId = table.Column<int>(type: "int", nullable: false),
+                    AccountId = table.Column<int>(type: "int", nullable: false),
                     SubjectResultId = table.Column<int>(type: "int", nullable: false),
                     AttendanceRecordId = table.Column<int>(type: "int", nullable: true),
                     AssessmentResultId = table.Column<int>(type: "int", nullable: true),
@@ -849,20 +887,38 @@ namespace ETR.Infrastructure.Migrations
                     MimeType = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     FileSize = table.Column<long>(type: "bigint", nullable: false),
                     VerificationStatus = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    VerifiedBy = table.Column<int>(type: "int", nullable: true),
+                    VerifiedByAccountId = table.Column<int>(type: "int", nullable: true),
                     VerifiedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     VerificationComment = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     UploadedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatedBy = table.Column<int>(type: "int", nullable: true),
+                    CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UpdatedBy = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DeletedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_EvidenceFiles", x => x.EvidenceFileId);
+                    table.ForeignKey(
+                        name: "FK_EvidenceFiles_Accounts_AccountId",
+                        column: x => x.AccountId,
+                        principalTable: "Accounts",
+                        principalColumn: "AccountId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_EvidenceFiles_Accounts_UploadedByAccountId",
+                        column: x => x.UploadedByAccountId,
+                        principalTable: "Accounts",
+                        principalColumn: "AccountId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_EvidenceFiles_Accounts_VerifiedByAccountId",
+                        column: x => x.VerifiedByAccountId,
+                        principalTable: "Accounts",
+                        principalColumn: "AccountId",
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_EvidenceFiles_AssessmentResults_AssessmentResultId",
                         column: x => x.AssessmentResultId,
@@ -882,18 +938,33 @@ namespace ETR.Infrastructure.Migrations
                         principalColumn: "EvidenceTypeId",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "FK_EvidenceFiles_Learners_LearnerId",
-                        column: x => x.LearnerId,
-                        principalTable: "Learners",
-                        principalColumn: "LearnerId",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
                         name: "FK_EvidenceFiles_SubjectResults_SubjectResultId",
                         column: x => x.SubjectResultId,
                         principalTable: "SubjectResults",
                         principalColumn: "SubjectResultId",
                         onDelete: ReferentialAction.Restrict);
                 });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Accounts_DepartmentId",
+                table: "Accounts",
+                column: "DepartmentId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Accounts_RoleId",
+                table: "Accounts",
+                column: "RoleId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Accounts_Username",
+                table: "Accounts",
+                column: "Username",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ApprovalHistories_ActionByAccountId",
+                table: "ApprovalHistories",
+                column: "ActionByAccountId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_ApprovalHistories_ApprovalRequestId",
@@ -906,15 +977,20 @@ namespace ETR.Infrastructure.Migrations
                 column: "ETRCourseRecordId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_AssessmentResults_AssessmentId_LearnerId",
+                name: "IX_AssessmentResults_AccountId",
                 table: "AssessmentResults",
-                columns: new[] { "AssessmentId", "LearnerId" },
+                column: "AccountId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AssessmentResults_AssessmentId_AccountId",
+                table: "AssessmentResults",
+                columns: new[] { "AssessmentId", "AccountId" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_AssessmentResults_LearnerId",
+                name: "IX_AssessmentResults_GradedByAccountId",
                 table: "AssessmentResults",
-                column: "LearnerId");
+                column: "GradedByAccountId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_AssessmentResults_SubjectResultId",
@@ -927,19 +1003,14 @@ namespace ETR.Infrastructure.Migrations
                 columns: new[] { "CourseId", "SubjectId" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_AttendanceRecords_EnrollmentId",
+                name: "IX_AttendanceRecords_ClassStudentId",
                 table: "AttendanceRecords",
-                column: "EnrollmentId");
+                column: "ClassStudentId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_AttendanceRecords_LearnerId",
+                name: "IX_AttendanceRecords_SessionId_ClassStudentId",
                 table: "AttendanceRecords",
-                column: "LearnerId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_AttendanceRecords_SessionId_LearnerId",
-                table: "AttendanceRecords",
-                columns: new[] { "SessionId", "LearnerId" },
+                columns: new[] { "SessionId", "ClassStudentId" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -954,15 +1025,25 @@ namespace ETR.Infrastructure.Migrations
                 column: "CourseId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_ClassStudents_AccountId",
+                table: "ClassStudents",
+                column: "AccountId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ClassStudents_CourseEnrollmentId",
+                table: "ClassStudents",
+                column: "CourseEnrollmentId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CourseEnrollments_AccountId_ClassId",
+                table: "CourseEnrollments",
+                columns: new[] { "AccountId", "ClassId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_CourseEnrollments_ClassId",
                 table: "CourseEnrollments",
                 column: "ClassId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_CourseEnrollments_LearnerId_ClassId",
-                table: "CourseEnrollments",
-                columns: new[] { "LearnerId", "ClassId" },
-                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Courses_CourseCode",
@@ -988,6 +1069,11 @@ namespace ETR.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_EvidenceFiles_AccountId",
+                table: "EvidenceFiles",
+                column: "AccountId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_EvidenceFiles_AssessmentResultId",
                 table: "EvidenceFiles",
                 column: "AssessmentResultId");
@@ -1003,14 +1089,19 @@ namespace ETR.Infrastructure.Migrations
                 column: "EvidenceTypeId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_EvidenceFiles_LearnerId",
-                table: "EvidenceFiles",
-                column: "LearnerId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_EvidenceFiles_SubjectResultId",
                 table: "EvidenceFiles",
                 column: "SubjectResultId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_EvidenceFiles_UploadedByAccountId",
+                table: "EvidenceFiles",
+                column: "UploadedByAccountId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_EvidenceFiles_VerifiedByAccountId",
+                table: "EvidenceFiles",
+                column: "VerifiedByAccountId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_EvidenceTypes_TypeName",
@@ -1019,35 +1110,9 @@ namespace ETR.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_Learners_Email",
-                table: "Learners",
-                column: "Email",
-                unique: true,
-                filter: "[Email] IS NOT NULL");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Learners_IdentificationNumber",
-                table: "Learners",
-                column: "IdentificationNumber",
-                unique: true,
-                filter: "[IdentificationNumber] IS NOT NULL");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Learners_LearnerCode",
-                table: "Learners",
-                column: "LearnerCode",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Learners_LearnerTypeId",
-                table: "Learners",
-                column: "LearnerTypeId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_LearnerTypes_TypeName",
-                table: "LearnerTypes",
-                column: "TypeName",
-                unique: true);
+                name: "IX_ExportJobs_RequestedByAccountId",
+                table: "ExportJobs",
+                column: "RequestedByAccountId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_PracticalChecklistResults_PracticalChecklistId",
@@ -1059,6 +1124,11 @@ namespace ETR.Infrastructure.Migrations
                 table: "PracticalChecklistResults",
                 columns: new[] { "SubjectResultId", "PracticalChecklistId" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PracticalChecklistResults_VerifiedByAccountId",
+                table: "PracticalChecklistResults",
+                column: "VerifiedByAccountId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_PracticalChecklists_CourseId_SubjectId",
@@ -1082,6 +1152,11 @@ namespace ETR.Infrastructure.Migrations
                 column: "ClassId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Sessions_ConfirmedByAccountId",
+                table: "Sessions",
+                column: "ConfirmedByAccountId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Sessions_SubjectId",
                 table: "Sessions",
                 column: "SubjectId");
@@ -1092,9 +1167,9 @@ namespace ETR.Infrastructure.Migrations
                 columns: new[] { "CourseId", "SubjectId" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_SubjectResults_EnrollmentId_CourseId_SubjectId",
+                name: "IX_SubjectResults_EtrId_CourseId_SubjectId",
                 table: "SubjectResults",
-                columns: new[] { "EnrollmentId", "CourseId", "SubjectId" },
+                columns: new[] { "EtrId", "CourseId", "SubjectId" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -1104,31 +1179,21 @@ namespace ETR.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_SubjectSignoffs_SignoffByAccountId",
+                table: "SubjectSignoffs",
+                column: "SignoffByAccountId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_SubjectSignoffs_SubjectResultId",
                 table: "SubjectSignoffs",
                 column: "SubjectResultId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Users_DepartmentId",
-                table: "Users",
-                column: "DepartmentId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Users_Email",
-                table: "Users",
+                name: "IX_UserProfiles_Email",
+                table: "UserProfiles",
                 column: "Email",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Users_RoleId",
-                table: "Users",
-                column: "RoleId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Users_Username",
-                table: "Users",
-                column: "Username",
-                unique: true);
+                unique: true,
+                filter: "[Email] IS NOT NULL AND [Email] <> ''");
         }
 
         /// <inheritdoc />
@@ -1162,7 +1227,7 @@ namespace ETR.Infrastructure.Migrations
                 name: "SubjectSignoffs");
 
             migrationBuilder.DropTable(
-                name: "Users");
+                name: "UserProfiles");
 
             migrationBuilder.DropTable(
                 name: "ApprovalRequests");
@@ -1180,43 +1245,43 @@ namespace ETR.Infrastructure.Migrations
                 name: "PracticalChecklists");
 
             migrationBuilder.DropTable(
-                name: "Departments");
-
-            migrationBuilder.DropTable(
-                name: "Roles");
-
-            migrationBuilder.DropTable(
-                name: "ETRCourseRecords");
-
-            migrationBuilder.DropTable(
                 name: "Assessments");
 
             migrationBuilder.DropTable(
                 name: "SubjectResults");
 
             migrationBuilder.DropTable(
-                name: "Sessions");
+                name: "ClassStudents");
 
             migrationBuilder.DropTable(
-                name: "CourseEnrollments");
+                name: "Sessions");
 
             migrationBuilder.DropTable(
                 name: "CourseSubjects");
 
             migrationBuilder.DropTable(
-                name: "Classes");
-
-            migrationBuilder.DropTable(
-                name: "Learners");
+                name: "ETRCourseRecords");
 
             migrationBuilder.DropTable(
                 name: "Subjects");
 
             migrationBuilder.DropTable(
-                name: "Courses");
+                name: "CourseEnrollments");
 
             migrationBuilder.DropTable(
-                name: "LearnerTypes");
+                name: "Accounts");
+
+            migrationBuilder.DropTable(
+                name: "Classes");
+
+            migrationBuilder.DropTable(
+                name: "Departments");
+
+            migrationBuilder.DropTable(
+                name: "Roles");
+
+            migrationBuilder.DropTable(
+                name: "Courses");
         }
     }
 }

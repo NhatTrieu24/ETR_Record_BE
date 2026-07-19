@@ -40,7 +40,7 @@ public class UserProfilesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Identity &amp; Access Management
     /// [Core Responsibility]: Retrieves all learner profiles.
-    /// [Target Audience]: Admin, CROStaff
+    /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpGet("learners")]
     public async Task<ActionResult<IEnumerable<UserProfileResponse>>> GetLearnerProfiles(CancellationToken cancellationToken)

@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ETR.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260717203556_UpdateSemanticAuditKeys")]
-    partial class UpdateSemanticAuditKeys
+    [Migration("20260719063637_SeedSystemData")]
+    partial class SeedSystemData
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -1105,48 +1105,6 @@ namespace ETR.Infrastructure.Migrations
                     b.ToTable("ExportJobs");
                 });
 
-            modelBuilder.Entity("ETR.Domain.Entities.LearnerType", b =>
-                {
-                    b.Property<int>("LearnerTypeId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("LearnerTypeId"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CreatedByAccountId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("TypeName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("UpdatedByAccountId")
-                        .HasColumnType("int");
-
-                    b.HasKey("LearnerTypeId");
-
-                    b.HasIndex("TypeName")
-                        .IsUnique();
-
-                    b.ToTable("LearnerTypes");
-                });
-
             modelBuilder.Entity("ETR.Domain.Entities.PracticalChecklist", b =>
                 {
                     b.Property<int>("PracticalChecklistId")
@@ -1617,9 +1575,6 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
-                    b.Property<int?>("LearnerTypeId")
-                        .HasColumnType("int");
-
                     b.Property<string>("Organization")
                         .HasColumnType("nvarchar(max)");
 
@@ -1641,8 +1596,6 @@ namespace ETR.Infrastructure.Migrations
                     b.HasIndex("Email")
                         .IsUnique()
                         .HasFilter("[Email] IS NOT NULL AND [Email] <> ''");
-
-                    b.HasIndex("LearnerTypeId");
 
                     b.ToTable("UserProfiles");
                 });
@@ -1946,11 +1899,6 @@ namespace ETR.Infrastructure.Migrations
                         .HasForeignKey("ETR.Domain.Entities.UserProfile", "AccountId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("ETR.Domain.Entities.LearnerType", null)
-                        .WithMany()
-                        .HasForeignKey("LearnerTypeId")
-                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Account");
                 });

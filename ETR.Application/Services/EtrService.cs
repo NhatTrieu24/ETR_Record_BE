@@ -26,6 +26,24 @@ public class EtrService : IEtrService
             e.CompletedAt));
     }
 
+    public async Task<IEnumerable<EtrRecordResponse>> GetMyEtrsAsync(int accountId, CancellationToken cancellationToken = default)
+    {
+        var enrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken);
+        var myEnrollmentIds = enrollments.Where(e => e.AccountId == accountId).Select(e => e.EnrollmentId).ToList();
+
+        var etrs = await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken);
+        var myEtrs = etrs.Where(e => myEnrollmentIds.Contains(e.EnrollmentId));
+
+        return myEtrs.Select(e => new EtrRecordResponse(
+            e.ETRCourseRecordId,
+            e.EnrollmentId,
+            e.Status,
+            e.IsLocked,
+            e.SubmittedAt,
+            e.VerifiedAt,
+            e.CompletedAt));
+    }
+
     public async Task<EtrDetailsResponse> GetEtrByIdAsync(int etrCourseRecordId, CancellationToken cancellationToken = default)
     {
         var e = await _unitOfWork.ETRCourseRecordRepository.GetWithSubjectResultsAsync(etrCourseRecordId, cancellationToken)

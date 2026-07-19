@@ -8,11 +8,11 @@ namespace ETR.API.Controllers;
 /// <summary>
 /// [Module/Flow]: ETR Processing
 /// [Core Responsibility]: Handles the workflow and state transitions of the Electronic Training Record (ETR).
-/// [Target Audience]: Instructor, Verifier, Admin
+/// [Target Audience]: Instructor, QA, Admin
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize] // Secure all endpoints in this controller by default
+[Authorize(Roles = "Admin,QA,Student,Instructor")] // Secure all endpoints in this controller by default
 public class EtrController : ControllerBase
 {
     private readonly IEtrService _etrService;
@@ -27,7 +27,7 @@ public class EtrController : ControllerBase
     /// <summary>
     /// [Module/Flow]: ETR Processing
     /// [Core Responsibility]: Retrieves all ETR records.
-    /// [Target Audience]: Instructor, Verifier, Admin
+    /// [Target Audience]: Instructor, QA, Admin
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A list of ETR records.</returns>
@@ -42,8 +42,24 @@ public class EtrController : ControllerBase
 
     /// <summary>
     /// [Module/Flow]: ETR Processing
+    /// [Core Responsibility]: Retrieves ETR records for the currently authenticated student.
+    /// [Target Audience]: Student
+    /// </summary>
+    [HttpGet("my-etr")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult<IEnumerable<EtrRecordResponse>>> GetMyEtrs(CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+            
+        var etrs = await _etrService.GetMyEtrsAsync(accountId, cancellationToken);
+        return Ok(etrs);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: ETR Processing
     /// [Core Responsibility]: Retrieves a specific ETR record by ID, including its Subject Results.
-    /// [Target Audience]: Instructor, Verifier, Admin
+    /// [Target Audience]: Instructor, QA, Admin
     /// </summary>
     /// <param name="id">The ETR Course Record ID.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -68,7 +84,7 @@ public class EtrController : ControllerBase
     /// <response code="401">If the user is not authenticated.</response>
     /// <response code="403">If the user is not an Instructor or Admin.</response>
     [HttpPost("{id}/submit")]
-    [Authorize(Roles = "Instructor, Admin")]
+    [Authorize(Roles = "Admin,Instructor")]
     public async Task<IActionResult> SubmitEtr(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -86,9 +102,9 @@ public class EtrController : ControllerBase
     /// <returns>The updated ETR record.</returns>
     /// <response code="200">Returns the updated record.</response>
     /// <response code="401">If the user is not authenticated.</response>
-    /// <response code="403">If the user is not a Verifier or Admin.</response>
+    /// <response code="403">If the user is not a QA or Admin.</response>
     [HttpPost("{id}/verify")]
-    [Authorize(Roles = "Verifier, Admin")]
+    [Authorize(Roles = "Admin,QA")]
     public async Task<IActionResult> VerifyEtr(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
