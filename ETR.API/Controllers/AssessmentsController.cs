@@ -1,124 +1,59 @@
-using ETR.Application.DTOs;
+using ETR.Application.DTOs.Assessment.Requests;
 using ETR.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ETR.API.Controllers;
 
-/// <summary>
-/// [Module/Flow]: Thực thi Đào tạo
-/// [Core Responsibility]: Records assessment scores and handles subject signoffs.
-/// [Target Audience]: Instructor, Admin
-/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
 public class AssessmentsController : ControllerBase
 {
-    private readonly IAssessmentService _assessmentService;
+    private readonly IAssessmentService _service;
     private readonly ICurrentUserService _currentUserService;
 
-    public AssessmentsController(IAssessmentService assessmentService, ICurrentUserService currentUserService)
+    public AssessmentsController(IAssessmentService service, ICurrentUserService currentUserService)
     {
-        _assessmentService = assessmentService;
+        _service = service;
         _currentUserService = currentUserService;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
-        return Ok(await _assessmentService.GetAllAssessmentResultsAsync(cancellationToken));
-    }
-
-    /// <summary>
-    /// [Module/Flow]: Thực thi Đào tạo
-    /// [Core Responsibility]: Ghi nhận điểm số cho một bài kiểm tra (assessment) cụ thể.
-    /// [Target Audience]: Instructor, Admin
-    /// </summary>
-    /// <param name="request">The assessment result details.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The recorded assessment result.</returns>
-    /// <response code="200">Returns the recorded assessment result.</response>
-    /// <response code="401">If the user is not authenticated.</response>
-    /// <response code="403">If the user is not an Instructor or Admin.</response>
-    [HttpPost("record")]
-    public async Task<IActionResult> RecordAssessment([FromBody] CreateAssessmentResultRequest request, CancellationToken cancellationToken)
-    {
-        var accountId = _currentUserService.AccountId 
-            ?? throw new UnauthorizedAccessException("User is not authenticated.");
-
-        var response = await _assessmentService.RecordAssessmentScoreAsync(request, accountId, cancellationToken);
-        return Ok(response);
-    }
-
-    /// <summary>
-    /// [Module/Flow]: Thực thi Đào tạo
-    /// [Core Responsibility]: Ký xác nhận (sign off) kết quả môn học.
-    /// [Target Audience]: Instructor, Admin
-    /// </summary>
-    /// <param name="request">The signoff details.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The signoff response.</returns>
-    /// <response code="200">Returns the signoff response.</response>
-    /// <response code="401">If the user is not authenticated.</response>
-    /// <response code="403">If the user is not an Instructor or Admin.</response>
-    [HttpPost("signoff")]
-    public async Task<IActionResult> SignoffSubject([FromBody] CreateSubjectSignoffRequest request, CancellationToken cancellationToken)
-    {
-        var accountId = _currentUserService.AccountId 
-            ?? throw new UnauthorizedAccessException("User is not authenticated.");
-
-        var response = await _assessmentService.SignoffSubjectResultAsync(request, accountId, cancellationToken);
-        return Ok(response);
-    }
-
-    /// <summary>
-    /// [Module/Flow]: Thực thi Đào tạo
-    /// [Core Responsibility]: Lấy danh sách kết quả kiểm tra của một học viên cụ thể trong lớp.
-    /// [Target Audience]: Instructor, Admin, Student
-    /// </summary>
-    /// <param name="classStudentId">The ClassStudent ID.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A list of assessment results.</returns>
-    /// <response code="200">Returns the list of assessment results.</response>
-    /// <response code="401">If the user is not authenticated.</response>
-    /// <response code="404">If the ClassStudent is not found.</response>
-    [HttpGet("student/{classStudentId}")]
-    [Authorize] // Allow students to also fetch their own results, validation inside service
-    public async Task<IActionResult> GetAssessmentResults(int classStudentId, CancellationToken cancellationToken)
-    {
-        var accountId = _currentUserService.AccountId 
-            ?? throw new UnauthorizedAccessException("User is not authenticated.");
-
-        var response = await _assessmentService.GetAssessmentResultsByClassStudentAsync(classStudentId, accountId, cancellationToken);
-        return Ok(response);
+        var result = await _service.GetAllAssessmentsAsync(cancellationToken);
+        return Ok(result);
     }
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
     {
-        return Ok(await _assessmentService.GetAssessmentResultByIdAsync(id, cancellationToken));
+        var result = await _service.GetAssessmentByIdAsync(id, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] CreateAssessmentRequest request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        var result = await _service.CreateAssessmentAsync(request, accountId, cancellationToken);
+        return CreatedAtAction(nameof(GetById), new { id = result.AssessmentId }, result);
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateAssessmentResult(int id, [FromBody] UpdateAssessmentResultRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Update(int id, [FromBody] UpdateAssessmentRequest request, CancellationToken cancellationToken)
     {
-        var accountId = _currentUserService.AccountId 
-            ?? throw new UnauthorizedAccessException("User is not authenticated.");
-
-        var response = await _assessmentService.UpdateAssessmentResultAsync(id, request, accountId, cancellationToken);
-        return Ok(response);
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        var result = await _service.UpdateAssessmentAsync(id, request, accountId, cancellationToken);
+        return Ok(result);
     }
 
     [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteAssessmentResult(int id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
-        var accountId = _currentUserService.AccountId 
-            ?? throw new UnauthorizedAccessException("User is not authenticated.");
-
-        await _assessmentService.DeleteAssessmentResultAsync(id, accountId, cancellationToken);
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        await _service.DeleteAssessmentAsync(id, accountId, cancellationToken);
         return NoContent();
     }
 }
-
-

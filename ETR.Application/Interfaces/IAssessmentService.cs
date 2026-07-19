@@ -1,14 +1,13 @@
-using ETR.Application.DTOs;
+using ETR.Application.DTOs.Assessment.Requests;
+using ETR.Application.DTOs.Assessment.Responses;
 
 namespace ETR.Application.Interfaces;
 
 public interface IAssessmentService
 {
-    Task<IEnumerable<AssessmentResultResponse>> GetAllAssessmentResultsAsync(CancellationToken cancellationToken = default);
-    Task<AssessmentResultResponse> GetAssessmentResultByIdAsync(int id, CancellationToken cancellationToken = default);
-    Task<IEnumerable<AssessmentResultResponse>> GetAssessmentResultsByClassStudentAsync(int classStudentId, int accountId, CancellationToken cancellationToken = default);
-    Task<AssessmentResultResponse> RecordAssessmentScoreAsync(CreateAssessmentResultRequest request, int recordedByAccountId, CancellationToken cancellationToken = default);
-    Task<AssessmentResultResponse> UpdateAssessmentResultAsync(int id, UpdateAssessmentResultRequest request, int updatedByAccountId, CancellationToken cancellationToken = default);
-    Task DeleteAssessmentResultAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default);
-    Task<SubjectSignoffResponse> SignoffSubjectResultAsync(CreateSubjectSignoffRequest request, int signoffByAccountId, CancellationToken cancellationToken = default);
+    Task<IEnumerable<AssessmentResponse>> GetAllAssessmentsAsync(CancellationToken cancellationToken = default);
+    Task<AssessmentResponse> GetAssessmentByIdAsync(int id, CancellationToken cancellationToken = default);
+    Task<AssessmentResponse> CreateAssessmentAsync(CreateAssessmentRequest request, int createdByAccountId, CancellationToken cancellationToken = default);
+    Task<AssessmentResponse> UpdateAssessmentAsync(int id, UpdateAssessmentRequest request, int updatedByAccountId, CancellationToken cancellationToken = default);
+    Task DeleteAssessmentAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default);
 }

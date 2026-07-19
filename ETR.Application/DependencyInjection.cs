@@ -14,16 +14,17 @@ public static class DependencyInjection
         services.AddScoped<IEtrService, EtrService>();
         services.AddScoped<IAttendanceService, AttendanceService>();
         services.AddScoped<IAssessmentService, AssessmentService>();
+        services.AddScoped<IAssessmentResultService, AssessmentResultService>();
         services.AddScoped<IApprovalService, ApprovalService>();
         services.AddScoped<ICourseService, CourseService>();
         services.AddScoped<IClassService, ClassService>();
         services.AddScoped<ISubjectService, SubjectService>();
         services.AddScoped<ISessionService, SessionService>();
         services.AddScoped<IEvidenceService, EvidenceService>();
-        services.AddScoped<IApprovalService, ApprovalService>();
         services.AddScoped<IDepartmentService, DepartmentService>();
         services.AddScoped<IEvidenceTypeService, EvidenceTypeService>();
         services.AddScoped<IPracticalChecklistService, PracticalChecklistService>();
+        services.AddScoped<IPracticalChecklistResultService, PracticalChecklistResultService>();
         services.AddScoped<ICompletionRequirementService, CompletionRequirementService>();
 
         return services;

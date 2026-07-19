@@ -1,7 +1,9 @@
 using ETR.Application.DTOs.Evidence;
+using ETR.Application.DTOs.Evidence.Requests;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
 using System.ComponentModel.DataAnnotations;
+using System.IO;
 
 namespace ETR.Application.Services;
 
@@ -29,8 +31,26 @@ public class EvidenceService : IEvidenceService
         return MapToResponse(evidence);
     }
 
-    public async Task<EvidenceResponse> UploadEvidenceAsync(CreateEvidenceRequest request, int uploadedByAccountId, CancellationToken cancellationToken = default)
+    public async Task<EvidenceResponse> UploadEvidenceAsync(UploadEvidenceRequest request, int uploadedByAccountId, string webRootPath, CancellationToken cancellationToken = default)
     {
+        if (request.File == null || request.File.Length == 0)
+            throw new ValidationException("File is empty or not provided.");
+
+        var uploadDir = Path.Combine(webRootPath, "uploads", "evidences");
+        if (!Directory.Exists(uploadDir))
+            Directory.CreateDirectory(uploadDir);
+
+        var fileExtension = Path.GetExtension(request.File.FileName);
+        var uniqueFileName = $"{Guid.NewGuid()}{fileExtension}";
+        var filePath = Path.Combine(uploadDir, uniqueFileName);
+
+        using (var stream = new FileStream(filePath, FileMode.Create))
+        {
+            await request.File.CopyToAsync(stream, cancellationToken);
+        }
+
+        var relativePath = Path.Combine("uploads", "evidences", uniqueFileName).Replace("\\", "/");
+
         var evidence = new EvidenceFile
         {
             EvidenceTypeId = request.EvidenceTypeId,
@@ -38,11 +58,11 @@ public class EvidenceService : IEvidenceService
             SubjectResultId = request.SubjectResultId,
             AttendanceRecordId = request.AttendanceRecordId,
             AssessmentResultId = request.AssessmentResultId,
-            FileName = request.FileName,
-            FilePath = request.FilePath,
-            FileExtension = request.FileExtension,
-            MimeType = request.MimeType,
-            FileSize = request.FileSize,
+            FileName = request.File.FileName,
+            FilePath = relativePath,
+            FileExtension = fileExtension,
+            MimeType = request.File.ContentType,
+            FileSize = request.File.Length,
             VerificationStatus = "Pending", // Default value
             UploadedByAccountId = uploadedByAccountId,
             UploadedAt = DateTime.UtcNow,
@@ -56,21 +76,19 @@ public class EvidenceService : IEvidenceService
         return MapToResponse(evidence);
     }
 
-    public async Task<EvidenceResponse> UpdateEvidenceAsync(int id, ETR.Application.DTOs.UpdateEvidenceRequest request, int updatedByAccountId, CancellationToken cancellationToken = default)
+    public async Task<EvidenceResponse> VerifyEvidenceAsync(int id, VerifyEvidenceRequest request, int verifiedByAccountId, CancellationToken cancellationToken = default)
     {
         var evidence = await _unitOfWork.EvidenceFileRepository.GetByIdAsync(id, cancellationToken);
         if (evidence == null)
             throw new KeyNotFoundException($"Evidence with ID {id} not found.");
 
-        evidence.EvidenceTypeId = request.EvidenceTypeId;
-        evidence.FileName = request.FileName;
-        evidence.FilePath = request.FilePath;
-        evidence.FileExtension = request.FileExtension;
-        evidence.MimeType = request.MimeType;
-        evidence.FileSize = request.FileSize;
-        
+        evidence.VerificationStatus = request.VerificationStatus;
+        evidence.VerificationComment = request.VerificationComment;
+        evidence.VerifiedByAccountId = verifiedByAccountId;
+        evidence.VerifiedAt = DateTime.UtcNow;
+
         evidence.UpdatedAt = DateTime.UtcNow;
-        evidence.UpdatedByAccountId = updatedByAccountId;
+        evidence.UpdatedByAccountId = verifiedByAccountId;
 
         _unitOfWork.EvidenceFileRepository.Update(evidence);
         await _unitOfWork.SaveAsync(cancellationToken);

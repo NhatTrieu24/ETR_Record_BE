@@ -1,14 +1,23 @@
 using Microsoft.AspNetCore.Http;
+using System.ComponentModel.DataAnnotations;
 
-namespace ETR.Application.DTOs;
+namespace ETR.Application.DTOs.Evidence.Requests;
 
 public class UploadEvidenceRequest
 {
-    public IFormFile File { get; set; } = null!;
+    [Required]
     public int EvidenceTypeId { get; set; }
-    public int UploadedBy { get; set; }
-    public int LearnerId { get; set; }
-    public int ETRRecordId { get; set; }
+
+    [Required]
+    public int AccountId { get; set; }
+
+    [Required]
+    public int SubjectResultId { get; set; }
+
     public int? AttendanceRecordId { get; set; }
+    
     public int? AssessmentResultId { get; set; }
+
+    [Required]
+    public IFormFile File { get; set; } = null!;
 }

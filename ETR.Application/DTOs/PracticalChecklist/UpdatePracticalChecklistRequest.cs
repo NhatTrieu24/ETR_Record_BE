@@ -5,6 +5,9 @@ namespace ETR.Application.DTOs.PracticalChecklist;
 public class UpdatePracticalChecklistRequest
 {
     [Required]
+    public int PracticalChecklistId { get; set; }
+
+    [Required]
     public string ItemName { get; set; } = string.Empty;
 
     public string? Description { get; set; }

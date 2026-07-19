@@ -1,7 +1,9 @@
-using ETR.Application.DTOs.Evidence;
+using ETR.Application.DTOs.Evidence.Requests;
 using ETR.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
+using System.IO;
 
 namespace ETR.API.Controllers;
 
@@ -16,11 +18,13 @@ public class EvidencesController : ControllerBase
 {
     private readonly IEvidenceService _evidenceService;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IWebHostEnvironment _env;
 
-    public EvidencesController(IEvidenceService evidenceService, ICurrentUserService currentUserService)
+    public EvidencesController(IEvidenceService evidenceService, ICurrentUserService currentUserService, IWebHostEnvironment env)
     {
         _evidenceService = evidenceService;
         _currentUserService = currentUserService;
+        _env = env;
     }
 
     /// <summary>
@@ -44,21 +48,52 @@ public class EvidencesController : ControllerBase
     }
 
     /// <summary>
+    /// Tải xuống tệp bằng chứng vật lý theo ID.
+    /// </summary>
+    [HttpGet("{id}/download")]
+    public async Task<IActionResult> Download(int id, CancellationToken cancellationToken)
+    {
+        var file = await _evidenceService.GetEvidenceByIdAsync(id, cancellationToken);
+        
+        if (string.IsNullOrEmpty(file.FilePath))
+            return NotFound("File path is empty.");
+
+        var physicalPath = Path.Combine(_env.WebRootPath, file.FilePath);
+        
+        if (!System.IO.File.Exists(physicalPath))
+            return NotFound("Physical file not found on disk.");
+
+        var mimeType = file.MimeType ?? "application/octet-stream";
+        var fileName = file.FileName ?? Path.GetFileName(physicalPath);
+
+        return PhysicalFile(physicalPath, mimeType, fileName);
+    }
+
+    /// <summary>
     /// Tải lên một bản ghi tệp bằng chứng mới.
     /// </summary>
-    [HttpPost]
-    public async Task<IActionResult> UploadEvidence([FromBody] CreateEvidenceRequest request, CancellationToken cancellationToken)
+    [HttpPost("upload")]
+    public async Task<IActionResult> UploadEvidence([FromForm] UploadEvidenceRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
-        var response = await _evidenceService.UploadEvidenceAsync(request, accountId, cancellationToken);
+        var webRootPath = _env.WebRootPath;
+        if (string.IsNullOrEmpty(webRootPath))
+        {
+            webRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+        }
+
+        var response = await _evidenceService.UploadEvidenceAsync(request, accountId, webRootPath, cancellationToken);
         return CreatedAtAction(nameof(GetById), new { id = response.EvidenceFileId }, response);
     }
 
-    [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateEvidence(int id, [FromBody] ETR.Application.DTOs.UpdateEvidenceRequest request, CancellationToken cancellationToken)
+    /// <summary>
+    /// Phê duyệt hoặc từ chối một tệp bằng chứng (Dành cho Instructor/Admin).
+    /// </summary>
+    [HttpPut("{id}/verify")]
+    public async Task<IActionResult> VerifyEvidence(int id, [FromBody] VerifyEvidenceRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
-        var response = await _evidenceService.UpdateEvidenceAsync(id, request, accountId, cancellationToken);
+        var response = await _evidenceService.VerifyEvidenceAsync(id, request, accountId, cancellationToken);
         return Ok(response);
     }
 
