@@ -110,6 +110,16 @@ public class AssessmentResultsController : ControllerBase
         return Ok(response);
     }
 
+    [HttpPatch("{id}/publish")]
+    public async Task<IActionResult> PublishAssessmentResult(int id, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
+        var response = await _assessmentResultService.PublishAssessmentResultAsync(id, accountId, cancellationToken);
+        return Ok(response);
+    }
+
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteAssessmentResult(int id, CancellationToken cancellationToken)
     {

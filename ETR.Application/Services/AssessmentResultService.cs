@@ -95,6 +95,8 @@ public class AssessmentResultService : IAssessmentResultService
                     existingResult.AttemptNo = attemptNo;
                     existingResult.UpdatedAt = DateTime.UtcNow;
                     existingResult.UpdatedByAccountId = recordedByAccountId;
+                    existingResult.IsPublished = false;
+                    existingResult.PublishedAt = null;
                     
                     _unitOfWork.AssessmentResultRepository.Update(existingResult);
                 }
@@ -112,7 +114,9 @@ public class AssessmentResultService : IAssessmentResultService
                         RecordedAt = DateTime.UtcNow,
                         AttemptNo = attemptNo,
                         CreatedAt = DateTime.UtcNow,
-                        CreatedByAccountId = recordedByAccountId
+                        CreatedByAccountId = recordedByAccountId,
+                        IsPublished = false,
+                        PublishedAt = null
                     };
                     await _unitOfWork.AssessmentResultRepository.AddAsync(result, ct);
                     existingResult = result;
@@ -171,6 +175,11 @@ public class AssessmentResultService : IAssessmentResultService
         var result = await _unitOfWork.AssessmentResultRepository.GetByIdAsync(id, cancellationToken);
         if (result == null) throw new KeyNotFoundException("AssessmentResult not found.");
 
+        if (result.IsPublished)
+        {
+            throw new InvalidOperationException("Cannot update an AssessmentResult that is already published.");
+        }
+
         result.Score = request.Score;
         result.Remark = request.Remark;
         
@@ -187,6 +196,28 @@ public class AssessmentResultService : IAssessmentResultService
         await _unitOfWork.SaveAsync(cancellationToken);
 
         await CalculateSubjectResultScoreAsync(result.SubjectResultId, cancellationToken);
+        await _unitOfWork.SaveAsync(cancellationToken);
+
+        return new AssessmentResultResponse(
+            result.AssessmentResultId, result.AssessmentId, result.AccountId, result.SubjectResultId, result.Score, result.ResultStatus, result.GradedByAccountId, result.RecordedAt, result.PublishedAt, result.IsPublished, result.TakenAt, result.Remark);
+    }
+
+    public async Task<AssessmentResultResponse> PublishAssessmentResultAsync(int id, int publishedByAccountId, CancellationToken cancellationToken = default)
+    {
+        var result = await _unitOfWork.AssessmentResultRepository.GetByIdAsync(id, cancellationToken);
+        if (result == null) throw new KeyNotFoundException("AssessmentResult not found.");
+
+        if (result.IsPublished)
+        {
+            throw new InvalidOperationException("AssessmentResult is already published.");
+        }
+
+        result.IsPublished = true;
+        result.PublishedAt = DateTime.UtcNow;
+        result.UpdatedAt = DateTime.UtcNow;
+        result.UpdatedByAccountId = publishedByAccountId;
+
+        _unitOfWork.AssessmentResultRepository.Update(result);
         await _unitOfWork.SaveAsync(cancellationToken);
 
         return new AssessmentResultResponse(
