@@ -10,6 +10,8 @@ namespace ETR.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql("SET QUOTED_IDENTIFIER ON;");
+
             migrationBuilder.Sql(@"
 SET QUOTED_IDENTIFIER ON;
 
