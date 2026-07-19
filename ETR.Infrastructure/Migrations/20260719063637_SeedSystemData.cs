@@ -13,6 +13,28 @@ namespace ETR.Infrastructure.Migrations
             migrationBuilder.Sql(@"
                 DECLARE @Now DATETIME2 = GETUTCDATE();
 
+                -- Disable all constraints
+                EXEC sp_MSForEachTable 'ALTER TABLE ? NOCHECK CONSTRAINT ALL';
+
+                -- Delete all data except MigrationsHistory
+                EXEC sp_MSForEachTable '
+                    IF ''?'' NOT LIKE ''%__EFMigrationsHistory%''
+                    BEGIN
+                        DELETE FROM ?
+                    END
+                ';
+
+                -- Reseed all identity columns back to 0 (next inserted will be 1)
+                EXEC sp_MSForEachTable '
+                    IF ''?'' NOT LIKE ''%__EFMigrationsHistory%'' AND OBJECTPROPERTY(OBJECT_ID(''?''), ''TableHasIdentity'') = 1
+                    BEGIN
+                        DBCC CHECKIDENT (''?'', RESEED, 0)
+                    END
+                ';
+
+                -- Re-enable all constraints
+                EXEC sp_MSForEachTable 'ALTER TABLE ? WITH CHECK CHECK CONSTRAINT ALL';
+
                 -- Seed Roles
                 SET IDENTITY_INSERT [Roles] ON;
                 INSERT INTO [Roles] (RoleId, RoleName, Description, CreatedAt, IsDeleted, CreatedByAccountId) VALUES 
