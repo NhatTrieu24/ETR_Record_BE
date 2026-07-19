@@ -845,26 +845,261 @@ public interface UserResponse {
 }
 
 export const API_ENDPOINTS = {
-    ACCOUNTS: '/api/Accounts',
-    APPROVALS: '/api/Approvals',
-    ASSESSMENTS: '/api/Assessments',
-    ATTENDANCE: '/api/Attendance',
+    // =========================================
+    // Accounts Module
+    // =========================================
+    // [Flow]: Quản lý Định danh &amp; Truy cập
+    // [Action]: Manages core system authentication accounts, roles, departments, and statuses.
+    GET_UPDATEACCOUNTSTATUS: '/api/Accounts',
+
+    // [Flow]: Quản lý Định danh &amp; Truy cập
+    // [Action]: Xóa một tài khoản khỏi hệ thống.
+    DELETE_DELETEACCOUNT: '/api/Accounts/{id:int}',
+
+    // =========================================
+    // Approvals Module
+    // =========================================
+    // [Flow]: Xử lý ETR
+    // [Action]: Processes approval workflows and state transitions for ETR records.
+    GET_GETALLAPPROVALREQUESTS: '/api/Approvals',
+
+    // =========================================
+    // Assessments Module
+    // =========================================
+    // [Flow]: Thực thi Đào tạo
+    // [Action]: Records assessment scores and handles subject signoffs.
+    GET_GETALL: '/api/Assessments',
+
+    // [Flow]: Thực thi Đào tạo
+    // [Action]: Ghi nhận điểm số cho một bài kiểm tra (assessment) cụ thể.
+    POST_RECORDASSESSMENT: '/api/Assessments/record',
+
+    // [Flow]: Thực thi Đào tạo
+    // [Action]: Ký xác nhận (sign off) kết quả môn học.
+    POST_SIGNOFFSUBJECT: '/api/Assessments/signoff',
+
+    // [Flow]: Thực thi Đào tạo
+    // [Action]: Lấy danh sách kết quả kiểm tra của một học viên cụ thể trong lớp.
+    GET_GETASSESSMENTRESULTS: '/api/Assessments/student/{classStudentId}',
+
+    // =========================================
+    // Attendance Module
+    // =========================================
+    // [Flow]: Thực thi Đào tạo
+    // [Action]: Records student attendance and confirms session completion.
+    GET_GETALL: '/api/Attendance',
+
+    // [Flow]: Thực thi Đào tạo
+    // [Action]: Điểm danh cho một buổi học (session) cụ thể.
+    POST_RECORDATTENDANCE: '/api/Attendance/record',
+
+    // [Flow]: Thực thi Đào tạo
+    // [Action]: Xác nhận phiên điểm danh đã được chốt (finalized).
+    POST_CONFIRMSESSION: '/api/Attendance/sessions/{sessionId}/confirm',
+
+    // [Flow]: Thực thi Đào tạo
+    // [Action]: Lấy lịch sử điểm danh của một học viên cụ thể trong lớp.
+    GET_GETATTENDANCERECORDS: '/api/Attendance/student/{classStudentId}',
+
+    // =========================================
+    // Audit Module
+    // =========================================
     AUDIT: '/api/Audit',
-    AUTH: '/api/auth',
-    CLASSES: '/api/Classes',
+
+    // =========================================
+    // Auth Module
+    // =========================================
+    // [Flow]: Quản lý Định danh &amp; Truy cập
+    // [Action]: Authenticates users and generates JWT tokens based on Account credentials.
+    POST_LOGIN: '/api/auth/login',
+
+    // [Flow]: Quản lý Định danh &amp; Truy cập
+    // [Action]: Xác thực người dùng qua Google OAuth và trả về JWT token.
+    POST_CHANGEPASSWORD: '/api/auth/google-login',
+
+    // [Flow]: Quản lý Định danh &amp; Truy cập
+    // [Action]: Khởi tạo luồng quên mật khẩu.
+    POST_GETME: '/api/auth/forgot-password',
+
+    // =========================================
+    // Classes Module
+    // =========================================
+    // [Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    // [Action]: Manages classes and scheduling.
+    GET_GETALLCLASSES: '/api/Classes',
+
+    // [Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    // [Action]: Lấy thông tin một lớp học theo ID.
+    GET_GETCLASS: '/api/Classes/{id}',
+
+    // [Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    // [Action]: Tạo một lớp học mới.
+    POST_CREATECLASS: '/api/Classes',
+
+    // [Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    // [Action]: Cập nhật một lớp học hiện có.
+    PUT_UPDATECLASS: '/api/Classes/{id}',
+
+    // [Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    // [Action]: Xóa mềm (soft delete) một lớp học.
+    DELETE_DELETECLASS: '/api/Classes/{id}',
+
+    // =========================================
+    // CompletionRequirements Module
+    // =========================================
     COMPLETIONREQUIREMENTS: '/api/CompletionRequirements',
-    COURSES: '/api/Courses',
-    DASHBOARD: '/api/Dashboard',
+
+    // =========================================
+    // Courses Module
+    // =========================================
+    // [Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    // [Action]: Manages course catalogues.
+    GET_GETALLCOURSES: '/api/Courses',
+
+    // [Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    // [Action]: Lấy thông tin một khóa học theo ID.
+    GET_GETCOURSE: '/api/Courses/{id}',
+
+    // [Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    // [Action]: Tạo một khóa học mới.
+    POST_CREATECOURSE: '/api/Courses',
+
+    // [Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    // [Action]: Cập nhật một khóa học hiện có.
+    PUT_UPDATECOURSE: '/api/Courses/{id}',
+
+    // [Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    // [Action]: Xóa mềm (soft delete) một khóa học.
+    DELETE_DELETECOURSE: '/api/Courses/{id}',
+
+    // =========================================
+    // Dashboard Module
+    // =========================================
+    // [Flow]: Báo cáo &amp; Phân tích
+    // [Action]: Aggregates high-level statistics for system dashboards.
+    GET_GETSTATS: '/api/Dashboard/stats',
+
+    // =========================================
+    // Departments Module
+    // =========================================
     DEPARTMENTS: '/api/Departments',
-    ENROLLMENTS: '/api/Enrollments',
-    ETR: '/api/Etr',
-    EVIDENCES: '/api/Evidences',
+
+    // =========================================
+    // Enrollments Module
+    // =========================================
+    // [Flow]: Xử lý ETR
+    // [Action]: Handles course enrollment operations.
+    GET_CREATEENROLLMENT: '/api/Enrollments',
+
+    // =========================================
+    // Etr Module
+    // =========================================
+    // [Flow]: Xử lý ETR
+    // [Action]: Handles the workflow and state transitions of the Electronic Training Record (ETR).
+    GET_SUBMITETR: '/api/Etr',
+
+    // [Action]: Xác minh một ETR đã được gửi.
+    POST_VERIFYETR: '/api/Etr/{id}/verify',
+
+    // [Action]: Hoàn tất một ETR đã được xác minh nếu đáp ứng đủ mọi điều kiện.
+    POST_COMPLETEETR: '/api/Etr/{id}/complete',
+
+    // =========================================
+    // Evidences Module
+    // =========================================
+    // [Flow]: Document Management
+    // [Action]: Manages uploaded evidence files for practical checklists and assessments.
+    GET_GETALL: '/api/Evidences',
+
+    // [Action]: Lấy thông tin một tệp bằng chứng cụ thể theo ID.
+    GET_GETBYID: '/api/Evidences/{id}',
+
+    // [Action]: Tải lên một bản ghi tệp bằng chứng mới.
+    POST_UPLOADEVIDENCE: '/api/Evidences',
+
+    // [Action]: Xóa mềm (soft delete) một tệp bằng chứng.
+    DELETE_DELETEEVIDENCE: '/api/Evidences/{id}',
+
+    // =========================================
+    // EvidenceTypes Module
+    // =========================================
     EVIDENCETYPES: '/api/EvidenceTypes',
-    EXPORTS: '/api/Exports',
+
+    // =========================================
+    // Exports Module
+    // =========================================
+    // [Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
+    // [Action]: Triggers and retrieves data export jobs.
+    GET_DOWNLOADEXPORTFILE: '/api/Exports/{id:int}',
+
+    // =========================================
+    // PracticalChecklists Module
+    // =========================================
     PRACTICALCHECKLISTS: '/api/PracticalChecklists',
-    REPORTS: '/api/Reports',
-    SEARCH: '/api/Search',
-    SESSIONS: '/api/Sessions',
-    SUBJECTS: '/api/Subjects',
+
+    // =========================================
+    // Reports Module
+    // =========================================
+    // [Flow]: Báo cáo &amp; Phân tích
+    // [Action]: Generates summary reports for ETR and Class data.
+    GET_GETSUMMARY: '/api/Reports/summary',
+
+    // =========================================
+    // Search Module
+    // =========================================
+    // [Flow]: Khám phá Hệ thống (System Discovery)
+    // [Action]: Provides global search capabilities across classes and ETR records.
+    GET_SEARCHCLASSES: '/api/Search/classes',
+
+    // [Flow]: Khám phá Hệ thống (System Discovery)
+    // [Action]: Tìm kiếm các hồ sơ ETR.
+    GET_SEARCHETRS: '/api/Search/etrs',
+
+    // =========================================
+    // Sessions Module
+    // =========================================
+    // [Flow]: Session Management
+    // [Action]: Manages class sessions.
+    GET_GETALLSESSIONS: '/api/Sessions',
+
+    // [Action]: Lấy thông tin một buổi học theo ID.
+    GET_GETSESSION: '/api/Sessions/{id}',
+
+    // [Action]: Tạo một buổi học mới.
+    POST_CREATESESSION: '/api/Sessions',
+
+    // [Action]: Cập nhật một buổi học hiện có.
+    PUT_UPDATESESSION: '/api/Sessions/{id}',
+
+    // [Action]: Xóa một buổi học.
+    DELETE_DELETESESSION: '/api/Sessions/{id}',
+
+    // =========================================
+    // Subjects Module
+    // =========================================
+    // [Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    // [Action]: Manages subject catalogues.
+    GET_GETALLSUBJECTS: '/api/Subjects',
+
+    // [Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    // [Action]: Lấy thông tin một môn học theo ID.
+    GET_GETSUBJECT: '/api/Subjects/{id}',
+
+    // [Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    // [Action]: Tạo một môn học mới.
+    POST_CREATESUBJECT: '/api/Subjects',
+
+    // [Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    // [Action]: Cập nhật một môn học hiện có.
+    PUT_UPDATESUBJECT: '/api/Subjects/{id}',
+
+    // [Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    // [Action]: Xóa mềm (soft delete) một môn học.
+    DELETE_DELETESUBJECT: '/api/Subjects/{id}',
+
+    // =========================================
+    // UserProfiles Module
+    // =========================================
     USERPROFILES: '/api/UserProfiles',
+
 };
