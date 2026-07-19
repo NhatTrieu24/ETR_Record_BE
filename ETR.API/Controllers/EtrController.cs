@@ -133,6 +133,38 @@ public class EtrController : ControllerBase
         var response = await _etrService.CompleteEtrAsync(id, accountId, cancellationToken);
         return Ok(response);
     }
+    [HttpPost]
+    [Authorize]
+    public async Task<IActionResult> CreateEtr([FromBody] CreateEtrRecordRequest request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
+        var response = await _etrService.CreateEtrAsync(request, accountId, cancellationToken);
+        return CreatedAtAction(nameof(GetEtrById), new { id = response.ETRCourseRecordId }, response);
+    }
+
+    [HttpPut("{id}")]
+    [Authorize]
+    public async Task<IActionResult> UpdateEtr(int id, [FromBody] UpdateEtrRecordRequest request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
+        var response = await _etrService.UpdateEtrAsync(id, request, accountId, cancellationToken);
+        return Ok(response);
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize]
+    public async Task<IActionResult> DeleteEtr(int id, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
+        await _etrService.DeleteEtrAsync(id, accountId, cancellationToken);
+        return NoContent();
+    }
 }
 
 

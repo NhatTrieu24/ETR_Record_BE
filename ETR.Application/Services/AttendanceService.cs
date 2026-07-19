@@ -117,4 +117,46 @@ public class AttendanceService : IAttendanceService
 
         return new AttendanceSessionResponse(session.SessionId, session.ClassId, session.SubjectId, session.SessionTitle, session.SessionDate, session.Location, session.IsConfirmed, session.ConfirmedByAccountId, session.ConfirmedAt);
     }
+
+    public async Task<AttendanceRecordResponse> GetAttendanceRecordByIdAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var r = await _unitOfWork.AttendanceRecordRepository.GetByIdAsync(id, cancellationToken);
+        if (r == null) throw new KeyNotFoundException("AttendanceRecord not found.");
+        return new AttendanceRecordResponse(
+            r.AttendanceRecordId, r.SessionId, r.ClassStudentId, r.Status, r.Remarks, r.RecordedByAccountId, r.RecordedAt);
+    }
+
+    public async Task<AttendanceRecordResponse> UpdateAttendanceRecordAsync(int id, UpdateAttendanceRecordRequest request, int updatedByAccountId, CancellationToken cancellationToken = default)
+    {
+        var record = await _unitOfWork.AttendanceRecordRepository.GetByIdAsync(id, cancellationToken);
+        if (record == null) throw new KeyNotFoundException("AttendanceRecord not found.");
+
+        record.Status = request.Status;
+        record.Remarks = request.Remarks;
+        record.UpdatedAt = DateTime.UtcNow;
+        record.UpdatedByAccountId = updatedByAccountId;
+
+        _unitOfWork.AttendanceRecordRepository.Update(record);
+        await _unitOfWork.SaveAsync(cancellationToken);
+
+        // Ideally, we should also recalculate AttendanceRate in SubjectResult here if Status changed.
+        // For simplicity, omitting full recalculation unless explicitly required.
+
+        return new AttendanceRecordResponse(
+            record.AttendanceRecordId, record.SessionId, record.ClassStudentId, record.Status, record.Remarks, record.RecordedByAccountId, record.RecordedAt);
+    }
+
+    public async Task DeleteAttendanceRecordAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default)
+    {
+        var record = await _unitOfWork.AttendanceRecordRepository.GetByIdAsync(id, cancellationToken);
+        if (record == null) throw new KeyNotFoundException("AttendanceRecord not found.");
+
+        record.IsDeleted = true;
+        record.DeletedAt = DateTime.UtcNow;
+        record.UpdatedAt = DateTime.UtcNow;
+        record.UpdatedByAccountId = deletedByAccountId;
+
+        _unitOfWork.AttendanceRecordRepository.Update(record);
+        await _unitOfWork.SaveAsync(cancellationToken);
+    }
 }

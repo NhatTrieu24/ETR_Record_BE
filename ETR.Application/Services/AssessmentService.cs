@@ -21,6 +21,14 @@ public class AssessmentService : IAssessmentService
             r.AssessmentResultId, r.AssessmentId, r.AccountId, r.SubjectResultId, r.Score, r.ResultStatus, r.GradedByAccountId, r.RecordedAt, r.PublishedAt, r.IsPublished, r.TakenAt, r.Remark));
     }
 
+    public async Task<AssessmentResultResponse> GetAssessmentResultByIdAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var result = await _unitOfWork.AssessmentResultRepository.GetByIdAsync(id, cancellationToken);
+        if (result == null) throw new KeyNotFoundException("AssessmentResult not found.");
+        return new AssessmentResultResponse(
+            result.AssessmentResultId, result.AssessmentId, result.AccountId, result.SubjectResultId, result.Score, result.ResultStatus, result.GradedByAccountId, result.RecordedAt, result.PublishedAt, result.IsPublished, result.TakenAt, result.Remark);
+    }
+
     public async Task<IEnumerable<AssessmentResultResponse>> GetAssessmentResultsByClassStudentAsync(int classStudentId, int accountId, CancellationToken cancellationToken = default)
     {
         var classStudent = await _unitOfWork.ClassStudentRepository.GetByIdAsync(classStudentId, cancellationToken)
@@ -153,6 +161,47 @@ public class AssessmentService : IAssessmentService
             subjectResult.Score = totalWeightedScore / totalWeight;
             _unitOfWork.SubjectResultRepository.Update(subjectResult);
         }
+    }
+
+    public async Task<AssessmentResultResponse> UpdateAssessmentResultAsync(int id, UpdateAssessmentResultRequest request, int updatedByAccountId, CancellationToken cancellationToken = default)
+    {
+        var result = await _unitOfWork.AssessmentResultRepository.GetByIdAsync(id, cancellationToken);
+        if (result == null) throw new KeyNotFoundException("AssessmentResult not found.");
+
+        result.Score = request.Score;
+        result.Remark = request.Remark;
+        
+        var assessment = await _unitOfWork.AssessmentRepository.GetByIdAsync(result.AssessmentId, cancellationToken);
+        if (assessment != null)
+        {
+            result.ResultStatus = request.Score >= assessment.PassingScore ? "Passed" : "Failed";
+        }
+
+        result.UpdatedAt = DateTime.UtcNow;
+        result.UpdatedByAccountId = updatedByAccountId;
+
+        _unitOfWork.AssessmentResultRepository.Update(result);
+        await _unitOfWork.SaveAsync(cancellationToken);
+
+        await CalculateSubjectResultScoreAsync(result.SubjectResultId, cancellationToken);
+        await _unitOfWork.SaveAsync(cancellationToken);
+
+        return new AssessmentResultResponse(
+            result.AssessmentResultId, result.AssessmentId, result.AccountId, result.SubjectResultId, result.Score, result.ResultStatus, result.GradedByAccountId, result.RecordedAt, result.PublishedAt, result.IsPublished, result.TakenAt, result.Remark);
+    }
+
+    public async Task DeleteAssessmentResultAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default)
+    {
+        var result = await _unitOfWork.AssessmentResultRepository.GetByIdAsync(id, cancellationToken);
+        if (result == null) throw new KeyNotFoundException("AssessmentResult not found.");
+
+        result.IsDeleted = true;
+        result.DeletedAt = DateTime.UtcNow;
+        result.UpdatedAt = DateTime.UtcNow;
+        result.UpdatedByAccountId = deletedByAccountId;
+
+        _unitOfWork.AssessmentResultRepository.Update(result);
+        await _unitOfWork.SaveAsync(cancellationToken);
     }
 
     public async Task<SubjectSignoffResponse> SignoffSubjectResultAsync(CreateSubjectSignoffRequest request, int signoffByAccountId, CancellationToken cancellationToken = default)

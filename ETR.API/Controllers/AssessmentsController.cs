@@ -93,6 +93,32 @@ public class AssessmentsController : ControllerBase
         var response = await _assessmentService.GetAssessmentResultsByClassStudentAsync(classStudentId, accountId, cancellationToken);
         return Ok(response);
     }
+
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
+    {
+        return Ok(await _assessmentService.GetAssessmentResultByIdAsync(id, cancellationToken));
+    }
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateAssessmentResult(int id, [FromBody] UpdateAssessmentResultRequest request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
+        var response = await _assessmentService.UpdateAssessmentResultAsync(id, request, accountId, cancellationToken);
+        return Ok(response);
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteAssessmentResult(int id, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
+        await _assessmentService.DeleteAssessmentResultAsync(id, accountId, cancellationToken);
+        return NoContent();
+    }
 }
 
 

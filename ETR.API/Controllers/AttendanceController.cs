@@ -93,6 +93,32 @@ public class AttendanceController : ControllerBase
         var response = await _attendanceService.GetAttendanceByClassStudentAsync(classStudentId, accountId, cancellationToken);
         return Ok(response);
     }
+
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
+    {
+        return Ok(await _attendanceService.GetAttendanceRecordByIdAsync(id, cancellationToken));
+    }
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateAttendanceRecord(int id, [FromBody] UpdateAttendanceRecordRequest request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
+        var response = await _attendanceService.UpdateAttendanceRecordAsync(id, request, accountId, cancellationToken);
+        return Ok(response);
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteAttendanceRecord(int id, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
+        await _attendanceService.DeleteAttendanceRecordAsync(id, accountId, cancellationToken);
+        return NoContent();
+    }
 }
 
 
