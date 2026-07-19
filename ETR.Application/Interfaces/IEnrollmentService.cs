@@ -6,6 +6,7 @@ public interface IEnrollmentService
 {
     Task<IEnumerable<EnrollmentResponse>> GetAllEnrollmentsAsync(CancellationToken cancellationToken = default);
     Task<EnrollmentResponse> GetEnrollmentByIdAsync(int enrollmentId, CancellationToken cancellationToken = default);
+    Task<IEnumerable<EnrollmentResponse>> GetEnrollmentsByStudentIdAsync(int studentId, CancellationToken cancellationToken = default);
     
     Task<CreateEnrollmentResponse> CreateEnrollmentAsync(
         int accountId,

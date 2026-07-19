@@ -37,6 +37,19 @@ public class EnrollmentService : IEnrollmentService
             e.EnrolledAt);
     }
 
+    public async Task<IEnumerable<EnrollmentResponse>> GetEnrollmentsByStudentIdAsync(int studentId, CancellationToken cancellationToken = default)
+    {
+        var enrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken);
+        return enrollments
+            .Where(e => e.AccountId == studentId)
+            .Select(e => new EnrollmentResponse(
+                e.EnrollmentId,
+                e.AccountId,
+                e.ClassId,
+                e.Status,
+                e.EnrolledAt));
+    }
+
     public async Task<CreateEnrollmentResponse> CreateEnrollmentAsync(
         int accountId,
         int classId,

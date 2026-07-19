@@ -61,6 +61,16 @@ public class EnrollmentsController : ControllerBase
     }
 
     /// <summary>
+    /// Retrieves enrollments for a specific student.
+    /// </summary>
+    [HttpGet("student/{studentId}")]
+    public async Task<ActionResult<IEnumerable<EnrollmentResponse>>> GetEnrollmentsByStudentId(int studentId, CancellationToken cancellationToken)
+    {
+        var enrollments = await _enrollmentService.GetEnrollmentsByStudentIdAsync(studentId, cancellationToken);
+        return Ok(enrollments);
+    }
+
+    /// <summary>
     /// Creates a new course enrollment for a learner.
     /// </summary>
     /// <param name="request">The enrollment details.</param>
