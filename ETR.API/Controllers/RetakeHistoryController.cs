@@ -1,0 +1,66 @@
+using ETR.Application.Interfaces;
+using ETR.Domain.Entities;
+using Microsoft.AspNetCore.Mvc;
+
+namespace ETR.API.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class RetakeHistoryController : ControllerBase
+{
+    private readonly IUnitOfWork _unitOfWork;
+
+    public RetakeHistoryController(IUnitOfWork unitOfWork)
+    {
+        _unitOfWork = unitOfWork;
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<RetakeHistoryResponse>>> GetAll(CancellationToken cancellationToken)
+    {
+        var list = await _unitOfWork.RetakeHistoryRepository.GetAllAsync(cancellationToken);
+        var response = list.Select(MapToResponse);
+        return Ok(response);
+    }
+
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<RetakeHistoryResponse>> GetById(int id, CancellationToken cancellationToken)
+    {
+        var item = await _unitOfWork.RetakeHistoryRepository.GetByIdAsync(id, cancellationToken);
+        if (item == null) return NotFound($"RetakeHistory with ID {id} not found.");
+        return Ok(MapToResponse(item));
+    }
+
+    [HttpGet("by-subject/{subjectResultId:int}")]
+    public async Task<ActionResult<IEnumerable<RetakeHistoryResponse>>> GetBySubjectResult(int subjectResultId, CancellationToken cancellationToken)
+    {
+        var list = await _unitOfWork.RetakeHistoryRepository.GetAllAsync(cancellationToken);
+        var filtered = list.Where(r => r.SubjectResultId == subjectResultId);
+        return Ok(filtered.Select(MapToResponse));
+    }
+
+    private static RetakeHistoryResponse MapToResponse(RetakeHistory r)
+    {
+        return new RetakeHistoryResponse(
+            r.RetakeHistoryId,
+            r.SubjectResultId,
+            r.RetakeDate,
+            r.Reason,
+            r.PreviousScore,
+            r.NewScore,
+            r.AuthorizedByAccountId,
+            r.AttemptNo
+        );
+    }
+}
+
+public record RetakeHistoryResponse(
+    int RetakeHistoryId,
+    int SubjectResultId,
+    DateTime RetakeDate,
+    string Reason,
+    decimal PreviousScore,
+    decimal NewScore,
+    int AuthorizedByAccountId,
+    int AttemptNo
+);

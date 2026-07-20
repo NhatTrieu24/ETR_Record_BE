@@ -54,7 +54,8 @@ public class EtrService : IEtrService
             sr.SubjectResultId,
             sr.SubjectId,
             sr.Status,
-            sr.CreatedAt)) ?? Array.Empty<SubjectResultResponse>();
+            sr.CreatedAt,
+            sr.AttendanceRate)) ?? Array.Empty<SubjectResultResponse>();
 
         return new EtrDetailsResponse(
             e.ETRCourseRecordId,
@@ -229,6 +230,38 @@ public class EtrService : IEtrService
 
         etr.Status = "Verified";
         etr.VerifiedAt = DateTime.UtcNow;
+        etr.UpdatedAt = DateTime.UtcNow;
+        etr.UpdatedByAccountId = accountId;
+
+        _unitOfWork.ETRCourseRecordRepository.Update(etr);
+        await _unitOfWork.SaveAsync(cancellationToken);
+
+        return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt);
+    }
+
+    public async Task<EtrRecordResponse> ReturnEtrAsync(int etrCourseRecordId, int accountId, string? comment, CancellationToken cancellationToken = default)
+    {
+        var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(etrCourseRecordId, cancellationToken)
+            ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
+
+        if (etr.Status != "Submitted")
+            throw new InvalidOperationException("Cannot return ETR that is not in Submitted status.");
+
+        // === AUDIT LOG ===
+        var auditLog = new AuditLog
+        {
+            ETRRecordId = etrCourseRecordId,
+            AccountId = accountId,
+            ActionType = "RETURN",
+            EntityName = nameof(ETRCourseRecord),
+            RecordId = etrCourseRecordId,
+            OldValue = etr.Status,
+            NewValue = "Draft",
+            Description = $"ETR #{etrCourseRecordId} returned for correction by QA. Comment: {comment ?? "N/A"}"
+        };
+        await _unitOfWork.AuditLogRepository.AddAsync(auditLog, cancellationToken);
+
+        etr.Status = "Draft";
         etr.UpdatedAt = DateTime.UtcNow;
         etr.UpdatedByAccountId = accountId;
 

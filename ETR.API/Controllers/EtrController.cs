@@ -115,6 +115,20 @@ public class EtrController : ControllerBase
     }
 
     /// <summary>
+    /// Trả lại ETR để chỉnh sửa (chuyển từ Submitted về Draft).
+    /// </summary>
+    [HttpPost("{id}/return")]
+    [Authorize]
+    public async Task<IActionResult> ReturnEtr(int id, [FromBody] ReturnEtrRequest? request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+            
+        var response = await _etrService.ReturnEtrAsync(id, accountId, request?.Comment, cancellationToken);
+        return Ok(response);
+    }
+
+    /// <summary>
     /// Hoàn tất một ETR đã được xác minh nếu đáp ứng đủ mọi điều kiện.
     /// </summary>
     /// <param name="id">The ETR Course Record ID.</param>
