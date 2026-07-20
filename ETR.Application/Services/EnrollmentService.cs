@@ -65,6 +65,13 @@ public class EnrollmentService : IEnrollmentService
                 var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(classId, ct);
                 if (trainingClass == null) throw new InvalidOperationException("Class not found.");
 
+                // === BUSINESS RULE 1: Course must have at least one Subject before enrollment ===
+                var hasSubjectsFromCheck = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct)).Any(cs => cs.CourseId == trainingClass.CourseId);
+                if (!hasSubjectsFromCheck)
+                {
+                    throw new InvalidOperationException($"Cannot enroll. Course (ID: {trainingClass.CourseId}) has no subjects configured. Please add subjects to the course first.");
+                }
+
                 var activeEnrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct);
                 var activeLearnerEnrollments = activeEnrollments
                     .Where(e => e.AccountId == accountId && e.Status == "Active")
