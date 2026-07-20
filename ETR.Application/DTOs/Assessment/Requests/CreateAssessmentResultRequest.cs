@@ -5,4 +5,5 @@ public record CreateAssessmentResultRequest(
     int AccountId,
     int SubjectResultId,
     decimal Score,
-    string? Remark);
+    string? Remark,
+    int? SessionId = null);

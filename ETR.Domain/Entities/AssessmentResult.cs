@@ -6,6 +6,7 @@ public class AssessmentResult : BaseEntity
     public int AssessmentId { get; set; }
     public int AccountId { get; set; }
     public int SubjectResultId { get; set; }
+    public int? SessionId { get; set; }
     public decimal Score { get; set; }
     public string ResultStatus { get; set; } = string.Empty;
     public int GradedByAccountId { get; set; }
@@ -15,4 +16,7 @@ public class AssessmentResult : BaseEntity
     public DateTime? TakenAt { get; set; }
     public string? Remark { get; set; }
     public int AttemptNo { get; set; } = 1;
+
+    // Navigation
+    public Session? Session { get; set; }
 }

@@ -5,6 +5,7 @@ public record AssessmentResultResponse(
     int AssessmentId,
     int AccountId,
     int SubjectResultId,
+    int? SessionId,
     decimal Score,
     string ResultStatus,
     int GradedByAccountId,

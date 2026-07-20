@@ -5,8 +5,12 @@ public record PracticalChecklistResultResponse(
     int? SessionId,
     int SubjectResultId,
     int PracticalChecklistId,
-    bool IsCompleted,
+    decimal Score,
+    string ResultStatus,
     int? VerifiedByAccountId,
     DateTime? CompletedAt,
-    string? VerificationComment
+    string? VerificationComment,
+    bool IsPublished,
+    DateTime? PublishedAt,
+    int? AccountId
 );

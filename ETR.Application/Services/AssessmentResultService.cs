@@ -21,7 +21,7 @@ public class AssessmentResultService : IAssessmentResultService
     {
         var results = await _unitOfWork.AssessmentResultRepository.GetAllAsync(cancellationToken);
         return results.Select(r => new AssessmentResultResponse(
-            r.AssessmentResultId, r.AssessmentId, r.AccountId, r.SubjectResultId, r.Score, r.ResultStatus, r.GradedByAccountId, r.RecordedAt, r.PublishedAt, r.IsPublished, r.TakenAt, r.Remark));
+            r.AssessmentResultId, r.AssessmentId, r.AccountId, r.SubjectResultId, r.SessionId, r.Score, r.ResultStatus, r.GradedByAccountId, r.RecordedAt, r.PublishedAt, r.IsPublished, r.TakenAt, r.Remark));
     }
 
     public async Task<AssessmentResultResponse> GetAssessmentResultByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -29,7 +29,7 @@ public class AssessmentResultService : IAssessmentResultService
         var result = await _unitOfWork.AssessmentResultRepository.GetByIdAsync(id, cancellationToken);
         if (result == null) throw new KeyNotFoundException("AssessmentResult not found.");
         return new AssessmentResultResponse(
-            result.AssessmentResultId, result.AssessmentId, result.AccountId, result.SubjectResultId, result.Score, result.ResultStatus, result.GradedByAccountId, result.RecordedAt, result.PublishedAt, result.IsPublished, result.TakenAt, result.Remark);
+            result.AssessmentResultId, result.AssessmentId, result.AccountId, result.SubjectResultId, result.SessionId, result.Score, result.ResultStatus, result.GradedByAccountId, result.RecordedAt, result.PublishedAt, result.IsPublished, result.TakenAt, result.Remark);
     }
 
     public async Task<IEnumerable<AssessmentResultResponse>> GetAssessmentResultsByClassStudentAsync(int classStudentId, int accountId, CancellationToken cancellationToken = default)
@@ -43,7 +43,7 @@ public class AssessmentResultService : IAssessmentResultService
             .Where(r => r.AccountId == classStudent.AccountId);
 
         return results.Select(r => new AssessmentResultResponse(
-            r.AssessmentResultId, r.AssessmentId, r.AccountId, r.SubjectResultId, r.Score, r.ResultStatus, r.GradedByAccountId, r.RecordedAt, r.PublishedAt, r.IsPublished, r.TakenAt, r.Remark));
+            r.AssessmentResultId, r.AssessmentId, r.AccountId, r.SubjectResultId, r.SessionId, r.Score, r.ResultStatus, r.GradedByAccountId, r.RecordedAt, r.PublishedAt, r.IsPublished, r.TakenAt, r.Remark));
     }
 
     public async Task<AssessmentResultResponse> RecordAssessmentScoreAsync(CreateAssessmentResultRequest request, int recordedByAccountId, CancellationToken cancellationToken = default)
@@ -60,9 +60,21 @@ public class AssessmentResultService : IAssessmentResultService
                 if (subjectResult == null) throw new InvalidOperationException("SubjectResult not found.");
 
                 var allResults = await _unitOfWork.AssessmentResultRepository.GetAllAsync(ct);
+                
+                // First try: exact match by (AssessmentId, AccountId, SessionId)
                 var existingResult = allResults.FirstOrDefault(r => 
                     r.AssessmentId == request.AssessmentId 
-                    && r.AccountId == request.AccountId);
+                    && r.AccountId == request.AccountId
+                    && r.SessionId == request.SessionId);
+
+                // Second try: legacy record without SessionId (transitional fallback)
+                if (existingResult == null && request.SessionId.HasValue)
+                {
+                    existingResult = allResults.FirstOrDefault(r => 
+                        r.AssessmentId == request.AssessmentId 
+                        && r.AccountId == request.AccountId
+                        && r.SessionId == null);
+                }
 
                 int attemptNo = 1;
 
@@ -93,6 +105,7 @@ public class AssessmentResultService : IAssessmentResultService
                     existingResult.GradedByAccountId = recordedByAccountId;
                     existingResult.RecordedAt = DateTime.UtcNow;
                     existingResult.AttemptNo = attemptNo;
+                    existingResult.SessionId = request.SessionId ?? existingResult.SessionId;
                     existingResult.UpdatedAt = DateTime.UtcNow;
                     existingResult.UpdatedByAccountId = recordedByAccountId;
                     existingResult.IsPublished = false;
@@ -107,6 +120,7 @@ public class AssessmentResultService : IAssessmentResultService
                         AssessmentId = request.AssessmentId,
                         AccountId = request.AccountId,
                         SubjectResultId = request.SubjectResultId,
+                        SessionId = request.SessionId,
                         Score = request.Score,
                         ResultStatus = request.Score >= assessment.PassingScore ? "Passed" : "Failed",
                         Remark = request.Remark,
@@ -130,7 +144,7 @@ public class AssessmentResultService : IAssessmentResultService
 
                 await _unitOfWork.CommitTransactionAsync(ct);
 
-                return new AssessmentResultResponse(existingResult.AssessmentResultId, existingResult.AssessmentId, existingResult.AccountId, existingResult.SubjectResultId, existingResult.Score, existingResult.ResultStatus, existingResult.GradedByAccountId, existingResult.RecordedAt, existingResult.PublishedAt, existingResult.IsPublished, existingResult.TakenAt, existingResult.Remark);
+                return new AssessmentResultResponse(existingResult.AssessmentResultId, existingResult.AssessmentId, existingResult.AccountId, existingResult.SubjectResultId, existingResult.SessionId, existingResult.Score, existingResult.ResultStatus, existingResult.GradedByAccountId, existingResult.RecordedAt, existingResult.PublishedAt, existingResult.IsPublished, existingResult.TakenAt, existingResult.Remark);
             }
             catch
             {
@@ -199,7 +213,7 @@ public class AssessmentResultService : IAssessmentResultService
         await _unitOfWork.SaveAsync(cancellationToken);
 
         return new AssessmentResultResponse(
-            result.AssessmentResultId, result.AssessmentId, result.AccountId, result.SubjectResultId, result.Score, result.ResultStatus, result.GradedByAccountId, result.RecordedAt, result.PublishedAt, result.IsPublished, result.TakenAt, result.Remark);
+            result.AssessmentResultId, result.AssessmentId, result.AccountId, result.SubjectResultId, result.SessionId, result.Score, result.ResultStatus, result.GradedByAccountId, result.RecordedAt, result.PublishedAt, result.IsPublished, result.TakenAt, result.Remark);
     }
 
     public async Task<AssessmentResultResponse> PublishAssessmentResultAsync(int id, int publishedByAccountId, CancellationToken cancellationToken = default)
@@ -221,7 +235,7 @@ public class AssessmentResultService : IAssessmentResultService
         await _unitOfWork.SaveAsync(cancellationToken);
 
         return new AssessmentResultResponse(
-            result.AssessmentResultId, result.AssessmentId, result.AccountId, result.SubjectResultId, result.Score, result.ResultStatus, result.GradedByAccountId, result.RecordedAt, result.PublishedAt, result.IsPublished, result.TakenAt, result.Remark);
+            result.AssessmentResultId, result.AssessmentId, result.AccountId, result.SubjectResultId, result.SessionId, result.Score, result.ResultStatus, result.GradedByAccountId, result.RecordedAt, result.PublishedAt, result.IsPublished, result.TakenAt, result.Remark);
     }
 
     public async Task DeleteAssessmentResultAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default)
@@ -296,7 +310,7 @@ public class AssessmentResultService : IAssessmentResultService
         var checklistResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(ct))
             .Where(r => r.SubjectResultId == subjectResultId).ToList();
 
-        if (checklists.Any(c => !checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.IsCompleted)))
+        if (checklists.Any(c => !checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.Score >= 50)))
         {
             return; // Mandatory checklist not completed
         }

@@ -2,8 +2,11 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ETR.Application.DTOs.PracticalChecklistResult;
 
-public class UpdatePracticalChecklistResultRequest
+public class CreatePracticalChecklistResultRequest
 {
+    [Required]
+    public int SubjectResultId { get; set; }
+
     public int? SessionId { get; set; }
 
     [Required]

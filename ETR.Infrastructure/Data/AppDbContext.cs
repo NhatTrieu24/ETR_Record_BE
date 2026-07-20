@@ -116,8 +116,9 @@ public partial class AppDbContext : DbContext
             .IsUnique();
 
         modelBuilder.Entity<AssessmentResult>()
-            .HasIndex(ar => new { ar.AssessmentId, ar.AccountId })
-            .IsUnique();
+            .HasIndex(ar => new { ar.AssessmentId, ar.AccountId, ar.SessionId })
+            .IsUnique()
+            .HasFilter("[SessionId] IS NOT NULL");
             
         modelBuilder.Entity<PracticalChecklistResult>()
             .HasIndex(pcr => new { pcr.SubjectResultId, pcr.PracticalChecklistId })
@@ -136,6 +137,7 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<RetakeHistory>().Property(rh => rh.NewScore).HasColumnType("decimal(5,2)");
         modelBuilder.Entity<DashboardSnapshot>().Property(d => d.AverageAttendanceRate).HasColumnType("decimal(5,2)");
         modelBuilder.Entity<DashboardSnapshot>().Property(d => d.AverageAssessmentScore).HasColumnType("decimal(5,2)");
+        modelBuilder.Entity<PracticalChecklistResult>().Property(p => p.Score).HasColumnType("decimal(5,2)");
     }
 
     private static void ConfigureRelationships(ModelBuilder modelBuilder)
@@ -184,6 +186,7 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<AssessmentResult>().HasOne<Account>().WithMany().HasForeignKey(ar => ar.AccountId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<AssessmentResult>().HasOne<SubjectResult>().WithMany().HasForeignKey(ar => ar.SubjectResultId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<AssessmentResult>().HasOne<Account>().WithMany().HasForeignKey(ar => ar.GradedByAccountId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<AssessmentResult>().HasOne(ar => ar.Session).WithMany().HasForeignKey(ar => ar.SessionId).OnDelete(cascadeDeleteConfig);
 
         // Practical Checklist Setup
         modelBuilder.Entity<PracticalChecklist>().HasOne<CourseSubject>().WithMany().HasForeignKey(pc => new { pc.CourseId, pc.SubjectId }).OnDelete(cascadeDeleteConfig);
