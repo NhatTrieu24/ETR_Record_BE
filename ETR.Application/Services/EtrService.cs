@@ -68,42 +68,6 @@ public class EtrService : IEtrService
             subjectResults);
     }
 
-    public async Task<EtrRecordResponse> CreateEtrAsync(CreateEtrRecordRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
-    {
-        var enrollment = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(request.EnrollmentId, cancellationToken);
-        if (enrollment == null) throw new InvalidOperationException("Enrollment not found.");
-
-        var etr = new ETRCourseRecord
-        {
-            EnrollmentId = request.EnrollmentId,
-            Status = "Draft",
-            IsLocked = false,
-            CreatedAt = DateTime.UtcNow,
-            CreatedByAccountId = createdByAccountId
-        };
-
-        await _unitOfWork.ETRCourseRecordRepository.AddAsync(etr, cancellationToken);
-        await _unitOfWork.SaveAsync(cancellationToken);
-
-        return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt);
-    }
-
-    public async Task<EtrRecordResponse> UpdateEtrAsync(int id, UpdateEtrRecordRequest request, int updatedByAccountId, CancellationToken cancellationToken = default)
-    {
-        var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(id, cancellationToken);
-        if (etr == null) throw new KeyNotFoundException("ETRCourseRecord not found.");
-
-        etr.Status = request.Status;
-        etr.IsLocked = request.IsLocked;
-        etr.UpdatedAt = DateTime.UtcNow;
-        etr.UpdatedByAccountId = updatedByAccountId;
-
-        _unitOfWork.ETRCourseRecordRepository.Update(etr);
-        await _unitOfWork.SaveAsync(cancellationToken);
-
-        return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt);
-    }
-
     public async Task DeleteEtrAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default)
     {
         var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(id, cancellationToken);

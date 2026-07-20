@@ -12,7 +12,7 @@ namespace ETR.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize] // Secure all endpoints in this controller by default
+[Authorize(Roles = "Admin,QA,Student,Instructor")] // Secure all endpoints in this controller by default
 public class EtrController : ControllerBase
 {
     private readonly IEtrService _etrService;
@@ -34,6 +34,7 @@ public class EtrController : ControllerBase
     /// <response code="200">Returns the list of ETR records.</response>
     /// <response code="401">If the user is not authenticated.</response>
     [HttpGet]
+    [Authorize(Roles = "Instructor,QA,Admin")]
     public async Task<ActionResult<IEnumerable<EtrRecordResponse>>> GetAllEtrs(CancellationToken cancellationToken)
     {
         var etrs = await _etrService.GetAllEtrsAsync(cancellationToken);
@@ -46,7 +47,7 @@ public class EtrController : ControllerBase
     /// [Target Audience]: Student
     /// </summary>
     [HttpGet("my-etr")]
-    [Authorize]
+    [Authorize(Roles = "Student")]
     public async Task<ActionResult<IEnumerable<EtrRecordResponse>>> GetMyEtrs(CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -68,6 +69,7 @@ public class EtrController : ControllerBase
     /// <response code="401">If the user is not authenticated.</response>
     /// <response code="404">If the ETR record is not found.</response>
     [HttpGet("{id}")]
+    [Authorize(Roles = "Instructor,QA,Admin")]
     public async Task<ActionResult<EtrDetailsResponse>> GetEtrById(int id, CancellationToken cancellationToken)
     {
         var etr = await _etrService.GetEtrByIdAsync(id, cancellationToken);
@@ -84,7 +86,7 @@ public class EtrController : ControllerBase
     /// <response code="401">If the user is not authenticated.</response>
     /// <response code="403">If the user is not an Instructor or Admin.</response>
     [HttpPost("{id}/submit")]
-    [Authorize]
+    [Authorize(Roles = "Instructor,Admin")]
     public async Task<IActionResult> SubmitEtr(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -104,7 +106,7 @@ public class EtrController : ControllerBase
     /// <response code="401">If the user is not authenticated.</response>
     /// <response code="403">If the user is not a QA or Admin.</response>
     [HttpPost("{id}/verify")]
-    [Authorize]
+    [Authorize(Roles = "QA,Admin")]
     public async Task<IActionResult> VerifyEtr(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -118,7 +120,7 @@ public class EtrController : ControllerBase
     /// Trả lại ETR để chỉnh sửa (chuyển từ Submitted về Draft).
     /// </summary>
     [HttpPost("{id}/return")]
-    [Authorize]
+    [Authorize(Roles = "QA,Admin")]
     public async Task<IActionResult> ReturnEtr(int id, [FromBody] ReturnEtrRequest? request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -136,9 +138,9 @@ public class EtrController : ControllerBase
     /// <returns>The updated ETR record.</returns>
     /// <response code="200">Returns the updated record.</response>
     /// <response code="401">If the user is not authenticated.</response>
-    /// <response code="403">If the user is not an Admin.</response>
+    /// <response code="403">If the user is not an Admin or TrainingManager.</response>
     [HttpPost("{id}/complete")]
-    [Authorize]
+    [Authorize(Roles = "Admin,TrainingManager")]
     public async Task<IActionResult> CompleteEtr(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -147,30 +149,11 @@ public class EtrController : ControllerBase
         var response = await _etrService.CompleteEtrAsync(id, accountId, cancellationToken);
         return Ok(response);
     }
-    [HttpPost]
-    [Authorize]
-    public async Task<IActionResult> CreateEtr([FromBody] CreateEtrRecordRequest request, CancellationToken cancellationToken)
-    {
-        var accountId = _currentUserService.AccountId 
-            ?? throw new UnauthorizedAccessException("User is not authenticated.");
-
-        var response = await _etrService.CreateEtrAsync(request, accountId, cancellationToken);
-        return CreatedAtAction(nameof(GetEtrById), new { id = response.ETRCourseRecordId }, response);
-    }
-
-    [HttpPut("{id}")]
-    [Authorize]
-    public async Task<IActionResult> UpdateEtr(int id, [FromBody] UpdateEtrRecordRequest request, CancellationToken cancellationToken)
-    {
-        var accountId = _currentUserService.AccountId 
-            ?? throw new UnauthorizedAccessException("User is not authenticated.");
-
-        var response = await _etrService.UpdateEtrAsync(id, request, accountId, cancellationToken);
-        return Ok(response);
-    }
-
+    /// <summary>
+    /// Xóa mềm (soft delete) một hồ sơ ETR.
+    /// </summary>
     [HttpDelete("{id}")]
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeleteEtr(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 

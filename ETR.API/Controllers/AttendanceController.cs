@@ -25,6 +25,7 @@ public class AttendanceController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Roles = "Instructor,Admin")]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
         return Ok(await _attendanceService.GetAllAttendanceRecordsAsync(cancellationToken));
@@ -42,6 +43,7 @@ public class AttendanceController : ControllerBase
     /// <response code="401">If the user is not authenticated.</response>
     /// <response code="403">If the user is not an Instructor or Admin.</response>
     [HttpPost("record")]
+    [Authorize(Roles = "Instructor,Admin")]
     public async Task<IActionResult> RecordAttendance([FromBody] CreateAttendanceRecordRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -63,6 +65,7 @@ public class AttendanceController : ControllerBase
     /// <response code="401">If the user is not authenticated.</response>
     /// <response code="403">If the user is not an Instructor or Admin.</response>
     [HttpPost("sessions/{sessionId}/confirm")]
+    [Authorize(Roles = "Instructor,Admin")]
     public async Task<IActionResult> ConfirmSession(int sessionId, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -95,12 +98,14 @@ public class AttendanceController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [Authorize(Roles = "Instructor,Admin")]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
     {
         return Ok(await _attendanceService.GetAttendanceRecordByIdAsync(id, cancellationToken));
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Instructor,Admin")]
     public async Task<IActionResult> UpdateAttendanceRecord(int id, [FromBody] UpdateAttendanceRecordRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -111,6 +116,7 @@ public class AttendanceController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Instructor,Admin")]
     public async Task<IActionResult> DeleteAttendanceRecord(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 

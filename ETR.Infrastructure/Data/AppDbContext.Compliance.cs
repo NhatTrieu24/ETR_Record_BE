@@ -87,7 +87,15 @@ public partial class AppDbContext
                     EntityName = entityName,
                     Action = action,
                     OriginalEtrStatus = entry.Property(nameof(ETRCourseRecord.Status)).OriginalValue as string,
-                    OriginalEtrIsLocked = entry.Property(nameof(ETRCourseRecord.IsLocked)).OriginalValue as bool?
+                    OriginalEtrIsLocked = entry.Property(nameof(ETRCourseRecord.IsLocked)).OriginalValue as bool?,
+                    IsBeingUnlocked = action == EntityChangeAction.Update
+                        && entry.Property(nameof(ETRCourseRecord.IsLocked)).OriginalValue is true
+                        && entry.Property(nameof(ETRCourseRecord.IsLocked)).CurrentValue is false
+                        && !entry.Property(nameof(ETRCourseRecord.Status)).IsModified
+                        && !entry.Property(nameof(ETRCourseRecord.SubmittedAt)).IsModified
+                        && !entry.Property(nameof(ETRCourseRecord.VerifiedAt)).IsModified
+                        && !entry.Property(nameof(ETRCourseRecord.CompletedAt)).IsModified
+                        && !entry.Property(nameof(ETRCourseRecord.EnrollmentId)).IsModified
                 });
                 continue;
             }
@@ -235,9 +243,11 @@ public partial class AppDbContext
     {
         if (values is null) return null;
 
-        var payload = values.Properties.ToDictionary(
-            property => property.Name,
-            property => values[property.Name]);
+        var payload = values.Properties
+            .Where(property => property.Name != nameof(Account.PasswordHash))
+            .ToDictionary(
+                property => property.Name,
+                property => values[property.Name]);
 
         return JsonSerializer.Serialize(payload, AuditJsonOptions);
     }
