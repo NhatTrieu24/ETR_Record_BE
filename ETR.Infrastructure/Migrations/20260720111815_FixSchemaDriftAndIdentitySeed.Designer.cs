@@ -4,6 +4,7 @@ using ETR.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ETR.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260720111815_FixSchemaDriftAndIdentitySeed")]
+    partial class FixSchemaDriftAndIdentitySeed
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -75,7 +78,7 @@ namespace ETR.Infrastructure.Migrations
                     b.HasIndex("Username")
                         .IsUnique();
 
-                    b.ToTable("Accounts", (string)null);
+                    b.ToTable("Accounts");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.ApprovalHistory", b =>
@@ -132,7 +135,7 @@ namespace ETR.Infrastructure.Migrations
 
                     b.HasIndex("ApprovalRequestId");
 
-                    b.ToTable("ApprovalHistories", (string)null);
+                    b.ToTable("ApprovalHistories");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.ApprovalRequest", b =>
@@ -184,7 +187,7 @@ namespace ETR.Infrastructure.Migrations
 
                     b.HasIndex("ETRCourseRecordId");
 
-                    b.ToTable("ApprovalRequests", (string)null);
+                    b.ToTable("ApprovalRequests");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.Assessment", b =>
@@ -243,7 +246,7 @@ namespace ETR.Infrastructure.Migrations
 
                     b.HasIndex("CourseId", "SubjectId");
 
-                    b.ToTable("Assessments", (string)null);
+                    b.ToTable("Assessments");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.AssessmentResult", b =>
@@ -326,7 +329,7 @@ namespace ETR.Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("[SessionId] IS NOT NULL");
 
-                    b.ToTable("AssessmentResults", (string)null);
+                    b.ToTable("AssessmentResults");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.AttendanceRecord", b =>
@@ -381,7 +384,7 @@ namespace ETR.Infrastructure.Migrations
                     b.HasIndex("SessionId", "ClassStudentId")
                         .IsUnique();
 
-                    b.ToTable("AttendanceRecords", (string)null);
+                    b.ToTable("AttendanceRecords");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.AuditLog", b =>
@@ -426,7 +429,7 @@ namespace ETR.Infrastructure.Migrations
 
                     b.HasKey("AuditLogId");
 
-                    b.ToTable("AuditLogs", (string)null);
+                    b.ToTable("AuditLogs");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.Class", b =>
@@ -489,7 +492,7 @@ namespace ETR.Infrastructure.Migrations
 
                     b.HasIndex("CourseId");
 
-                    b.ToTable("Classes", (string)null);
+                    b.ToTable("Classes");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.ClassStudent", b =>
@@ -537,7 +540,7 @@ namespace ETR.Infrastructure.Migrations
 
                     b.HasIndex("CourseEnrollmentId");
 
-                    b.ToTable("ClassStudents", (string)null);
+                    b.ToTable("ClassStudents");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.CompletionRequirement", b =>
@@ -584,7 +587,7 @@ namespace ETR.Infrastructure.Migrations
 
                     b.HasKey("RequirementId");
 
-                    b.ToTable("CompletionRequirements", (string)null);
+                    b.ToTable("CompletionRequirements");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.Course", b =>
@@ -637,7 +640,7 @@ namespace ETR.Infrastructure.Migrations
                     b.HasIndex("CourseCode")
                         .IsUnique();
 
-                    b.ToTable("Courses", (string)null);
+                    b.ToTable("Courses");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.CourseEnrollment", b =>
@@ -695,7 +698,7 @@ namespace ETR.Infrastructure.Migrations
                     b.HasIndex("AccountId", "ClassId")
                         .IsUnique();
 
-                    b.ToTable("CourseEnrollments", (string)null);
+                    b.ToTable("CourseEnrollments");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.CourseSubject", b =>
@@ -743,7 +746,7 @@ namespace ETR.Infrastructure.Migrations
 
                     b.HasIndex("SubjectId");
 
-                    b.ToTable("CourseSubjects", (string)null);
+                    b.ToTable("CourseSubjects");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.DashboardSnapshot", b =>
@@ -810,7 +813,7 @@ namespace ETR.Infrastructure.Migrations
 
                     b.HasKey("SnapshotId");
 
-                    b.ToTable("DashboardSnapshots", (string)null);
+                    b.ToTable("DashboardSnapshots");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.Department", b =>
@@ -852,7 +855,7 @@ namespace ETR.Infrastructure.Migrations
                     b.HasIndex("DepartmentName")
                         .IsUnique();
 
-                    b.ToTable("Departments", (string)null);
+                    b.ToTable("Departments");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.ETRCourseRecord", b =>
@@ -908,7 +911,7 @@ namespace ETR.Infrastructure.Migrations
                     b.HasIndex("EnrollmentId")
                         .IsUnique();
 
-                    b.ToTable("ETRCourseRecords", (string)null);
+                    b.ToTable("ETRCourseRecords");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.EvidenceFile", b =>
@@ -1004,7 +1007,7 @@ namespace ETR.Infrastructure.Migrations
 
                     b.HasIndex("VerifiedByAccountId");
 
-                    b.ToTable("EvidenceFiles", (string)null);
+                    b.ToTable("EvidenceFiles");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.EvidenceType", b =>
@@ -1046,7 +1049,7 @@ namespace ETR.Infrastructure.Migrations
                     b.HasIndex("TypeName")
                         .IsUnique();
 
-                    b.ToTable("EvidenceTypes", (string)null);
+                    b.ToTable("EvidenceTypes");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.ExportJob", b =>
@@ -1105,7 +1108,7 @@ namespace ETR.Infrastructure.Migrations
 
                     b.HasIndex("RequestedByAccountId");
 
-                    b.ToTable("ExportJobs", (string)null);
+                    b.ToTable("ExportJobs");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.PracticalChecklist", b =>
@@ -1157,7 +1160,7 @@ namespace ETR.Infrastructure.Migrations
 
                     b.HasIndex("CourseId", "SubjectId");
 
-                    b.ToTable("PracticalChecklists", (string)null);
+                    b.ToTable("PracticalChecklists");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.PracticalChecklistResult", b =>
@@ -1226,7 +1229,7 @@ namespace ETR.Infrastructure.Migrations
                     b.HasIndex("SubjectResultId", "PracticalChecklistId")
                         .IsUnique();
 
-                    b.ToTable("PracticalChecklistResults", (string)null);
+                    b.ToTable("PracticalChecklistResults");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.RetakeHistory", b =>
@@ -1281,7 +1284,7 @@ namespace ETR.Infrastructure.Migrations
 
                     b.HasIndex("SubjectResultId");
 
-                    b.ToTable("RetakeHistories", (string)null);
+                    b.ToTable("RetakeHistories");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.Role", b =>
@@ -1323,7 +1326,7 @@ namespace ETR.Infrastructure.Migrations
                     b.HasIndex("RoleName")
                         .IsUnique();
 
-                    b.ToTable("Roles", (string)null);
+                    b.ToTable("Roles");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.Session", b =>
@@ -1391,7 +1394,7 @@ namespace ETR.Infrastructure.Migrations
 
                     b.HasIndex("SubjectId");
 
-                    b.ToTable("Sessions", (string)null);
+                    b.ToTable("Sessions");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.Subject", b =>
@@ -1450,7 +1453,7 @@ namespace ETR.Infrastructure.Migrations
                     b.HasIndex("SubjectCode")
                         .IsUnique();
 
-                    b.ToTable("Subjects", (string)null);
+                    b.ToTable("Subjects");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.SubjectResult", b =>
@@ -1511,7 +1514,7 @@ namespace ETR.Infrastructure.Migrations
                     b.HasIndex("EtrId", "CourseId", "SubjectId")
                         .IsUnique();
 
-                    b.ToTable("SubjectResults", (string)null);
+                    b.ToTable("SubjectResults");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.SubjectSignoff", b =>
@@ -1562,7 +1565,7 @@ namespace ETR.Infrastructure.Migrations
 
                     b.HasIndex("SubjectResultId");
 
-                    b.ToTable("SubjectSignoffs", (string)null);
+                    b.ToTable("SubjectSignoffs");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.UserProfile", b =>
@@ -1619,7 +1622,7 @@ namespace ETR.Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("[Email] IS NOT NULL AND [Email] <> ''");
 
-                    b.ToTable("UserProfiles", (string)null);
+                    b.ToTable("UserProfiles");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.Account", b =>
