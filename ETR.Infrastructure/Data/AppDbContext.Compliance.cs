@@ -104,7 +104,10 @@ public partial class AppDbContext
                 OriginalAssessmentIsPublished = entityName == nameof(AssessmentResult)
                     && entry.Property(nameof(AssessmentResult.IsPublished)).OriginalValue is true,
                 IsScoreModified = entityName == nameof(AssessmentResult)
-                    && entry.Property(nameof(AssessmentResult.Score)).IsModified
+                    && entry.Property(nameof(AssessmentResult.Score)).IsModified,
+                IsBeingUnpublished = entityName == nameof(AssessmentResult)
+                    && entry.Property(nameof(AssessmentResult.IsPublished)).OriginalValue is true
+                    && entry.Property(nameof(AssessmentResult.IsPublished)).CurrentValue is false
             });
         }
 

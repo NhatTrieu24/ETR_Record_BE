@@ -18,6 +18,7 @@ public sealed class EntityChangeSnapshot
     public bool? OriginalEtrIsLocked { get; init; }
     public bool OriginalAssessmentIsPublished { get; init; }
     public bool IsScoreModified { get; init; }
+    public bool IsBeingUnpublished { get; init; }
 }
 
 public static class ImmutabilityValidator
@@ -67,7 +68,8 @@ public static class ImmutabilityValidator
 
     private static void ValidatePublishedAssessmentScore(EntityChangeSnapshot change)
     {
-        if (change.EntityName == nameof(AssessmentResult) && change.IsScoreModified && change.OriginalAssessmentIsPublished)
+        // Allow score modification if the result is being unpublished (retake scenario)
+        if (change.EntityName == nameof(AssessmentResult) && change.IsScoreModified && change.OriginalAssessmentIsPublished && !change.IsBeingUnpublished)
         {
             throw new ImmutabilityViolationException("Cannot modify score of a published AssessmentResult.");
         }

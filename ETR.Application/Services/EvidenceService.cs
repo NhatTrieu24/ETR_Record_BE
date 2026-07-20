@@ -51,13 +51,21 @@ public class EvidenceService : IEvidenceService
 
         var relativePath = Path.Combine("uploads", "evidences", uniqueFileName).Replace("\\", "/");
 
+        // Treat 0 or negative as null for nullable FK fields to avoid FK violations
+        var attendanceRecordId = request.AttendanceRecordId.HasValue && request.AttendanceRecordId.Value > 0
+            ? request.AttendanceRecordId
+            : null;
+        var assessmentResultId = request.AssessmentResultId.HasValue && request.AssessmentResultId.Value > 0
+            ? request.AssessmentResultId
+            : null;
+
         var evidence = new EvidenceFile
         {
             EvidenceTypeId = request.EvidenceTypeId,
             AccountId = request.AccountId,
             SubjectResultId = request.SubjectResultId,
-            AttendanceRecordId = request.AttendanceRecordId,
-            AssessmentResultId = request.AssessmentResultId,
+            AttendanceRecordId = attendanceRecordId,
+            AssessmentResultId = assessmentResultId,
             FileName = request.File.FileName,
             FilePath = relativePath,
             FileExtension = fileExtension,
