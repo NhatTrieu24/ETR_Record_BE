@@ -7,10 +7,12 @@ namespace ETR.Application.Services;
 public class ApprovalService : IApprovalService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IEtrService _etrService;
 
-    public ApprovalService(IUnitOfWork unitOfWork)
+    public ApprovalService(IUnitOfWork unitOfWork, IEtrService etrService)
     {
         _unitOfWork = unitOfWork;
+        _etrService = etrService;
     }
 
     public async Task<IEnumerable<ApprovalRequestResponse>> GetAllApprovalRequestsAsync(CancellationToken cancellationToken = default)
@@ -86,19 +88,13 @@ public class ApprovalService : IApprovalService
                 
                 await _unitOfWork.ApprovalHistoryRepository.AddAsync(history, ct);
 
+                await _unitOfWork.SaveAsync(ct);
+
                 if (newStatus == "Approved")
                 {
-                    var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(request.ETRCourseRecordId, ct);
-                    if (etr != null)
-                    {
-                        etr.Status = "Completed";
-                        etr.CompletedAt = DateTime.UtcNow;
-                        etr.IsLocked = true;
-                        _unitOfWork.ETRCourseRecordRepository.Update(etr);
-                    }
+                    await _etrService.CompleteEtrAsync(request.ETRCourseRecordId, actionByAccountId, ct);
                 }
 
-                await _unitOfWork.SaveAsync(ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
 
                 return new ApprovalRequestResponse(request.ApprovalRequestId, request.ETRCourseRecordId, request.CurrentStatus, request.SubmittedByAccountId, request.SubmittedAt, request.CurrentApproverId, request.CompletedAt);

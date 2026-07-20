@@ -1,11 +1,13 @@
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ETR.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = "Admin,QA,Instructor,TrainingManager,Academic")]
 public class RetakeHistoryController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;

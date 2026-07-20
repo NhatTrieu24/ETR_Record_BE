@@ -32,7 +32,7 @@ public class AccountService : IAccountService
         var account = new Account
         {
             Username = request.Username,
-            PasswordHash = request.Password, // Mock hashing
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             RoleId = request.RoleId,
             DepartmentId = request.DepartmentId,
             Status = "Active",

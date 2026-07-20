@@ -31,6 +31,7 @@ public class EvidencesController : ControllerBase
     /// Lấy danh sách tất cả các tệp bằng chứng (evidence) đã tải lên.
     /// </summary>
     [HttpGet]
+    [Authorize(Roles = "Instructor,QA,Admin")]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
         var files = await _evidenceService.GetAllEvidencesAsync(cancellationToken);
@@ -41,6 +42,7 @@ public class EvidencesController : ControllerBase
     /// Lấy thông tin một tệp bằng chứng cụ thể theo ID.
     /// </summary>
     [HttpGet("{id}")]
+    [Authorize(Roles = "Instructor,QA,Admin")]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
     {
         var file = await _evidenceService.GetEvidenceByIdAsync(id, cancellationToken);
@@ -51,6 +53,7 @@ public class EvidencesController : ControllerBase
     /// Tải xuống tệp bằng chứng vật lý theo ID.
     /// </summary>
     [HttpGet("{id}/download")]
+    [Authorize(Roles = "Instructor,QA,Admin")]
     public async Task<IActionResult> Download(int id, CancellationToken cancellationToken)
     {
         var file = await _evidenceService.GetEvidenceByIdAsync(id, cancellationToken);
@@ -73,6 +76,7 @@ public class EvidencesController : ControllerBase
     /// Tải lên một bản ghi tệp bằng chứng mới.
     /// </summary>
     [HttpPost("upload")]
+    [Authorize(Roles = "Instructor,Admin")]
     public async Task<IActionResult> UploadEvidence([FromForm] UploadEvidenceRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -90,6 +94,7 @@ public class EvidencesController : ControllerBase
     /// Phê duyệt hoặc từ chối một tệp bằng chứng (Dành cho Instructor/Admin).
     /// </summary>
     [HttpPut("{id}/verify")]
+    [Authorize(Roles = "Instructor,QA,Admin")]
     public async Task<IActionResult> VerifyEvidence(int id, [FromBody] VerifyEvidenceRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -101,6 +106,7 @@ public class EvidencesController : ControllerBase
     /// Xóa mềm (soft delete) một tệp bằng chứng.
     /// </summary>
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Instructor,Admin")]
     public async Task<IActionResult> DeleteEvidence(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();

@@ -7,7 +7,7 @@ namespace ETR.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Roles = "Admin,Academic,TrainingManager")]
 public class CompletionRequirementsController : ControllerBase
 {
     private readonly ICompletionRequirementService _service;

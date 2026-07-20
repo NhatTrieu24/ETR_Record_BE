@@ -16,6 +16,7 @@ public sealed class EntityChangeSnapshot
     public required EntityChangeAction Action { get; init; }
     public string? OriginalEtrStatus { get; init; }
     public bool? OriginalEtrIsLocked { get; init; }
+    public bool IsBeingUnlocked { get; init; }
     public bool OriginalAssessmentIsPublished { get; init; }
     public bool IsScoreModified { get; init; }
     public bool IsBeingUnpublished { get; init; }
@@ -48,7 +49,7 @@ public static class ImmutabilityValidator
     {
         if (change.EntityName == nameof(ETRCourseRecord))
         {
-            if (IsEtrImmutable(change.OriginalEtrStatus, change.OriginalEtrIsLocked))
+            if (IsEtrImmutable(change.OriginalEtrStatus, change.OriginalEtrIsLocked) && !change.IsBeingUnlocked)
             {
                 throw new ImmutabilityViolationException("Cannot modify ETRCourseRecord because it is Completed or Locked.");
             }

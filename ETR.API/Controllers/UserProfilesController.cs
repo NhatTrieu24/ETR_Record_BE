@@ -30,7 +30,7 @@ public class UserProfilesController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpGet]
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<IEnumerable<UserProfileResponse>>> GetAllProfiles(CancellationToken cancellationToken)
     {
         var profiles = await _userProfileService.GetAllProfilesAsync(cancellationToken);
@@ -43,6 +43,7 @@ public class UserProfilesController : ControllerBase
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpGet("learners")]
+    [Authorize(Roles = "Admin,Academic,TrainingManager")]
     public async Task<ActionResult<IEnumerable<UserProfileResponse>>> GetLearnerProfiles(CancellationToken cancellationToken)
     {
         var profiles = await _userProfileService.GetLearnerProfilesAsync(cancellationToken);
@@ -68,6 +69,7 @@ public class UserProfilesController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpGet("{accountId:int}")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<UserProfileResponse>> GetProfileByAccountId(int accountId, CancellationToken cancellationToken)
     {
         var profile = await _userProfileService.GetProfileByAccountIdAsync(accountId, cancellationToken);
@@ -80,7 +82,7 @@ public class UserProfilesController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPost("{accountId:int}")]
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<UserProfileResponse>> CreateProfile(int accountId, [FromBody] CreateUserProfileRequest request, CancellationToken cancellationToken)
     {
         var currentAccountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -107,7 +109,7 @@ public class UserProfilesController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPut("{accountId:int}")]
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<UserProfileResponse>> UpdateProfile(int accountId, [FromBody] UpdateUserProfileRequest request, CancellationToken cancellationToken)
     {
         var currentAccountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();

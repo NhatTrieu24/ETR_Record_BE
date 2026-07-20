@@ -1,6 +1,7 @@
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ETR.API.Controllers;
@@ -14,13 +15,20 @@ namespace ETR.API.Controllers;
 [Route("api/auth")]
 public class AuthController : ControllerBase
 {
+    // Verified even when no account matches the username, so a missing account and a
+    // wrong password take the same amount of time — otherwise the BCrypt cost factor
+    // becomes a timing oracle for username enumeration.
+    private static readonly string DummyPasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString());
+
     private readonly IUnitOfWork _unitOfWork;
     private readonly ITokenService _tokenService;
+    private readonly ICurrentUserService _currentUserService;
 
-    public AuthController(IUnitOfWork unitOfWork, ITokenService tokenService)
+    public AuthController(IUnitOfWork unitOfWork, ITokenService tokenService, ICurrentUserService currentUserService)
     {
         _unitOfWork = unitOfWork;
         _tokenService = tokenService;
+        _currentUserService = currentUserService;
     }
 
     /// <summary>
@@ -32,9 +40,11 @@ public class AuthController : ControllerBase
     public async Task<ActionResult> Login([FromBody] LoginRequestDto request, CancellationToken cancellationToken)
     {
         var accounts = await _unitOfWork.AccountRepository.GetAllAsync(cancellationToken);
-        var account = accounts.FirstOrDefault(a => a.Username == request.Username && a.PasswordHash == request.Password);
+        var account = accounts.FirstOrDefault(a => a.Username == request.Username);
 
-        if (account == null || account.Status != "Active")
+        var passwordIsValid = BCrypt.Net.BCrypt.Verify(request.Password, account?.PasswordHash ?? DummyPasswordHash);
+
+        if (account == null || account.Status != "Active" || !passwordIsValid)
         {
             return Unauthorized("Invalid credentials or account is inactive.");
         }
@@ -88,6 +98,7 @@ public class AuthController : ControllerBase
     /// [Target Audience]: All Roles
     /// </summary>
     [HttpPost("logout")]
+    [Authorize]
     public ActionResult Logout()
     {
         return Ok(new { message = "Đã đăng xuất thành công." });
@@ -99,6 +110,7 @@ public class AuthController : ControllerBase
     /// [Target Audience]: All Roles
     /// </summary>
     [HttpPost("change-password")]
+    [Authorize]
     public async Task<ActionResult> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken cancellationToken)
     {
         return Ok("Đổi mật khẩu thành công (mock).");
@@ -132,8 +144,12 @@ public class AuthController : ControllerBase
     /// [Target Audience]: All Roles
     /// </summary>
     [HttpGet("me")]
-    public async Task<ActionResult> GetMe([FromQuery] int accountId, CancellationToken cancellationToken)
+    [Authorize]
+    public async Task<ActionResult> GetMe(CancellationToken cancellationToken)
     {
+        var accountId = _currentUserService.AccountId
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
         var account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken);
         if (account == null) return NotFound("Account not found.");
 

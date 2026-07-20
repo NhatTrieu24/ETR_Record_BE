@@ -12,7 +12,7 @@ namespace ETR.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Roles = "Instructor,Academic")]
 public class SubjectSignoffController : ControllerBase
 {
     private readonly IAssessmentResultService _assessmentResultService;

@@ -25,6 +25,7 @@ public class AssessmentResultsController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Roles = "Instructor,Admin")]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
         return Ok(await _assessmentResultService.GetAllAssessmentResultsAsync(cancellationToken));
@@ -42,6 +43,7 @@ public class AssessmentResultsController : ControllerBase
     /// <response code="401">If the user is not authenticated.</response>
     /// <response code="403">If the user is not an Instructor or Admin.</response>
     [HttpPost("record")]
+    [Authorize(Roles = "Instructor,Admin")]
     public async Task<IActionResult> RecordAssessment([FromBody] CreateAssessmentResultRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -63,6 +65,7 @@ public class AssessmentResultsController : ControllerBase
     /// <response code="401">If the user is not authenticated.</response>
     /// <response code="403">If the user is not an Instructor or Admin.</response>
     [HttpPost("signoff")]
+    [Authorize(Roles = "Instructor,Admin")]
     public async Task<IActionResult> SignoffSubject([FromBody] CreateSubjectSignoffRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -95,12 +98,14 @@ public class AssessmentResultsController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [Authorize(Roles = "Instructor,Admin")]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
     {
         return Ok(await _assessmentResultService.GetAssessmentResultByIdAsync(id, cancellationToken));
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Instructor,Admin")]
     public async Task<IActionResult> UpdateAssessmentResult(int id, [FromBody] UpdateAssessmentResultRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -111,6 +116,7 @@ public class AssessmentResultsController : ControllerBase
     }
 
     [HttpPatch("{id}/publish")]
+    [Authorize(Roles = "Instructor,Admin")]
     public async Task<IActionResult> PublishAssessmentResult(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -121,6 +127,7 @@ public class AssessmentResultsController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Instructor,Admin")]
     public async Task<IActionResult> DeleteAssessmentResult(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 

@@ -1,5 +1,6 @@
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ETR.API.Controllers;
@@ -11,6 +12,7 @@ namespace ETR.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = "Admin,Instructor,TrainingManager")]
 public class ApprovalsController : ControllerBase
 {
     private readonly IApprovalService _approvalService;

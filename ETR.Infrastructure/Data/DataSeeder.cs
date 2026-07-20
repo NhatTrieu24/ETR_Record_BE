@@ -85,10 +85,9 @@ public static class DataSeeder
         return new Account
         {
             Username = username,
-            // Plaintext placeholder matching the legacy SeedSystemData migration — the
-            // codebase has no password hashing service yet, so there is nothing to hash
-            // with here. Flagged for follow-up once an auth/hashing service exists.
-            PasswordHash = "123456",
+            // Demo credential remains "123456" for local/dev login convenience, but is
+            // now stored as a bcrypt hash rather than plaintext.
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("123456"),
             RoleId = roleId,
             DepartmentId = departmentId,
             Status = "Active",
