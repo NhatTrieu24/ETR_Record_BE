@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ETR.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260720060720_AddIsPublishedToPracticalChecklistResult")]
-    partial class AddIsPublishedToPracticalChecklistResult
+    [Migration("20260720065855_AddPendingChanges")]
+    partial class AddPendingChanges
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
