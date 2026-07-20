@@ -47,4 +47,8 @@ project.lock.json
 .Trashes
 ehthumbs.db
 Thumbs.db
-nul 
+nul
+
+.claude
+CLAUDE.md
+ETR.Documentation
