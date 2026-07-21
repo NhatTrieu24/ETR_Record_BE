@@ -146,9 +146,9 @@ public static class DataSeeder
         if (!await context.CompletionRequirements.AnyAsync())
         {
             context.CompletionRequirements.AddRange(
-                new CompletionRequirement { CourseId = course.CourseId, RequirementName = "Minimum 80% Attendance", IsMandatory = true, DisplayOrder = 1 },
-                new CompletionRequirement { CourseId = course.CourseId, RequirementName = "All Assessments Passed", Description = "Every mandatory assessment scored at or above its passing score.", IsMandatory = true, DisplayOrder = 2 },
-                new CompletionRequirement { CourseId = course.CourseId, RequirementName = "All Practical Checklists Signed Off", IsMandatory = true, DisplayOrder = 3 });
+                new CompletionRequirement { CourseId = course.CourseId, RequirementName = "Minimum 80% Attendance", IsMandatory = true, DisplayOrder = 1, RequirementType = "MinAttendance", ThresholdValue = 80m },
+                new CompletionRequirement { CourseId = course.CourseId, RequirementName = "All Assessments Passed", Description = "Every mandatory assessment scored at or above its passing score.", IsMandatory = true, DisplayOrder = 2, RequirementType = "AllAssessmentsPassed" },
+                new CompletionRequirement { CourseId = course.CourseId, RequirementName = "All Practical Checklists Signed Off", IsMandatory = true, DisplayOrder = 3, RequirementType = "AllChecklistsSignedOff" });
             await context.SaveChangesAsync();
         }
 

@@ -138,6 +138,7 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<DashboardSnapshot>().Property(d => d.AverageAttendanceRate).HasColumnType("decimal(5,2)");
         modelBuilder.Entity<DashboardSnapshot>().Property(d => d.AverageAssessmentScore).HasColumnType("decimal(5,2)");
         modelBuilder.Entity<PracticalChecklistResult>().Property(p => p.Score).HasColumnType("decimal(5,2)");
+        modelBuilder.Entity<CompletionRequirement>().Property(c => c.ThresholdValue).HasColumnType("decimal(5,2)");
     }
 
     private static void ConfigureRelationships(ModelBuilder modelBuilder)

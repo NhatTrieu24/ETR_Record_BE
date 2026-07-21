@@ -16,6 +16,13 @@ public class PracticalChecklistResultService : IPracticalChecklistResultService
         _logger = logger;
     }
 
+    private async Task<decimal> GetPassingScoreAsync(int courseId, int subjectId, CancellationToken ct)
+    {
+        var courseSubject = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct))
+            .FirstOrDefault(cs => cs.CourseId == courseId && cs.SubjectId == subjectId);
+        return courseSubject?.PassingScore ?? 50m;
+    }
+
     private async Task<int?> GetAccountIdAsync(int subjectResultId, CancellationToken ct)
     {
         var subjectResult = await _unitOfWork.SubjectResultRepository.GetByIdAsync(subjectResultId, ct);
@@ -86,31 +93,17 @@ public class PracticalChecklistResultService : IPracticalChecklistResultService
         if (subjectResult == null)
             throw new InvalidOperationException("SubjectResult not found.");
 
-        // Find the first PracticalChecklist for this course/subject
+        // Find the PracticalChecklist for this course/subject — must already be configured by Admin/Instructor.
         var checklist = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(cancellationToken))
             .FirstOrDefault(pc => pc.CourseId == subjectResult.CourseId && pc.SubjectId == subjectResult.SubjectId);
-        
-        // Auto-create a default PracticalChecklist if none exists
+
         if (checklist == null)
         {
-            var course = await _unitOfWork.CourseRepository.GetByIdAsync(subjectResult.CourseId, cancellationToken);
-            var subject = await _unitOfWork.SubjectRepository.GetByIdAsync(subjectResult.SubjectId, cancellationToken);
-            checklist = new PracticalChecklist
-            {
-                CourseId = subjectResult.CourseId,
-                SubjectId = subjectResult.SubjectId,
-                ItemName = $"Practical - {(subject?.SubjectName ?? "Subject")}",
-                Description = $"Default practical checklist for {(course?.CourseName ?? "Course")}",
-                IsRequired = true,
-                DisplayOrder = 1,
-                CreatedAt = DateTime.UtcNow,
-                CreatedByAccountId = verifiedByAccountId
-            };
-            await _unitOfWork.PracticalChecklistRepository.AddAsync(checklist, cancellationToken);
-            await _unitOfWork.SaveAsync(cancellationToken);
-            _logger.LogInformation("Auto-created default PracticalChecklist for CourseId={CourseId}, SubjectId={SubjectId}", 
-                subjectResult.CourseId, subjectResult.SubjectId);
+            throw new InvalidOperationException(
+                $"No PracticalChecklist configured for CourseId={subjectResult.CourseId}, SubjectId={subjectResult.SubjectId}. Configure one via PracticalChecklistsController before recording a result.");
         }
+
+        var passingScore = await GetPassingScoreAsync(subjectResult.CourseId, subjectResult.SubjectId, cancellationToken);
 
         var result = new PracticalChecklistResult
         {
@@ -118,10 +111,10 @@ public class PracticalChecklistResultService : IPracticalChecklistResultService
             PracticalChecklistId = checklist.PracticalChecklistId,
             SessionId = request.SessionId,
             Score = request.Score,
-            ResultStatus = request.Score >= 50 ? "Passed" : "Failed",
+            ResultStatus = request.Score >= passingScore ? "Passed" : "Failed",
             VerificationComment = request.VerificationComment,
             VerifiedByAccountId = verifiedByAccountId,
-            CompletedAt = request.Score >= 50 ? DateTime.UtcNow : null,
+            CompletedAt = request.Score >= passingScore ? DateTime.UtcNow : null,
             IsPublished = false,
             PublishedAt = null,
             CreatedAt = DateTime.UtcNow,
@@ -164,11 +157,16 @@ public class PracticalChecklistResultService : IPracticalChecklistResultService
             result.SessionId = request.SessionId;
         }
 
+        var subjectResult = await _unitOfWork.SubjectResultRepository.GetByIdAsync(result.SubjectResultId, cancellationToken);
+        var passingScore = subjectResult == null
+            ? 50m
+            : await GetPassingScoreAsync(subjectResult.CourseId, subjectResult.SubjectId, cancellationToken);
+
         result.Score = request.Score;
-        result.ResultStatus = request.Score >= 50 ? "Passed" : "Failed";
+        result.ResultStatus = request.Score >= passingScore ? "Passed" : "Failed";
         result.VerificationComment = request.VerificationComment;
         result.VerifiedByAccountId = verifiedByAccountId;
-        result.CompletedAt = request.Score >= 50 ? DateTime.UtcNow : null;
+        result.CompletedAt = request.Score >= passingScore ? DateTime.UtcNow : null;
 
         _unitOfWork.PracticalChecklistResultRepository.Update(result);
         await _unitOfWork.SaveAsync(cancellationToken);

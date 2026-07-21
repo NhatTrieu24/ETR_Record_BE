@@ -98,7 +98,17 @@ public class AssessmentResultService : IAssessmentResultService
                 if (existingResult != null)
                 {
                     attemptNo = existingResult.AttemptNo + 1;
-                    
+
+                    if (attemptNo > BusinessRuleEngine.MaxAssessmentAttempts)
+                    {
+                        throw new InvalidOperationException($"Cannot retake. Maximum of {BusinessRuleEngine.MaxAssessmentAttempts} attempts already reached for this assessment.");
+                    }
+
+                    if (!request.AuthorizedByAccountId.HasValue || request.AuthorizedByAccountId.Value == recordedByAccountId)
+                    {
+                        throw new InvalidOperationException("A retake must be authorized by an account different from the one recording the score.");
+                    }
+
                     var retakeHistory = new RetakeHistory
                     {
                         SubjectResultId = request.SubjectResultId,
@@ -106,7 +116,7 @@ public class AssessmentResultService : IAssessmentResultService
                         Reason = "Retake Assessment",
                         PreviousScore = existingResult.Score,
                         NewScore = request.Score,
-                        AuthorizedByAccountId = recordedByAccountId,
+                        AuthorizedByAccountId = request.AuthorizedByAccountId.Value,
                         AttemptNo = attemptNo,
                         CreatedAt = DateTime.UtcNow,
                         CreatedByAccountId = recordedByAccountId
@@ -314,22 +324,28 @@ public class AssessmentResultService : IAssessmentResultService
         var subjectResult = await _unitOfWork.SubjectResultRepository.GetByIdAsync(subjectResultId, ct);
         if (subjectResult == null) return;
 
+        var courseSubject = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct))
+            .FirstOrDefault(cs => cs.CourseId == subjectResult.CourseId && cs.SubjectId == subjectResult.SubjectId);
+        var passingScore = courseSubject?.PassingScore ?? 50m;
+
+        var isPassable = true;
+
         // 1. Attendance Threshold
         if ((subjectResult.AttendanceRate ?? 0) < BusinessRuleEngine.MinimumAttendanceThreshold)
         {
-            return; // Cannot pass
+            isPassable = false;
         }
 
-        // 2. Practical Checklist
+        // 2. Practical Checklist — ngưỡng đọc từ CourseSubject.PassingScore, không hard-code
         var checklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(ct))
             .Where(p => p.CourseId == subjectResult.CourseId && p.SubjectId == subjectResult.SubjectId && p.IsRequired).ToList();
-        
+
         var checklistResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(ct))
             .Where(r => r.SubjectResultId == subjectResultId).ToList();
 
-        if (checklists.Any(c => !checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.Score >= 50)))
+        if (checklists.Any(c => !checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.Score >= passingScore)))
         {
-            return; // Mandatory checklist not completed
+            isPassable = false; // Mandatory checklist not completed
         }
 
         // 3. Mandatory Evidence Files (At least ONE EvidenceFile must be linked, and all must be Verified)
@@ -338,20 +354,16 @@ public class AssessmentResultService : IAssessmentResultService
 
         if (evidenceFiles.Count == 0 || evidenceFiles.Any(e => e.VerificationStatus != "Verified"))
         {
-            return; // No evidence file uploaded, or not all evidence has been Verified yet
+            isPassable = false; // No evidence file uploaded, or not all evidence has been Verified yet
         }
 
-        // 4. Score check (using CourseSubject)
-        var courseSubjects = await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct);
-        var courseSubject = courseSubjects.FirstOrDefault(cs => cs.CourseId == subjectResult.CourseId && cs.SubjectId == subjectResult.SubjectId);
-        
-        if (courseSubject != null && (subjectResult.Score ?? 0) < courseSubject.PassingScore)
+        // 4. Score check (using CourseSubject.PassingScore)
+        if ((subjectResult.Score ?? 0) < passingScore)
         {
-            return; // Score too low
+            isPassable = false; // Score too low
         }
 
-        // If all strict conditions are met:
-        subjectResult.Status = "Passed";
+        subjectResult.Status = isPassable ? "Passed" : "Failed";
         subjectResult.EvaluatedAt = DateTime.UtcNow;
         _unitOfWork.SubjectResultRepository.Update(subjectResult);
     }

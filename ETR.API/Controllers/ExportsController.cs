@@ -2,6 +2,7 @@ using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ETR.API.Controllers;
@@ -18,11 +19,15 @@ public class ExportsController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IExportService _exportService;
+    private readonly IWebHostEnvironment _env;
 
-    public ExportsController(IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
+    public ExportsController(IUnitOfWork unitOfWork, ICurrentUserService currentUserService, IExportService exportService, IWebHostEnvironment env)
     {
         _unitOfWork = unitOfWork;
         _currentUserService = currentUserService;
+        _exportService = exportService;
+        _env = env;
     }
 
     /// <summary>
@@ -47,7 +52,19 @@ public class ExportsController : ControllerBase
     public async Task<ActionResult<ExportJobResponse>> ExportTrainingPackage([FromBody] ExportRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
-        return await CreateMockExportJob("TrainingPackage", accountId, cancellationToken);
+        if (request.ETRCourseRecordId is not int etrCourseRecordId)
+        {
+            return BadRequest("ETRCourseRecordId is required to export a Training Package.");
+        }
+
+        var webRootPath = _env.WebRootPath;
+        if (string.IsNullOrEmpty(webRootPath))
+        {
+            webRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+        }
+
+        var response = await _exportService.ExportTrainingPackageAsync(etrCourseRecordId, accountId, webRootPath, cancellationToken);
+        return Ok(response);
     }
 
     /// <summary>
@@ -86,6 +103,22 @@ public class ExportsController : ControllerBase
         if (job == null) return NotFound($"Không tìm thấy yêu cầu xuất dữ liệu với ID {id}.");
         if (job.Status != "Completed") return BadRequest("File xuất chưa hoàn thành hoặc đã bị lỗi.");
 
+        if (!string.IsNullOrEmpty(job.FilePath))
+        {
+            var webRootPath = _env.WebRootPath;
+            if (string.IsNullOrEmpty(webRootPath))
+            {
+                webRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+            }
+
+            var physicalPath = Path.Combine(webRootPath, job.FilePath);
+            if (System.IO.File.Exists(physicalPath))
+            {
+                return PhysicalFile(physicalPath, "application/octet-stream", job.FileName);
+            }
+        }
+
+        // ExportType chưa có file thật trên đĩa (VD "PDF"/"Dashboard", vẫn còn mock) — trả nội dung placeholder.
         var mockFileContent = $"Nội dung tệp xuất loại: {job.ExportType}, Tên tệp: {job.FileName}";
         var bytes = System.Text.Encoding.UTF8.GetBytes(mockFileContent);
         var stream = new System.IO.MemoryStream(bytes);
@@ -126,7 +159,8 @@ public class ExportsController : ControllerBase
             j.Status,
             j.RequestedAt,
             j.CompletedAt,
-            j.DownloadExpiredAt);
+            j.DownloadExpiredAt,
+            j.ETRCourseRecordId);
     }
 }
 

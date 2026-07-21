@@ -1,4 +1,5 @@
 using ETR.Application.Interfaces;
+using ETR.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -30,8 +31,8 @@ public class DashboardController : ControllerBase
     public async Task<IActionResult> GetStats(CancellationToken cancellationToken)
     {
         var classes = await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken);
-        var etrs = await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken);
-        return Ok(new { TotalClasses = classes.Count(), TotalEtrs = etrs.Count() });
+        var kpis = await DashboardKpiCalculator.ComputeAsync(_unitOfWork, cancellationToken);
+        return Ok(new { TotalClasses = classes.Count(), TotalEtrs = kpis.TotalEtrs, kpis.CompletedCount, kpis.CompletionRatePercent, kpis.PendingApprovalCount, kpis.RejectedCount, kpis.ReturnedForCorrectionCount, kpis.MissingEvidenceCount });
     }
 }
 

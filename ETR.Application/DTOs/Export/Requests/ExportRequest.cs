@@ -1,3 +1,3 @@
 namespace ETR.Application.DTOs;
 
-public record ExportRequest(int UserId);
+public record ExportRequest(int UserId, int? ETRCourseRecordId = null);

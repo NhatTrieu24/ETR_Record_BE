@@ -11,6 +11,8 @@ using Microsoft.OpenApi;
 using System.Text;
 using System.Threading.RateLimiting;
 
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
 try
 {
     var builder = WebApplication.CreateBuilder(args);

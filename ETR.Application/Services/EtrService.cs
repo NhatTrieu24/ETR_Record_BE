@@ -2,6 +2,7 @@ using ETR.Application.Compliance;
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using System.ComponentModel.DataAnnotations;
 
 namespace ETR.Application.Services;
 
@@ -145,6 +146,52 @@ public class EtrService : IEtrService
             }
         }
 
+        // 5. Check mandatory CompletionRequirements configured for the course
+        var completionRequirements = (await _unitOfWork.CompletionRequirementRepository.GetAllAsync(cancellationToken))
+            .Where(cr => cr.CourseId == trainingClass.CourseId && cr.IsMandatory).ToList();
+
+        foreach (var requirement in completionRequirements)
+        {
+            switch (requirement.RequirementType)
+            {
+                case "MinAttendance":
+                    var minAttendance = requirement.ThresholdValue ?? BusinessRuleEngine.MinimumAttendanceThreshold;
+                    if (etr.SubjectResults != null && etr.SubjectResults.Any(sr => (sr.AttendanceRate ?? 0) < minAttendance))
+                    {
+                        throw new InvalidOperationException($"Cannot submit ETR. Completion requirement '{requirement.RequirementName}' not met: attendance below {minAttendance}%.");
+                    }
+                    break;
+
+                case "AllAssessmentsPassed":
+                    foreach (var cs in courseSubjects)
+                    {
+                        var sr = etr.SubjectResults?.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
+                        if (sr == null || (sr.Status != "Passed" && sr.Status != "Exempted"))
+                        {
+                            throw new InvalidOperationException($"Cannot submit ETR. Completion requirement '{requirement.RequirementName}' not met: not all mandatory subjects are Passed or Exempted.");
+                        }
+                    }
+                    break;
+
+                case "AllChecklistsSignedOff":
+                    var subjectResultIds = etr.SubjectResults?.Select(sr => sr.SubjectResultId).ToList() ?? new List<int>();
+                    var mandatoryChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(cancellationToken))
+                        .Where(pc => pc.CourseId == trainingClass.CourseId && pc.IsRequired).ToList();
+                    var checklistResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(cancellationToken))
+                        .Where(r => subjectResultIds.Contains(r.SubjectResultId)).ToList();
+
+                    if (mandatoryChecklists.Any(c => !checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.ResultStatus == "Passed")))
+                    {
+                        throw new InvalidOperationException($"Cannot submit ETR. Completion requirement '{requirement.RequirementName}' not met: not all mandatory practical checklists are signed off.");
+                    }
+                    break;
+
+                default:
+                    // Free-text/advisory requirement (RequirementType not set) — not machine-enforced.
+                    break;
+            }
+        }
+
         // === AUDIT LOG ===
         var auditLog = new AuditLog
         {
@@ -210,6 +257,9 @@ public class EtrService : IEtrService
 
         if (etr.Status != "Submitted")
             throw new InvalidOperationException("Cannot return ETR that is not in Submitted status.");
+
+        if (string.IsNullOrWhiteSpace(comment))
+            throw new ValidationException("A comment is required when returning an ETR for correction.");
 
         // === AUDIT LOG ===
         var auditLog = new AuditLog
