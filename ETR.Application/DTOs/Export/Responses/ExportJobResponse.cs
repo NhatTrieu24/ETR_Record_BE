@@ -9,4 +9,5 @@ public record ExportJobResponse(
     string Status,
     DateTime RequestedAt,
     DateTime? CompletedAt,
-    DateTime? DownloadExpiredAt);
+    DateTime? DownloadExpiredAt,
+    int? ETRCourseRecordId = null);

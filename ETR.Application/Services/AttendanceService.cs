@@ -79,17 +79,7 @@ public class AttendanceService : IAttendanceService
                     
                     if (sr != null)
                     {
-                        var allRecords = (await _unitOfWork.AttendanceRecordRepository.GetAllAsync(ct))
-                            .Where(r => r.ClassStudentId == request.ClassStudentId && r.Status == "Present").ToList();
-                        
-                        var allSessions = (await _unitOfWork.SessionRepository.GetAllAsync(ct))
-                            .Where(s => s.SubjectId == session.SubjectId && s.ClassId == session.ClassId).ToList();
-
-                        if (allSessions.Count > 0)
-                        {
-                            sr.AttendanceRate = (decimal)allRecords.Count / allSessions.Count * 100;
-                            _unitOfWork.SubjectResultRepository.Update(sr);
-                        }
+                        await RecalculateAttendanceRateAsync(sr, request.ClassStudentId, session.SubjectId, session.ClassId, ct);
                     }
                 }
 
@@ -133,35 +123,100 @@ public class AttendanceService : IAttendanceService
 
     public async Task<AttendanceRecordResponse> UpdateAttendanceRecordAsync(int id, UpdateAttendanceRecordRequest request, int updatedByAccountId, CancellationToken cancellationToken = default)
     {
-        var record = await _unitOfWork.AttendanceRecordRepository.GetByIdAsync(id, cancellationToken);
-        if (record == null) throw new KeyNotFoundException("AttendanceRecord not found.");
+        return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
+        {
+            await _unitOfWork.BeginTransactionAsync(ct);
+            try
+            {
+                var record = await _unitOfWork.AttendanceRecordRepository.GetByIdAsync(id, ct);
+                if (record == null) throw new KeyNotFoundException("AttendanceRecord not found.");
 
-        record.Status = request.Status;
-        record.Remarks = request.Remarks;
-        record.UpdatedAt = DateTime.UtcNow;
-        record.UpdatedByAccountId = updatedByAccountId;
+                record.Status = request.Status;
+                record.Remarks = request.Remarks;
+                record.UpdatedAt = DateTime.UtcNow;
+                record.UpdatedByAccountId = updatedByAccountId;
 
-        _unitOfWork.AttendanceRecordRepository.Update(record);
-        await _unitOfWork.SaveAsync(cancellationToken);
+                _unitOfWork.AttendanceRecordRepository.Update(record);
+                await _unitOfWork.SaveAsync(ct);
 
-        // Ideally, we should also recalculate AttendanceRate in SubjectResult here if Status changed.
-        // For simplicity, omitting full recalculation unless explicitly required.
+                await RecalculateAttendanceRateForRecordAsync(record, ct);
+                await _unitOfWork.SaveAsync(ct);
+                await _unitOfWork.CommitTransactionAsync(ct);
 
-        return new AttendanceRecordResponse(
-            record.AttendanceRecordId, record.SessionId, record.ClassStudentId, record.Status, record.Remarks, record.RecordedByAccountId, record.RecordedAt);
+                return new AttendanceRecordResponse(
+                    record.AttendanceRecordId, record.SessionId, record.ClassStudentId, record.Status, record.Remarks, record.RecordedByAccountId, record.RecordedAt);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync(ct);
+                throw;
+            }
+        }, cancellationToken);
     }
 
     public async Task DeleteAttendanceRecordAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default)
     {
-        var record = await _unitOfWork.AttendanceRecordRepository.GetByIdAsync(id, cancellationToken);
-        if (record == null) throw new KeyNotFoundException("AttendanceRecord not found.");
+        await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
+        {
+            await _unitOfWork.BeginTransactionAsync(ct);
+            try
+            {
+                var record = await _unitOfWork.AttendanceRecordRepository.GetByIdAsync(id, ct);
+                if (record == null) throw new KeyNotFoundException("AttendanceRecord not found.");
 
-        record.IsDeleted = true;
-        record.DeletedAt = DateTime.UtcNow;
-        record.UpdatedAt = DateTime.UtcNow;
-        record.UpdatedByAccountId = deletedByAccountId;
+                record.IsDeleted = true;
+                record.DeletedAt = DateTime.UtcNow;
+                record.UpdatedAt = DateTime.UtcNow;
+                record.UpdatedByAccountId = deletedByAccountId;
 
-        _unitOfWork.AttendanceRecordRepository.Update(record);
-        await _unitOfWork.SaveAsync(cancellationToken);
+                _unitOfWork.AttendanceRecordRepository.Update(record);
+                await _unitOfWork.SaveAsync(ct);
+
+                await RecalculateAttendanceRateForRecordAsync(record, ct);
+                await _unitOfWork.SaveAsync(ct);
+                await _unitOfWork.CommitTransactionAsync(ct);
+                return true;
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync(ct);
+                throw;
+            }
+        }, cancellationToken);
+    }
+
+    // Ngưỡng đã diễn ra/đã confirm — không tính trên tổng session kế hoạch (mẫu số sai nếu lớp chưa học hết).
+    private async Task RecalculateAttendanceRateAsync(SubjectResult sr, int classStudentId, int subjectId, int classId, CancellationToken ct)
+    {
+        var presentRecords = (await _unitOfWork.AttendanceRecordRepository.GetAllAsync(ct))
+            .Where(r => r.ClassStudentId == classStudentId && r.Status == "Present").ToList();
+
+        var confirmedSessions = (await _unitOfWork.SessionRepository.GetAllAsync(ct))
+            .Where(s => s.SubjectId == subjectId && s.ClassId == classId && s.IsConfirmed).ToList();
+
+        if (confirmedSessions.Count > 0)
+        {
+            sr.AttendanceRate = (decimal)presentRecords.Count / confirmedSessions.Count * 100;
+            _unitOfWork.SubjectResultRepository.Update(sr);
+        }
+    }
+
+    private async Task RecalculateAttendanceRateForRecordAsync(AttendanceRecord record, CancellationToken ct)
+    {
+        var session = await _unitOfWork.SessionRepository.GetByIdAsync(record.SessionId, ct);
+        if (session == null) return;
+
+        var classStudent = await _unitOfWork.ClassStudentRepository.GetByIdAsync(record.ClassStudentId, ct);
+        if (classStudent == null) return;
+
+        var etrRecord = (await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(ct))
+            .FirstOrDefault(etr => etr.EnrollmentId == classStudent.CourseEnrollmentId);
+        if (etrRecord == null) return;
+
+        var sr = (await _unitOfWork.SubjectResultRepository.GetAllAsync(ct))
+            .FirstOrDefault(s => s.EtrId == etrRecord.ETRCourseRecordId && s.SubjectId == session.SubjectId);
+        if (sr == null) return;
+
+        await RecalculateAttendanceRateAsync(sr, record.ClassStudentId, session.SubjectId, session.ClassId, ct);
     }
 }

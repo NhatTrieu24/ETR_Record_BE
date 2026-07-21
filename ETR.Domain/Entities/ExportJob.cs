@@ -11,4 +11,5 @@ public class ExportJob : BaseEntity
     public DateTime RequestedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
     public DateTime? DownloadExpiredAt { get; set; }
+    public int? ETRCourseRecordId { get; set; }
 }

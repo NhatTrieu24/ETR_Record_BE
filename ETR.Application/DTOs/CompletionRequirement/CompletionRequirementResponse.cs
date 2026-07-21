@@ -8,4 +8,6 @@ public class CompletionRequirementResponse
     public string? Description { get; set; }
     public bool IsMandatory { get; set; }
     public int DisplayOrder { get; set; }
+    public string? RequirementType { get; set; }
+    public decimal? ThresholdValue { get; set; }
 }

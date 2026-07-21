@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<IPracticalChecklistService, PracticalChecklistService>();
         services.AddScoped<IPracticalChecklistResultService, PracticalChecklistResultService>();
         services.AddScoped<ICompletionRequirementService, CompletionRequirementService>();
+        services.AddScoped<IExportService, ExportService>();
 
         return services;
     }

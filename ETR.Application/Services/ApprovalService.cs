@@ -1,6 +1,7 @@
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using System.ComponentModel.DataAnnotations;
 
 namespace ETR.Application.Services;
 
@@ -45,6 +46,11 @@ public class ApprovalService : IApprovalService
 
     public async Task<ApprovalRequestResponse> ProcessApprovalActionAsync(int approvalRequestId, string action, int actionByAccountId, string? comment, CancellationToken cancellationToken = default)
     {
+        if ((action == "Reject" || action == "Return") && string.IsNullOrWhiteSpace(comment))
+        {
+            throw new ValidationException("A comment is required when rejecting or returning an ApprovalRequest.");
+        }
+
         return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
         {
             await _unitOfWork.BeginTransactionAsync(ct);

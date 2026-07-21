@@ -4,6 +4,7 @@ using ETR.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ETR.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260721111759_AddCompletionRequirementTypeAndThreshold")]
+    partial class AddCompletionRequirementTypeAndThreshold
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1077,9 +1080,6 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<DateTime?>("DownloadExpiredAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<int?>("ETRCourseRecordId")
-                        .HasColumnType("int");
 
                     b.Property<string>("ExportType")
                         .IsRequired()

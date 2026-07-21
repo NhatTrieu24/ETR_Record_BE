@@ -45,6 +45,8 @@ public class CompletionRequirementService : ICompletionRequirementService
             Description = request.Description,
             IsMandatory = request.IsMandatory,
             DisplayOrder = request.DisplayOrder,
+            RequirementType = request.RequirementType,
+            ThresholdValue = request.ThresholdValue,
             CreatedAt = DateTime.UtcNow,
             CreatedByAccountId = createdByAccountId
         };
@@ -64,6 +66,8 @@ public class CompletionRequirementService : ICompletionRequirementService
         item.Description = request.Description;
         item.IsMandatory = request.IsMandatory;
         item.DisplayOrder = request.DisplayOrder;
+        item.RequirementType = request.RequirementType;
+        item.ThresholdValue = request.ThresholdValue;
         item.UpdatedAt = DateTime.UtcNow;
         item.UpdatedByAccountId = updatedByAccountId;
 
@@ -96,7 +100,9 @@ public class CompletionRequirementService : ICompletionRequirementService
             RequirementName = entity.RequirementName,
             Description = entity.Description,
             IsMandatory = entity.IsMandatory,
-            DisplayOrder = entity.DisplayOrder
+            DisplayOrder = entity.DisplayOrder,
+            RequirementType = entity.RequirementType,
+            ThresholdValue = entity.ThresholdValue
         };
     }
 }
