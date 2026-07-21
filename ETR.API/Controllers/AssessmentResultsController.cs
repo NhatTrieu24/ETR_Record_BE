@@ -68,10 +68,12 @@ public class AssessmentResultsController : ControllerBase
     [Authorize(Roles = "Instructor,Admin")]
     public async Task<IActionResult> SignoffSubject([FromBody] CreateSubjectSignoffRequest request, CancellationToken cancellationToken)
     {
-        var accountId = _currentUserService.AccountId 
+        var accountId = _currentUserService.AccountId
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+        var roleName = _currentUserService.RoleName
             ?? throw new UnauthorizedAccessException("User is not authenticated.");
 
-        var response = await _assessmentResultService.SignoffSubjectResultAsync(request, accountId, cancellationToken);
+        var response = await _assessmentResultService.SignoffSubjectResultAsync(request, accountId, roleName, cancellationToken);
         return Ok(response);
     }
 
@@ -93,7 +95,7 @@ public class AssessmentResultsController : ControllerBase
         var accountId = _currentUserService.AccountId 
             ?? throw new UnauthorizedAccessException("User is not authenticated.");
 
-        var response = await _assessmentResultService.GetAssessmentResultsByClassStudentAsync(classStudentId, accountId, cancellationToken);
+        var response = await _assessmentResultService.GetAssessmentResultsByClassStudentAsync(classStudentId, accountId, _currentUserService.RoleName, cancellationToken);
         return Ok(response);
     }
 

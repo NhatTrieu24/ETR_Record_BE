@@ -32,13 +32,17 @@ public class AssessmentResultService : IAssessmentResultService
             result.AssessmentResultId, result.AssessmentId, result.AccountId, result.SubjectResultId, result.SessionId, result.Score, result.ResultStatus, result.GradedByAccountId, result.RecordedAt, result.PublishedAt, result.IsPublished, result.TakenAt, result.Remark);
     }
 
-    public async Task<IEnumerable<AssessmentResultResponse>> GetAssessmentResultsByClassStudentAsync(int classStudentId, int accountId, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<AssessmentResultResponse>> GetAssessmentResultsByClassStudentAsync(int classStudentId, int accountId, string? roleName, CancellationToken cancellationToken = default)
     {
         var classStudent = await _unitOfWork.ClassStudentRepository.GetByIdAsync(classStudentId, cancellationToken)
             ?? throw new KeyNotFoundException("ClassStudent not found.");
 
-        // Zero-Trust: If not Admin/Instructor, ensure they are fetching their own data
-        // For simplicity, we just fetch results for this student's AccountId
+        // Zero-Trust: Students may only view their own assessment results.
+        if (roleName == "Student" && classStudent.AccountId != accountId)
+        {
+            throw new UnauthorizedAccessException("You are not authorized to view another student's assessment results.");
+        }
+
         var results = (await _unitOfWork.AssessmentResultRepository.GetAllAsync(cancellationToken))
             .Where(r => r.AccountId == classStudent.AccountId);
 
@@ -58,6 +62,19 @@ public class AssessmentResultService : IAssessmentResultService
 
                 var subjectResult = await _unitOfWork.SubjectResultRepository.GetByIdAsync(request.SubjectResultId, ct);
                 if (subjectResult == null) throw new InvalidOperationException("SubjectResult not found.");
+
+                // Verify request.AccountId is a real learner enrolled in a class for this assessment's course —
+                // prevents recording a score against an arbitrary/forged AccountId.
+                var learnerClassIds = (await _unitOfWork.ClassStudentRepository.GetAllAsync(ct))
+                    .Where(cs => cs.AccountId == request.AccountId)
+                    .Select(cs => cs.ClassId)
+                    .ToList();
+                var isEnrolledInAssessmentCourse = (await _unitOfWork.ClassRepository.GetAllAsync(ct))
+                    .Any(c => learnerClassIds.Contains(c.ClassId) && c.CourseId == assessment.CourseId);
+                if (!isEnrolledInAssessmentCourse)
+                {
+                    throw new InvalidOperationException($"Account (ID: {request.AccountId}) is not enrolled in a class for this assessment's course.");
+                }
 
                 var allResults = await _unitOfWork.AssessmentResultRepository.GetAllAsync(ct);
                 
@@ -252,7 +269,7 @@ public class AssessmentResultService : IAssessmentResultService
         await _unitOfWork.SaveAsync(cancellationToken);
     }
 
-    public async Task<SubjectSignoffResponse> SignoffSubjectResultAsync(CreateSubjectSignoffRequest request, int signoffByAccountId, CancellationToken cancellationToken = default)
+    public async Task<SubjectSignoffResponse> SignoffSubjectResultAsync(CreateSubjectSignoffRequest request, int signoffByAccountId, string signoffByRoleName, CancellationToken cancellationToken = default)
     {
         return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
         {
@@ -266,7 +283,7 @@ public class AssessmentResultService : IAssessmentResultService
                 {
                     SubjectResultId = request.SubjectResultId,
                     SignoffByAccountId = signoffByAccountId,
-                    Role = request.Role,
+                    Role = signoffByRoleName,
                     Comment = request.Comment,
                     SignoffAt = DateTime.UtcNow,
                     CreatedAt = DateTime.UtcNow,
@@ -315,13 +332,13 @@ public class AssessmentResultService : IAssessmentResultService
             return; // Mandatory checklist not completed
         }
 
-        // 3. Mandatory Evidence Files (At least ONE EvidenceFile must be linked)
+        // 3. Mandatory Evidence Files (At least ONE EvidenceFile must be linked, and all must be Verified)
         var evidenceFiles = (await _unitOfWork.EvidenceFileRepository.GetAllAsync(ct))
             .Where(e => e.SubjectResultId == subjectResultId).ToList();
 
-        if (evidenceFiles.Count == 0)
+        if (evidenceFiles.Count == 0 || evidenceFiles.Any(e => e.VerificationStatus != "Verified"))
         {
-            return; // No evidence file uploaded
+            return; // No evidence file uploaded, or not all evidence has been Verified yet
         }
 
         // 4. Score check (using CourseSubject)

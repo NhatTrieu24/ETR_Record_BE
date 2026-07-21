@@ -141,7 +141,7 @@ public class EnrollmentService : IEnrollmentService
                         SubjectId = cs.SubjectId,
                         Status = "Pending",
                         CreatedAt = DateTime.UtcNow,
-                        CreatedByAccountId = accountId
+                        CreatedByAccountId = createdByAccountId
                     };
                     await _unitOfWork.SubjectResultRepository.AddAsync(subjectResult, ct);
                 }
@@ -194,6 +194,14 @@ public class EnrollmentService : IEnrollmentService
     {
         var item = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(id, cancellationToken);
         if (item == null) throw new KeyNotFoundException("Enrollment not found.");
+
+        var etrRecord = (await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken))
+            .FirstOrDefault(e => e.EnrollmentId == id);
+
+        if (etrRecord != null && (etrRecord.IsLocked || (etrRecord.Status != "Draft" && etrRecord.Status != "InProgress")))
+        {
+            throw new InvalidOperationException($"Cannot delete enrollment because its ETRCourseRecord is already {etrRecord.Status}{(etrRecord.IsLocked ? " and locked" : string.Empty)}.");
+        }
 
         item.IsDeleted = true;
         item.DeletedAt = DateTime.UtcNow;
