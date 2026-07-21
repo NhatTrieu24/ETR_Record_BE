@@ -1,12 +1,15 @@
+using ETR.API.Middleware;
 using ETR.API.Services;
 using ETR.Application;
 using ETR.Application.Interfaces;
 using ETR.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using System.Text;
+using System.Threading.RateLimiting;
 
 try
 {
@@ -81,6 +84,25 @@ try
     // Explicitly add Authorization (critical for [Authorize] attributes to map policies)
     builder.Services.AddAuthorization();
 
+    // Global exception handler → ProblemDetails (no stack traces leaked to clients)
+    builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+    builder.Services.AddProblemDetails();
+
+    // Rate limiting cho các endpoint auth nhạy cảm (chống brute-force)
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        options.AddPolicy("AuthPolicy", httpContext =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 5,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0
+                }));
+    });
+
     // CẤU HÌNH CORS
     builder.Services.AddCors(options =>
     {
@@ -96,6 +118,8 @@ try
     var app = builder.Build();
 
     // 3. Cấu hình HTTP request pipeline (Middleware)
+    app.UseExceptionHandler();
+
     if (app.Environment.IsDevelopment())
     {
         // Kích hoạt giao diện Swagger trực quan để test API
@@ -111,6 +135,8 @@ try
 
     // ĐĂNG KÝ MIDDLEWARE CORS
     app.UseCors("AllowAll");
+
+    app.UseRateLimiter();
 
     // Middleware xác thực (Authentication) phải nằm trước phân quyền (Authorization)
     app.UseAuthentication();

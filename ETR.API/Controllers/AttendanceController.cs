@@ -93,7 +93,7 @@ public class AttendanceController : ControllerBase
         var accountId = _currentUserService.AccountId 
             ?? throw new UnauthorizedAccessException("User is not authenticated.");
 
-        var response = await _attendanceService.GetAttendanceByClassStudentAsync(classStudentId, accountId, cancellationToken);
+        var response = await _attendanceService.GetAttendanceByClassStudentAsync(classStudentId, accountId, _currentUserService.RoleName, cancellationToken);
         return Ok(response);
     }
 

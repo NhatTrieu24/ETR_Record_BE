@@ -220,12 +220,12 @@ public class EtrService : IEtrService
             EntityName = nameof(ETRCourseRecord),
             RecordId = etrCourseRecordId,
             OldValue = etr.Status,
-            NewValue = "Draft",
+            NewValue = "ReturnedForCorrection",
             Description = $"ETR #{etrCourseRecordId} returned for correction by QA. Comment: {comment ?? "N/A"}"
         };
         await _unitOfWork.AuditLogRepository.AddAsync(auditLog, cancellationToken);
 
-        etr.Status = "Draft";
+        etr.Status = "ReturnedForCorrection";
         etr.UpdatedAt = DateTime.UtcNow;
         etr.UpdatedByAccountId = accountId;
 

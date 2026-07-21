@@ -9,6 +9,23 @@ namespace ETR.Application.Services;
 
 public class EvidenceService : IEvidenceService
 {
+    private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf"
+    };
+
+    private static readonly HashSet<string> AllowedMimeTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"
+    };
+
+    private static readonly HashSet<string> AllowedVerificationStatuses = new(StringComparer.Ordinal)
+    {
+        "Verified", "Rejected"
+    };
+
+    private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
+
     private readonly IUnitOfWork _unitOfWork;
 
     public EvidenceService(IUnitOfWork unitOfWork)
@@ -36,11 +53,20 @@ public class EvidenceService : IEvidenceService
         if (request.File == null || request.File.Length == 0)
             throw new ValidationException("File is empty or not provided.");
 
+        if (request.File.Length > MaxFileSizeBytes)
+            throw new ValidationException($"File exceeds the maximum allowed size of {MaxFileSizeBytes / (1024 * 1024)} MB.");
+
+        var fileExtension = Path.GetExtension(request.File.FileName);
+        if (string.IsNullOrEmpty(fileExtension) || !AllowedExtensions.Contains(fileExtension))
+            throw new ValidationException($"File extension '{fileExtension}' is not allowed. Allowed extensions: {string.Join(", ", AllowedExtensions)}.");
+
+        if (string.IsNullOrEmpty(request.File.ContentType) || !AllowedMimeTypes.Contains(request.File.ContentType))
+            throw new ValidationException($"File content type '{request.File.ContentType}' is not allowed.");
+
         var uploadDir = Path.Combine(webRootPath, "uploads", "evidences");
         if (!Directory.Exists(uploadDir))
             Directory.CreateDirectory(uploadDir);
 
-        var fileExtension = Path.GetExtension(request.File.FileName);
         var uniqueFileName = $"{Guid.NewGuid()}{fileExtension}";
         var filePath = Path.Combine(uploadDir, uniqueFileName);
 
@@ -86,6 +112,12 @@ public class EvidenceService : IEvidenceService
 
     public async Task<EvidenceResponse> VerifyEvidenceAsync(int id, VerifyEvidenceRequest request, int verifiedByAccountId, CancellationToken cancellationToken = default)
     {
+        if (!AllowedVerificationStatuses.Contains(request.VerificationStatus))
+            throw new ValidationException($"VerificationStatus must be one of: {string.Join(", ", AllowedVerificationStatuses)}.");
+
+        if (request.VerificationStatus == "Rejected" && string.IsNullOrWhiteSpace(request.VerificationComment))
+            throw new ValidationException("A comment is required when rejecting evidence.");
+
         var evidence = await _unitOfWork.EvidenceFileRepository.GetByIdAsync(id, cancellationToken);
         if (evidence == null)
             throw new KeyNotFoundException($"Evidence with ID {id} not found.");

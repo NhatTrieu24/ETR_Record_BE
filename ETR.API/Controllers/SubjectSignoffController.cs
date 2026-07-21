@@ -54,8 +54,10 @@ public class SubjectSignoffController : ControllerBase
     {
         var accountId = _currentUserService.AccountId
             ?? throw new UnauthorizedAccessException("User is not authenticated.");
+        var roleName = _currentUserService.RoleName
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
 
-        var result = await _assessmentResultService.SignoffSubjectResultAsync(request, accountId, cancellationToken);
+        var result = await _assessmentResultService.SignoffSubjectResultAsync(request, accountId, roleName, cancellationToken);
         return Ok(result);
     }
 

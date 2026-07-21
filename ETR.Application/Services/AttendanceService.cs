@@ -20,12 +20,17 @@ public class AttendanceService : IAttendanceService
             r.AttendanceRecordId, r.SessionId, r.ClassStudentId, r.Status, r.Remarks, r.RecordedByAccountId, r.RecordedAt));
     }
 
-    public async Task<IEnumerable<AttendanceRecordResponse>> GetAttendanceByClassStudentAsync(int classStudentId, int accountId, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<AttendanceRecordResponse>> GetAttendanceByClassStudentAsync(int classStudentId, int accountId, string? roleName, CancellationToken cancellationToken = default)
     {
         var classStudent = await _unitOfWork.ClassStudentRepository.GetByIdAsync(classStudentId, cancellationToken)
             ?? throw new KeyNotFoundException("ClassStudent not found.");
 
-        // Zero-Trust validation could be enforced here by checking if the requesting accountId is the student's
+        // Zero-Trust: Students may only view their own attendance records.
+        if (roleName == "Student" && classStudent.AccountId != accountId)
+        {
+            throw new UnauthorizedAccessException("You are not authorized to view another student's attendance records.");
+        }
+
         var records = (await _unitOfWork.AttendanceRecordRepository.GetAllAsync(cancellationToken))
             .Where(r => r.ClassStudentId == classStudentId);
 

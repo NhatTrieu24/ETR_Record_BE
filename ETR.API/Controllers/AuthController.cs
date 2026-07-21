@@ -3,6 +3,7 @@ using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace ETR.API.Controllers;
 
@@ -37,6 +38,7 @@ public class AuthController : ControllerBase
     /// [Target Audience]: Public (Unauthenticated)
     /// </summary>
     [HttpPost("login")]
+    [EnableRateLimiting("AuthPolicy")]
     public async Task<ActionResult> Login([FromBody] LoginRequestDto request, CancellationToken cancellationToken)
     {
         var accounts = await _unitOfWork.AccountRepository.GetAllAsync(cancellationToken);
@@ -122,6 +124,7 @@ public class AuthController : ControllerBase
     /// [Target Audience]: Public (Unauthenticated)
     /// </summary>
     [HttpPost("forgot-password")]
+    [EnableRateLimiting("AuthPolicy")]
     public ActionResult ForgotPassword([FromBody] ForgotPasswordRequest request)
     {
         return Ok(new { message = "Yêu cầu đặt lại mật khẩu đã được gửi đến email: " + request.Email });
@@ -133,6 +136,7 @@ public class AuthController : ControllerBase
     /// [Target Audience]: Public (Unauthenticated)
     /// </summary>
     [HttpPost("reset-password")]
+    [EnableRateLimiting("AuthPolicy")]
     public ActionResult ResetPassword([FromBody] ResetPasswordRequest request)
     {
         return Ok(new { message = "Mật khẩu đã được đặt lại thành công." });
