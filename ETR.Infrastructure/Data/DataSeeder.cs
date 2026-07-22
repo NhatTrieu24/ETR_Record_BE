@@ -17,6 +17,7 @@ namespace ETR.Infrastructure.Data;
 /// </summary>
 public static class DataSeeder
 {
+    private const string AdminUsername = "admin@etr.com";
     private const string StudentUsername = "student@etr.com";
     private const string InstructorUsername = "instructor@etr.com";
     private const string QaUsername = "qa@etr.com";
@@ -70,7 +71,7 @@ public static class DataSeeder
             var deptIds = await context.Departments.ToDictionaryAsync(d => d.DepartmentName, d => d.DepartmentId);
 
             context.Accounts.AddRange(
-                CreateAccount("admin@etr.com", roleIds["Admin"], deptIds["Administration"], "ADM-01", "System Admin", new DateTime(1980, 1, 1), "Other"),
+                CreateAccount(AdminUsername, roleIds["Admin"], deptIds["Administration"], "ADM-01", "System Admin", new DateTime(1980, 1, 1), "Other"),
                 CreateAccount(InstructorUsername, roleIds["Instructor"], deptIds["Training"], "INS-01", "Senior Instructor", new DateTime(1985, 1, 1), "Male"),
                 CreateAccount(QaUsername, roleIds["QA"], deptIds["Administration"], "QA-01", "QA Specialist", new DateTime(1990, 1, 1), "Female"),
                 CreateAccount("academic@etr.com", roleIds["Academic"], deptIds["Administration"], "ACA-01", "Academic Staff", new DateTime(1992, 1, 1), "Female"),
