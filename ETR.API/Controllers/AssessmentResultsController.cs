@@ -53,29 +53,9 @@ public class AssessmentResultsController : ControllerBase
         return Ok(response);
     }
 
-    /// <summary>
-    /// [Module/Flow]: Thực thi Đào tạo
-    /// [Core Responsibility]: Ký xác nhận (sign off) kết quả môn học.
-    /// [Target Audience]: Instructor, Admin
-    /// </summary>
-    /// <param name="request">The signoff details.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The signoff response.</returns>
-    /// <response code="200">Returns the signoff response.</response>
-    /// <response code="401">If the user is not authenticated.</response>
-    /// <response code="403">If the user is not an Instructor or Admin.</response>
-    [HttpPost("signoff")]
-    [Authorize(Roles = "Instructor,Admin")]
-    public async Task<IActionResult> SignoffSubject([FromBody] CreateSubjectSignoffRequest request, CancellationToken cancellationToken)
-    {
-        var accountId = _currentUserService.AccountId
-            ?? throw new UnauthorizedAccessException("User is not authenticated.");
-        var roleName = _currentUserService.RoleName
-            ?? throw new UnauthorizedAccessException("User is not authenticated.");
-
-        var response = await _assessmentResultService.SignoffSubjectResultAsync(request, accountId, roleName, cancellationToken);
-        return Ok(response);
-    }
+    // Signoff endpoint đã gộp vào SubjectSignoffController (POST /api/SubjectSignoff) — trước đây
+    // 2 controller trùng nhau (cùng gọi SignoffSubjectResultAsync) nhưng role khác nhau
+    // (Instructor,Admin vs Instructor,Academic), rủi ro 1 bên được vá bảo mật còn bên kia thì không.
 
     /// <summary>
     /// [Module/Flow]: Thực thi Đào tạo

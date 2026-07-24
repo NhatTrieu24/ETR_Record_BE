@@ -22,4 +22,15 @@ public class CurrentUserService : ICurrentUserService
     }
 
     public string? RoleName => _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.Role)?.Value;
+
+    public string? IPAddress => _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
+
+    public string? UserAgent
+    {
+        get
+        {
+            var value = _httpContextAccessor.HttpContext?.Request.Headers.UserAgent.ToString();
+            return string.IsNullOrEmpty(value) ? null : value;
+        }
+    }
 }

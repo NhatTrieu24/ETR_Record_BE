@@ -82,16 +82,21 @@ namespace ETR.Infrastructure.Migrations
             // receives identity value 0 (SQL Server's documented empty-table RESEED rule) —
             // indistinguishable from an unset key/FK to EF Core. Reseed every currently-empty
             // identity table so its next row starts at 1 instead.
+            // sp_MSForEachTable is an on-prem/boxed-SQL-Server-only internal proc — unavailable on
+            // Azure SQL Database. Portable equivalent via sys.tables + sp_executesql (same pattern
+            // already used in Deploy_NukeAndSeed.sql) so this migration works on any SQL Server target.
             migrationBuilder.Sql(@"
-                EXEC sp_MSForEachTable '
-                    SET QUOTED_IDENTIFIER ON;
-                    IF ''?'' NOT LIKE ''%__EFMigrationsHistory%''
-                       AND OBJECTPROPERTY(OBJECT_ID(''?''), ''TableHasIdentity'') = 1
-                       AND NOT EXISTS (SELECT 1 FROM ?)
+                DECLARE @reseedSql NVARCHAR(MAX) = N'';
+                SELECT @reseedSql += N'
+                    IF NOT EXISTS (SELECT 1 FROM ' + QUOTENAME(s.name) + N'.' + QUOTENAME(t.name) + N')
                     BEGIN
-                        DBCC CHECKIDENT (''?'', RESEED, 1)
-                    END
-                ';
+                        DBCC CHECKIDENT (''' + QUOTENAME(s.name) + N'.' + QUOTENAME(t.name) + N''', RESEED, 1);
+                    END'
+                FROM sys.tables t
+                JOIN sys.schemas s ON t.schema_id = s.schema_id
+                WHERE t.name <> '__EFMigrationsHistory' AND OBJECTPROPERTY(t.object_id, 'TableHasIdentity') = 1;
+
+                EXEC sp_executesql @reseedSql;
             ");
         }
 

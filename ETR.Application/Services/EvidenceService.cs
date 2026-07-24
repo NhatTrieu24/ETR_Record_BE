@@ -1,3 +1,4 @@
+using ETR.Application.Compliance;
 using ETR.Application.DTOs.Evidence;
 using ETR.Application.DTOs.Evidence.Requests;
 using ETR.Application.Interfaces;
@@ -64,15 +65,25 @@ public class EvidenceService : IEvidenceService
             throw new ValidationException($"File content type '{request.File.ContentType}' is not allowed.");
 
         var uploadDir = Path.Combine(webRootPath, "uploads", "evidences");
-        if (!Directory.Exists(uploadDir))
-            Directory.CreateDirectory(uploadDir);
-
         var uniqueFileName = $"{Guid.NewGuid()}{fileExtension}";
         var filePath = Path.Combine(uploadDir, uniqueFileName);
 
-        using (var stream = new FileStream(filePath, FileMode.Create))
+        try
         {
-            await request.File.CopyToAsync(stream, cancellationToken);
+            if (!Directory.Exists(uploadDir))
+                Directory.CreateDirectory(uploadDir);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await request.File.CopyToAsync(stream, cancellationToken);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // System.IO throws the same UnauthorizedAccessException type as auth failures on OS-level
+            // permission denial — translate both IO failure modes to a domain error so the client sees
+            // a storage-specific message instead of a misleading 401 "Not authenticated".
+            throw new BusinessRuleViolationException("Could not save the uploaded file. Please retry or contact an administrator.");
         }
 
         var relativePath = Path.Combine("uploads", "evidences", uniqueFileName).Replace("\\", "/");

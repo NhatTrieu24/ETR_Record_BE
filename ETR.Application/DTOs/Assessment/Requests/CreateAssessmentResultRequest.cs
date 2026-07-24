@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace ETR.Application.DTOs;
 
 public record CreateAssessmentResultRequest(
@@ -5,6 +7,6 @@ public record CreateAssessmentResultRequest(
     int AccountId,
     int SubjectResultId,
     decimal Score,
-    string? Remark,
+    [MaxLength(1000)] string? Remark,
     int? SessionId = null,
     int? AuthorizedByAccountId = null);

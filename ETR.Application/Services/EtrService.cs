@@ -88,13 +88,13 @@ public class EtrService : IEtrService
         var etr = await _unitOfWork.ETRCourseRecordRepository.GetWithSubjectResultsAsync(etrCourseRecordId, cancellationToken)
             ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
 
-        if (etr.IsLocked) throw new InvalidOperationException("ETR is locked.");
+        if (etr.IsLocked) throw new BusinessRuleViolationException("ETR is locked.");
 
         var enrollment = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(etr.EnrollmentId, cancellationToken)
-            ?? throw new InvalidOperationException("Enrollment not found.");
+            ?? throw new BusinessRuleViolationException("Enrollment not found.");
 
         var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(enrollment.ClassId, cancellationToken)
-            ?? throw new InvalidOperationException("Class not found.");
+            ?? throw new BusinessRuleViolationException("Class not found.");
 
         var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken))
             .Where(cs => cs.CourseId == trainingClass.CourseId && cs.IsMandatory).ToList();
@@ -107,7 +107,7 @@ public class EtrService : IEtrService
             var sr = etr.SubjectResults?.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
             if (sr == null || (sr.Status != "Passed" && sr.Status != "Exempted"))
             {
-                throw new InvalidOperationException($"Cannot submit ETR. Mandatory subject (ID: {cs.SubjectId}) is not Passed or Exempted.");
+                throw new BusinessRuleViolationException($"Cannot submit ETR. Mandatory subject (ID: {cs.SubjectId}) is not Passed or Exempted.");
             }
         }
 
@@ -118,7 +118,7 @@ public class EtrService : IEtrService
             {
                 if ((sr.AttendanceRate ?? 0) < BusinessRuleEngine.MinimumAttendanceThreshold)
                 {
-                    throw new InvalidOperationException($"Cannot submit ETR. Subject (ID: {sr.SubjectId}) attendance rate ({sr.AttendanceRate}%) is below minimum threshold ({BusinessRuleEngine.MinimumAttendanceThreshold}%).");
+                    throw new BusinessRuleViolationException($"Cannot submit ETR. Subject (ID: {sr.SubjectId}) attendance rate ({sr.AttendanceRate}%) is below minimum threshold ({BusinessRuleEngine.MinimumAttendanceThreshold}%).");
                 }
             }
         }
@@ -132,7 +132,7 @@ public class EtrService : IEtrService
 
         if (pendingEvidences.Any())
         {
-            throw new InvalidOperationException($"Cannot submit ETR. {pendingEvidences.Count} evidence file(s) are not yet Verified.");
+            throw new BusinessRuleViolationException($"Cannot submit ETR. {pendingEvidences.Count} evidence file(s) are not yet Verified.");
         }
 
         // 4. Check all subject signoffs exist
@@ -142,7 +142,7 @@ public class EtrService : IEtrService
             var hasSignoff = allSignoffs.Any(s => s.SubjectResultId == sr.SubjectResultId);
             if (!hasSignoff)
             {
-                throw new InvalidOperationException($"Cannot submit ETR. Subject (ID: {sr.SubjectId}) has not been signed off by instructor.");
+                throw new BusinessRuleViolationException($"Cannot submit ETR. Subject (ID: {sr.SubjectId}) has not been signed off by instructor.");
             }
         }
 
@@ -158,7 +158,7 @@ public class EtrService : IEtrService
                     var minAttendance = requirement.ThresholdValue ?? BusinessRuleEngine.MinimumAttendanceThreshold;
                     if (etr.SubjectResults != null && etr.SubjectResults.Any(sr => (sr.AttendanceRate ?? 0) < minAttendance))
                     {
-                        throw new InvalidOperationException($"Cannot submit ETR. Completion requirement '{requirement.RequirementName}' not met: attendance below {minAttendance}%.");
+                        throw new BusinessRuleViolationException($"Cannot submit ETR. Completion requirement '{requirement.RequirementName}' not met: attendance below {minAttendance}%.");
                     }
                     break;
 
@@ -168,7 +168,7 @@ public class EtrService : IEtrService
                         var sr = etr.SubjectResults?.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
                         if (sr == null || (sr.Status != "Passed" && sr.Status != "Exempted"))
                         {
-                            throw new InvalidOperationException($"Cannot submit ETR. Completion requirement '{requirement.RequirementName}' not met: not all mandatory subjects are Passed or Exempted.");
+                            throw new BusinessRuleViolationException($"Cannot submit ETR. Completion requirement '{requirement.RequirementName}' not met: not all mandatory subjects are Passed or Exempted.");
                         }
                     }
                     break;
@@ -182,7 +182,7 @@ public class EtrService : IEtrService
 
                     if (mandatoryChecklists.Any(c => !checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.ResultStatus == "Passed")))
                     {
-                        throw new InvalidOperationException($"Cannot submit ETR. Completion requirement '{requirement.RequirementName}' not met: not all mandatory practical checklists are signed off.");
+                        throw new BusinessRuleViolationException($"Cannot submit ETR. Completion requirement '{requirement.RequirementName}' not met: not all mandatory practical checklists are signed off.");
                     }
                     break;
 
@@ -223,7 +223,7 @@ public class EtrService : IEtrService
             ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
 
         if (etr.Status != "Submitted")
-            throw new InvalidOperationException("Cannot verify ETR that is not in Submitted status.");
+            throw new BusinessRuleViolationException("Cannot verify ETR that is not in Submitted status.");
 
         // === AUDIT LOG ===
         var auditLog = new AuditLog
@@ -256,7 +256,7 @@ public class EtrService : IEtrService
             ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
 
         if (etr.Status != "Submitted")
-            throw new InvalidOperationException("Cannot return ETR that is not in Submitted status.");
+            throw new BusinessRuleViolationException("Cannot return ETR that is not in Submitted status.");
 
         if (string.IsNullOrWhiteSpace(comment))
             throw new ValidationException("A comment is required when returning an ETR for correction.");
@@ -291,13 +291,13 @@ public class EtrService : IEtrService
             ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
 
         if (etr.Status != "Verified")
-            throw new InvalidOperationException("Cannot complete ETR that is not in Verified status.");
+            throw new BusinessRuleViolationException("Cannot complete ETR that is not in Verified status.");
 
         var enrollment = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(etr.EnrollmentId, cancellationToken);
-        if (enrollment == null) throw new InvalidOperationException("Enrollment not found.");
+        if (enrollment == null) throw new BusinessRuleViolationException("Enrollment not found.");
 
         var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(enrollment.ClassId, cancellationToken);
-        if (trainingClass == null) throw new InvalidOperationException("Class not found.");
+        if (trainingClass == null) throw new BusinessRuleViolationException("Class not found.");
 
         var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken))
             .Where(cs => cs.CourseId == trainingClass.CourseId && cs.IsMandatory).ToList();
@@ -310,7 +310,7 @@ public class EtrService : IEtrService
             var sr = etr.SubjectResults.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
             if (sr == null || (sr.Status != "Passed" && sr.Status != "Exempted"))
             {
-                throw new InvalidOperationException($"Cannot complete ETR. Mandatory subject (ID: {cs.SubjectId}) is not Passed or Exempted.");
+                throw new BusinessRuleViolationException($"Cannot complete ETR. Mandatory subject (ID: {cs.SubjectId}) is not Passed or Exempted.");
             }
         }
 
@@ -323,7 +323,7 @@ public class EtrService : IEtrService
 
         if (pendingEvidences.Any())
         {
-            throw new InvalidOperationException($"Cannot complete ETR. {pendingEvidences.Count} evidence file(s) are not yet Verified.");
+            throw new BusinessRuleViolationException($"Cannot complete ETR. {pendingEvidences.Count} evidence file(s) are not yet Verified.");
         }
 
         // === AUDIT LOG ===

@@ -1,3 +1,4 @@
+using ETR.Application.Compliance;
 using ETR.Application.DTOs.PracticalChecklistResult;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
@@ -91,7 +92,7 @@ public class PracticalChecklistResultService : IPracticalChecklistResultService
         // Look up SubjectResult to find CourseId and SubjectId
         var subjectResult = await _unitOfWork.SubjectResultRepository.GetByIdAsync(request.SubjectResultId, cancellationToken);
         if (subjectResult == null)
-            throw new InvalidOperationException("SubjectResult not found.");
+            throw new BusinessRuleViolationException("SubjectResult not found.");
 
         // Find the PracticalChecklist for this course/subject — must already be configured by Admin/Instructor.
         var checklist = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(cancellationToken))
@@ -99,7 +100,7 @@ public class PracticalChecklistResultService : IPracticalChecklistResultService
 
         if (checklist == null)
         {
-            throw new InvalidOperationException(
+            throw new BusinessRuleViolationException(
                 $"No PracticalChecklist configured for CourseId={subjectResult.CourseId}, SubjectId={subjectResult.SubjectId}. Configure one via PracticalChecklistsController before recording a result.");
         }
 
@@ -201,7 +202,7 @@ public class PracticalChecklistResultService : IPracticalChecklistResultService
 
         if (result.IsPublished)
         {
-            throw new InvalidOperationException("PracticalChecklistResult is already published.");
+            throw new BusinessRuleViolationException("PracticalChecklistResult is already published.");
         }
 
         result.IsPublished = true;

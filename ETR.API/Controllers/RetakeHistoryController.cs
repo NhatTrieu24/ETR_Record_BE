@@ -1,3 +1,4 @@
+using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
@@ -18,11 +19,16 @@ public class RetakeHistoryController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<RetakeHistoryResponse>>> GetAll(CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResponse<RetakeHistoryResponse>>> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken cancellationToken = default)
     {
-        var list = await _unitOfWork.RetakeHistoryRepository.GetAllAsync(cancellationToken);
-        var response = list.Select(MapToResponse);
-        return Ok(response);
+        page = Math.Max(page, 1);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        var list = (await _unitOfWork.RetakeHistoryRepository.GetAllAsync(cancellationToken))
+            .OrderByDescending(r => r.RetakeHistoryId)
+            .ToList();
+        var pageItems = list.Skip((page - 1) * pageSize).Take(pageSize).Select(MapToResponse);
+        return Ok(new PagedResponse<RetakeHistoryResponse>(pageItems, list.Count, page, pageSize));
     }
 
     [HttpGet("{id:int}")]

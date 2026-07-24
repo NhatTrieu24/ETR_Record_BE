@@ -1,3 +1,4 @@
+using ETR.Application.Compliance;
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
@@ -25,7 +26,7 @@ public class ApprovalService : IApprovalService
     public async Task<ApprovalRequestResponse> CreateApprovalRequestAsync(int etrCourseRecordId, int? currentApproverId, int submittedByAccountId, CancellationToken cancellationToken = default)
     {
         var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(etrCourseRecordId, cancellationToken);
-        if (etr == null) throw new InvalidOperationException("ETRCourseRecord not found.");
+        if (etr == null) throw new BusinessRuleViolationException("ETRCourseRecord not found.");
 
         var request = new ApprovalRequest
         {
@@ -57,7 +58,7 @@ public class ApprovalService : IApprovalService
             try
             {
                 var request = await _unitOfWork.ApprovalRequestRepository.GetByIdAsync(approvalRequestId, ct);
-                if (request == null) throw new InvalidOperationException("ApprovalRequest not found.");
+                if (request == null) throw new BusinessRuleViolationException("ApprovalRequest not found.");
 
                 var prevStatus = request.CurrentStatus;
                 string newStatus = action switch
@@ -66,7 +67,7 @@ public class ApprovalService : IApprovalService
                     "Reject" => "Rejected",
                     "Verify" => "Verified",
                     "Return" => "ReturnedForCorrection",
-                    _ => throw new InvalidOperationException("Invalid action.")
+                    _ => throw new BusinessRuleViolationException("Invalid action.")
                 };
 
                 request.CurrentStatus = newStatus;
@@ -119,7 +120,7 @@ public class ApprovalService : IApprovalService
         if (item == null) throw new KeyNotFoundException("ApprovalRequest not found.");
 
         if (item.CurrentStatus != "Pending")
-            throw new InvalidOperationException("Cannot update an ApprovalRequest that is not in Pending status.");
+            throw new BusinessRuleViolationException("Cannot update an ApprovalRequest that is not in Pending status.");
 
         item.CurrentApproverId = request.CurrentApproverId;
         item.UpdatedAt = DateTime.UtcNow;
@@ -137,7 +138,7 @@ public class ApprovalService : IApprovalService
         if (item == null) throw new KeyNotFoundException("ApprovalRequest not found.");
 
         if (item.CurrentStatus != "Pending")
-            throw new InvalidOperationException("Cannot delete an ApprovalRequest that is not in Pending status.");
+            throw new BusinessRuleViolationException("Cannot delete an ApprovalRequest that is not in Pending status.");
 
         item.IsDeleted = true;
         item.DeletedAt = DateTime.UtcNow;

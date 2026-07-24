@@ -1,3 +1,4 @@
+using ETR.Application.Compliance;
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
@@ -52,15 +53,15 @@ public class AuthController : ControllerBase
         }
 
         var roles = await _unitOfWork.RoleRepository.GetAllAsync(cancellationToken);
-        var role = roles.FirstOrDefault(r => r.RoleId == account.RoleId);
-        var roleName = role?.RoleName ?? "User";
+        var role = roles.FirstOrDefault(r => r.RoleId == account.RoleId)
+            ?? throw new BusinessRuleViolationException("Account role is missing or inactive.");
 
         var profiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
         var profile = profiles.FirstOrDefault(p => p.AccountId == account.AccountId);
 
-        var token = _tokenService.GenerateToken(account, role!);
+        var token = _tokenService.GenerateToken(account, role);
 
-        return Ok(new AuthResponse(account.AccountId, account.Username, profile?.FullName ?? "Unknown", roleName, token, "mock-refresh-token"));
+        return Ok(new AuthResponse(account.AccountId, account.Username, profile?.FullName ?? "Unknown", role.RoleName, token, "mock-refresh-token"));
     }
 
     [HttpGet("mock-admin-token")]

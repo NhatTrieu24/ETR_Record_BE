@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace ETR.Application.DTOs;
 
-public record RefreshTokenRequest(string RefreshToken);
+public record RefreshTokenRequest([Required] string RefreshToken);

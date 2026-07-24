@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -6,9 +7,12 @@ namespace ETR.Infrastructure.Data;
 
 public partial class AppDbContext : DbContext
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options)
+    private readonly ICurrentUserService? _currentUserService;
+
+    public AppDbContext(DbContextOptions<AppDbContext> options, ICurrentUserService? currentUserService = null)
         : base(options)
     {
+        _currentUserService = currentUserService;
     }
 
     public DbSet<Role> Roles => Set<Role>();
@@ -115,8 +119,10 @@ public partial class AppDbContext : DbContext
             .HasIndex(ar => new { ar.SessionId, ar.ClassStudentId })
             .IsUnique();
 
+        // AttemptNo trong khoá unique — cho phép mỗi lần retake tạo 1 dòng mới (giữ lịch sử điểm),
+        // thay vì ghi đè dòng cũ; vẫn chặn 2 dòng cùng tuyên bố cùng 1 attempt number.
         modelBuilder.Entity<AssessmentResult>()
-            .HasIndex(ar => new { ar.AssessmentId, ar.AccountId, ar.SessionId })
+            .HasIndex(ar => new { ar.AssessmentId, ar.AccountId, ar.SessionId, ar.AttemptNo })
             .IsUnique()
             .HasFilter("[SessionId] IS NOT NULL");
             
