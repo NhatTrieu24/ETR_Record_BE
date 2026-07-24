@@ -7,12 +7,14 @@ namespace ETR.API.Controllers;
 
 /// <summary>
 /// [Module/Flow]: Ký xác nhận Subject
-/// [Core Responsibility]: Instructor signs off subject results to confirm completion.
-/// [Target Audience]: Instructor, Academic
+/// [Core Responsibility]: Instructor signs off subject results to confirm completion. Endpoint
+/// duy nhất cho signoff — trước đây trùng với AssessmentResultsController.SignoffSubject (đã gộp,
+/// xem P3 mục 36), role là hợp của cả 2 controller cũ để không thu hẹp quyền truy cập ai đó đang dùng.
+/// [Target Audience]: Instructor, Academic, Admin
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Instructor,Academic")]
+[Authorize(Roles = "Instructor,Academic,Admin")]
 public class SubjectSignoffController : ControllerBase
 {
     private readonly IAssessmentResultService _assessmentResultService;

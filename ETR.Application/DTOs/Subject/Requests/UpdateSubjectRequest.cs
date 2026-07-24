@@ -1,3 +1,13 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace ETR.Application.DTOs;
 
-public record UpdateSubjectRequest(int SubjectId, string SubjectCode, string SubjectName, string SubjectType, int DefaultHours, string? AssessmentMethod, string? Description, string Status);
+public record UpdateSubjectRequest(
+    int SubjectId,
+    [Required, MaxLength(20)] string SubjectCode,
+    [Required, MaxLength(200)] string SubjectName,
+    [Required, MaxLength(50)] string SubjectType,
+    int DefaultHours,
+    [MaxLength(100)] string? AssessmentMethod,
+    [MaxLength(2000)] string? Description,
+    [Required, MaxLength(20)] string Status);

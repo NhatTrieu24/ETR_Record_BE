@@ -1,3 +1,4 @@
+using ETR.Application.Compliance;
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
@@ -63,13 +64,13 @@ public class EnrollmentService : IEnrollmentService
             try
             {
                 var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(classId, ct);
-                if (trainingClass == null) throw new InvalidOperationException("Class not found.");
+                if (trainingClass == null) throw new BusinessRuleViolationException("Class not found.");
 
                 // === BUSINESS RULE 1: Course must have at least one Subject before enrollment ===
                 var hasSubjectsFromCheck = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct)).Any(cs => cs.CourseId == trainingClass.CourseId);
                 if (!hasSubjectsFromCheck)
                 {
-                    throw new InvalidOperationException($"Cannot enroll. Course (ID: {trainingClass.CourseId}) has no subjects configured. Please add subjects to the course first.");
+                    throw new BusinessRuleViolationException($"Cannot enroll. Course (ID: {trainingClass.CourseId}) has no subjects configured. Please add subjects to the course first.");
                 }
 
                 var activeEnrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct);
@@ -88,7 +89,7 @@ public class EnrollmentService : IEnrollmentService
 
                     if (activeCourseIds.Contains(trainingClass.CourseId))
                     {
-                        throw new InvalidOperationException("Learner is already enrolled in an active class for this course.");
+                        throw new BusinessRuleViolationException("Learner is already enrolled in an active class for this course.");
                     }
                 }
 
@@ -200,7 +201,7 @@ public class EnrollmentService : IEnrollmentService
 
         if (etrRecord != null && (etrRecord.IsLocked || (etrRecord.Status != "Draft" && etrRecord.Status != "InProgress")))
         {
-            throw new InvalidOperationException($"Cannot delete enrollment because its ETRCourseRecord is already {etrRecord.Status}{(etrRecord.IsLocked ? " and locked" : string.Empty)}.");
+            throw new BusinessRuleViolationException($"Cannot delete enrollment because its ETRCourseRecord is already {etrRecord.Status}{(etrRecord.IsLocked ? " and locked" : string.Empty)}.");
         }
 
         item.IsDeleted = true;

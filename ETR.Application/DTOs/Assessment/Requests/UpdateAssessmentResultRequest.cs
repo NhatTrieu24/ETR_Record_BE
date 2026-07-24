@@ -1,6 +1,8 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace ETR.Application.DTOs;
 
 public record UpdateAssessmentResultRequest(
     decimal Score,
-    string? Remark
+    [MaxLength(1000)] string? Remark
 );

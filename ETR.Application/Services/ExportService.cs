@@ -1,3 +1,4 @@
+using ETR.Application.Compliance;
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
@@ -24,15 +25,15 @@ public class ExportService : IExportService
 
         if (etr.Status != "Completed")
         {
-            throw new InvalidOperationException("Cannot export Training Package. ETR is not in Completed status.");
+            throw new BusinessRuleViolationException("Cannot export Training Package. ETR is not in Completed status.");
         }
 
         var enrollment = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(etr.EnrollmentId, cancellationToken)
-            ?? throw new InvalidOperationException("Enrollment not found.");
+            ?? throw new BusinessRuleViolationException("Enrollment not found.");
         var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(enrollment.ClassId, cancellationToken)
-            ?? throw new InvalidOperationException("Class not found.");
+            ?? throw new BusinessRuleViolationException("Class not found.");
         var course = await _unitOfWork.CourseRepository.GetByIdAsync(trainingClass.CourseId, cancellationToken)
-            ?? throw new InvalidOperationException("Course not found.");
+            ?? throw new BusinessRuleViolationException("Course not found.");
         var profiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
         var studentProfile = profiles.FirstOrDefault(p => p.AccountId == enrollment.AccountId);
         var subjects = (await _unitOfWork.SubjectRepository.GetAllAsync(cancellationToken)).ToDictionary(s => s.SubjectId, s => s);
@@ -50,7 +51,19 @@ public class ExportService : IExportService
                 .OrderBy(h => h.ActionAt)
                 .ToList();
 
-        var pdfBytes = BuildPdf(etr, enrollment, trainingClass, course, studentProfile, subjects, evidenceFiles, approvalHistory);
+        byte[] pdfBytes;
+        try
+        {
+            pdfBytes = BuildPdf(etr, enrollment, trainingClass, course, studentProfile, subjects, evidenceFiles, approvalHistory);
+        }
+        catch (Exception ex) when (ex is QuestPDF.Drawing.Exceptions.DocumentDrawingException
+            or QuestPDF.Drawing.Exceptions.DocumentComposeException
+            or QuestPDF.Drawing.Exceptions.DocumentLayoutException)
+        {
+            // Overlong user-authored strings (approval comments, evidence file names) can overflow the
+            // fixed page layout — translate to a domain error instead of a bare 500.
+            throw new BusinessRuleViolationException("Could not generate the export PDF because one or more narrative fields are too long. Please shorten comments/file names and retry.");
+        }
 
         var exportDir = Path.Combine(webRootPath, "uploads", "exports");
         Directory.CreateDirectory(exportDir);
@@ -59,14 +72,25 @@ public class ExportService : IExportService
         var zipFileName = $"{baseName}.zip";
         var zipPath = Path.Combine(exportDir, zipFileName);
 
-        using (var zipStream = new FileStream(zipPath, FileMode.Create))
-        using (var archive = new ZipArchive(zipStream, ZipArchiveMode.Create))
+        try
         {
-            var pdfEntry = archive.CreateEntry($"{baseName}.pdf", CompressionLevel.Optimal);
-            using (var entryStream = pdfEntry.Open())
+            using (var zipStream = new FileStream(zipPath, FileMode.Create))
+            using (var archive = new ZipArchive(zipStream, ZipArchiveMode.Create))
             {
-                await entryStream.WriteAsync(pdfBytes, cancellationToken);
+                var pdfEntry = archive.CreateEntry($"{baseName}.pdf", CompressionLevel.Optimal);
+                using (var entryStream = pdfEntry.Open())
+                {
+                    await entryStream.WriteAsync(pdfBytes, cancellationToken);
+                }
             }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            if (File.Exists(zipPath))
+            {
+                File.Delete(zipPath);
+            }
+            throw new BusinessRuleViolationException("Could not write the export archive to disk. Please retry or contact an administrator.");
         }
 
         var job = new ExportJob

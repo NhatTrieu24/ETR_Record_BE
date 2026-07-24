@@ -40,7 +40,7 @@ public class AssessmentResultService : IAssessmentResultService
         // Zero-Trust: Students may only view their own assessment results.
         if (roleName == "Student" && classStudent.AccountId != accountId)
         {
-            throw new UnauthorizedAccessException("You are not authorized to view another student's assessment results.");
+            throw new ForbiddenAccessException("You are not authorized to view another student's assessment results.");
         }
 
         var results = (await _unitOfWork.AssessmentResultRepository.GetAllAsync(cancellationToken))
@@ -58,10 +58,10 @@ public class AssessmentResultService : IAssessmentResultService
             try
             {
                 var assessment = await _unitOfWork.AssessmentRepository.GetByIdAsync(request.AssessmentId, ct);
-                if (assessment == null) throw new InvalidOperationException("Assessment not found.");
+                if (assessment == null) throw new BusinessRuleViolationException("Assessment not found.");
 
                 var subjectResult = await _unitOfWork.SubjectResultRepository.GetByIdAsync(request.SubjectResultId, ct);
-                if (subjectResult == null) throw new InvalidOperationException("SubjectResult not found.");
+                if (subjectResult == null) throw new BusinessRuleViolationException("SubjectResult not found.");
 
                 // Verify request.AccountId is a real learner enrolled in a class for this assessment's course —
                 // prevents recording a score against an arbitrary/forged AccountId.
@@ -73,40 +73,33 @@ public class AssessmentResultService : IAssessmentResultService
                     .Any(c => learnerClassIds.Contains(c.ClassId) && c.CourseId == assessment.CourseId);
                 if (!isEnrolledInAssessmentCourse)
                 {
-                    throw new InvalidOperationException($"Account (ID: {request.AccountId}) is not enrolled in a class for this assessment's course.");
+                    throw new BusinessRuleViolationException($"Account (ID: {request.AccountId}) is not enrolled in a class for this assessment's course.");
                 }
 
                 var allResults = await _unitOfWork.AssessmentResultRepository.GetAllAsync(ct);
-                
-                // First try: exact match by (AssessmentId, AccountId, SessionId)
-                var existingResult = allResults.FirstOrDefault(r => 
-                    r.AssessmentId == request.AssessmentId 
-                    && r.AccountId == request.AccountId
-                    && r.SessionId == request.SessionId);
 
-                // Second try: legacy record without SessionId (transitional fallback)
-                if (existingResult == null && request.SessionId.HasValue)
-                {
-                    existingResult = allResults.FirstOrDefault(r => 
-                        r.AssessmentId == request.AssessmentId 
-                        && r.AccountId == request.AccountId
-                        && r.SessionId == null);
-                }
+                // Latest attempt so far — exact match by (AssessmentId, AccountId, SessionId), or
+                // legacy record without SessionId (transitional fallback), highest AttemptNo wins.
+                var latestResult = allResults
+                    .Where(r => r.AssessmentId == request.AssessmentId && r.AccountId == request.AccountId
+                        && (r.SessionId == request.SessionId || (r.SessionId == null && request.SessionId.HasValue)))
+                    .OrderByDescending(r => r.AttemptNo)
+                    .FirstOrDefault();
 
                 int attemptNo = 1;
 
-                if (existingResult != null)
+                if (latestResult != null)
                 {
-                    attemptNo = existingResult.AttemptNo + 1;
+                    attemptNo = latestResult.AttemptNo + 1;
 
                     if (attemptNo > BusinessRuleEngine.MaxAssessmentAttempts)
                     {
-                        throw new InvalidOperationException($"Cannot retake. Maximum of {BusinessRuleEngine.MaxAssessmentAttempts} attempts already reached for this assessment.");
+                        throw new BusinessRuleViolationException($"Cannot retake. Maximum of {BusinessRuleEngine.MaxAssessmentAttempts} attempts already reached for this assessment.");
                     }
 
                     if (!request.AuthorizedByAccountId.HasValue || request.AuthorizedByAccountId.Value == recordedByAccountId)
                     {
-                        throw new InvalidOperationException("A retake must be authorized by an account different from the one recording the score.");
+                        throw new BusinessRuleViolationException("A retake must be authorized by an account different from the one recording the score.");
                     }
 
                     var retakeHistory = new RetakeHistory
@@ -114,7 +107,7 @@ public class AssessmentResultService : IAssessmentResultService
                         SubjectResultId = request.SubjectResultId,
                         RetakeDate = DateTime.UtcNow,
                         Reason = "Retake Assessment",
-                        PreviousScore = existingResult.Score,
+                        PreviousScore = latestResult.Score,
                         NewScore = request.Score,
                         AuthorizedByAccountId = request.AuthorizedByAccountId.Value,
                         AttemptNo = attemptNo,
@@ -122,47 +115,29 @@ public class AssessmentResultService : IAssessmentResultService
                         CreatedByAccountId = recordedByAccountId
                     };
                     await _unitOfWork.RetakeHistoryRepository.AddAsync(retakeHistory, ct);
+                }
 
-                    // We soft-delete the old result or simply mark it as retaken. Since the index is unique on (AssessmentId, LearnerId),
-                    // we must update the existing record rather than insert a new one if it has a unique index, 
-                    // OR we must soft delete the old one. Wait, let's update the existing one.
-                    existingResult.Score = request.Score;
-                    existingResult.ResultStatus = request.Score >= assessment.PassingScore ? "Passed" : "Failed";
-                    existingResult.Remark = request.Remark;
-                    existingResult.GradedByAccountId = recordedByAccountId;
-                    existingResult.RecordedAt = DateTime.UtcNow;
-                    existingResult.AttemptNo = attemptNo;
-                    existingResult.SessionId = request.SessionId ?? existingResult.SessionId;
-                    existingResult.UpdatedAt = DateTime.UtcNow;
-                    existingResult.UpdatedByAccountId = recordedByAccountId;
-                    existingResult.IsPublished = false;
-                    existingResult.PublishedAt = null;
-                    
-                    _unitOfWork.AssessmentResultRepository.Update(existingResult);
-                }
-                else
+                // Mỗi lần chấm (kể cả retake) tạo 1 dòng AssessmentResult mới — giữ nguyên lịch sử
+                // điểm các lần thi trước thay vì ghi đè (unique index nay gồm cả AttemptNo).
+                var result = new AssessmentResult
                 {
-                    var result = new AssessmentResult
-                    {
-                        AssessmentId = request.AssessmentId,
-                        AccountId = request.AccountId,
-                        SubjectResultId = request.SubjectResultId,
-                        SessionId = request.SessionId,
-                        Score = request.Score,
-                        ResultStatus = request.Score >= assessment.PassingScore ? "Passed" : "Failed",
-                        Remark = request.Remark,
-                        GradedByAccountId = recordedByAccountId,
-                        RecordedAt = DateTime.UtcNow,
-                        AttemptNo = attemptNo,
-                        CreatedAt = DateTime.UtcNow,
-                        CreatedByAccountId = recordedByAccountId,
-                        IsPublished = false,
-                        PublishedAt = null
-                    };
-                    await _unitOfWork.AssessmentResultRepository.AddAsync(result, ct);
-                    existingResult = result;
-                }
-                
+                    AssessmentId = request.AssessmentId,
+                    AccountId = request.AccountId,
+                    SubjectResultId = request.SubjectResultId,
+                    SessionId = request.SessionId,
+                    Score = request.Score,
+                    ResultStatus = request.Score >= assessment.PassingScore ? "Passed" : "Failed",
+                    Remark = request.Remark,
+                    GradedByAccountId = recordedByAccountId,
+                    RecordedAt = DateTime.UtcNow,
+                    AttemptNo = attemptNo,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedByAccountId = recordedByAccountId,
+                    IsPublished = false,
+                    PublishedAt = null
+                };
+                await _unitOfWork.AssessmentResultRepository.AddAsync(result, ct);
+
                 await _unitOfWork.SaveAsync(ct);
 
                 // Auto-Calculate Total Score
@@ -171,7 +146,7 @@ public class AssessmentResultService : IAssessmentResultService
 
                 await _unitOfWork.CommitTransactionAsync(ct);
 
-                return new AssessmentResultResponse(existingResult.AssessmentResultId, existingResult.AssessmentId, existingResult.AccountId, existingResult.SubjectResultId, existingResult.SessionId, existingResult.Score, existingResult.ResultStatus, existingResult.GradedByAccountId, existingResult.RecordedAt, existingResult.PublishedAt, existingResult.IsPublished, existingResult.TakenAt, existingResult.Remark);
+                return new AssessmentResultResponse(result.AssessmentResultId, result.AssessmentId, result.AccountId, result.SubjectResultId, result.SessionId, result.Score, result.ResultStatus, result.GradedByAccountId, result.RecordedAt, result.PublishedAt, result.IsPublished, result.TakenAt, result.Remark);
             }
             catch
             {
@@ -218,7 +193,7 @@ public class AssessmentResultService : IAssessmentResultService
 
         if (result.IsPublished)
         {
-            throw new InvalidOperationException("Cannot update an AssessmentResult that is already published.");
+            throw new BusinessRuleViolationException("Cannot update an AssessmentResult that is already published.");
         }
 
         result.Score = request.Score;
@@ -250,7 +225,7 @@ public class AssessmentResultService : IAssessmentResultService
 
         if (result.IsPublished)
         {
-            throw new InvalidOperationException("AssessmentResult is already published.");
+            throw new BusinessRuleViolationException("AssessmentResult is already published.");
         }
 
         result.IsPublished = true;
@@ -287,7 +262,7 @@ public class AssessmentResultService : IAssessmentResultService
             try
             {
                 var subjectResult = await _unitOfWork.SubjectResultRepository.GetByIdAsync(request.SubjectResultId, ct);
-                if (subjectResult == null) throw new InvalidOperationException("SubjectResult not found.");
+                if (subjectResult == null) throw new BusinessRuleViolationException("SubjectResult not found.");
 
                 var signoff = new SubjectSignoff
                 {

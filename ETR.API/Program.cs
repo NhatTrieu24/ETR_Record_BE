@@ -172,10 +172,14 @@ catch (HostAbortedException)
 }
 catch (Exception ex)
 {
-    Console.WriteLine("==================================================");
-    Console.WriteLine("❌ ỨNG DỤNG BỊ SẬP KHI KHỞI ĐỘNG! CHI TIẾT LỖI:");
-    Console.WriteLine($"Thông điệp: {ex.Message}");
-    Console.WriteLine($"Vị trí lỗi (StackTrace):\n{ex.StackTrace}");
-    Console.WriteLine("==================================================");
+    // No ILogger is guaranteed available this early (failure can happen before builder.Build()), and a
+    // full ex.Message/StackTrace on stdout can echo secrets the failing component pulled in (e.g. SqlClient
+    // connection-string fragments, config-binder key/value pairs) — container log aggregators often have
+    // broader read access than the app's own secrets. Log only the exception type; the full detail is
+    // still available to whoever runs the process interactively (re-thrown below).
+    Console.Error.WriteLine("==================================================");
+    Console.Error.WriteLine("❌ ỨNG DỤNG BỊ SẬP KHI KHỞI ĐỘNG!");
+    Console.Error.WriteLine($"Loại lỗi: {ex.GetType().FullName}");
+    Console.Error.WriteLine("==================================================");
     throw;
 }

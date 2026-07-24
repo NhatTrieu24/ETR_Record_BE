@@ -10,10 +10,12 @@ namespace ETR.Infrastructure.Data;
 /// values below and reset the target database's data (see Deploy_NukeAndSeed.sql),
 /// then restart the app.
 ///
-/// Note: Roles/Departments/Accounts may already exist from the historical
-/// SeedSystemData migration on databases created before this seeder existed — in that
-/// case the Identity module below is a no-op and the migration's data remains
-/// authoritative until the database is reset.
+/// Note: on databases migrated before 2026-07-23, Roles/Departments/Accounts may already
+/// exist with plaintext PasswordHash values from the historical SeedSystemData migration's
+/// raw-SQL insert — in that case the Identity module below is a no-op and those accounts
+/// won't authenticate until the database's Accounts table is cleared and the app restarted.
+/// The migration's raw-SQL seed was removed (it also used sp_MSForEachTable, which isn't
+/// available on Azure SQL Database) — this seeder is now the only source for that data.
 /// </summary>
 public static class DataSeeder
 {

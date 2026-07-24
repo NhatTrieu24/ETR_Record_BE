@@ -1,3 +1,4 @@
+using ETR.Application.Compliance;
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
@@ -28,7 +29,7 @@ public class AttendanceService : IAttendanceService
         // Zero-Trust: Students may only view their own attendance records.
         if (roleName == "Student" && classStudent.AccountId != accountId)
         {
-            throw new UnauthorizedAccessException("You are not authorized to view another student's attendance records.");
+            throw new ForbiddenAccessException("You are not authorized to view another student's attendance records.");
         }
 
         var records = (await _unitOfWork.AttendanceRecordRepository.GetAllAsync(cancellationToken))
@@ -47,11 +48,11 @@ public class AttendanceService : IAttendanceService
             {
                 var session = await _unitOfWork.SessionRepository.GetByIdAsync(request.SessionId, ct);
                 if (session == null || session.IsConfirmed)
-                    throw new InvalidOperationException("Session not found or already confirmed.");
+                    throw new BusinessRuleViolationException("Session not found or already confirmed.");
 
                 var classStudent = await _unitOfWork.ClassStudentRepository.GetByIdAsync(request.ClassStudentId, ct);
                 if (classStudent == null || classStudent.ClassId != session.ClassId)
-                    throw new InvalidOperationException("Student is not assigned to this class.");
+                    throw new BusinessRuleViolationException("Student is not assigned to this class.");
 
                 var record = new AttendanceRecord
                 {

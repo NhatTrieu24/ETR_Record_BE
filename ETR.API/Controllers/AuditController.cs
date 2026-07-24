@@ -29,10 +29,13 @@ public class AuditController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<AuditLogResponse>>> GetAuditLogs(CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResponse<AuditLogResponse>>> GetAuditLogs([FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken cancellationToken = default)
     {
+        (page, pageSize) = NormalizePaging(page, pageSize);
         var list = await _unitOfWork.AuditLogRepository.GetAllAsync(cancellationToken);
-        return Ok(list.Select(MapLogToResponse));
+        var ordered = list.OrderByDescending(l => l.AuditLogId).ToList();
+        var pageItems = ordered.Skip((page - 1) * pageSize).Take(pageSize).Select(MapLogToResponse);
+        return Ok(new PagedResponse<AuditLogResponse>(pageItems, ordered.Count, page, pageSize));
     }
 
     /// <summary>
@@ -54,13 +57,22 @@ public class AuditController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpGet("search")]
-    public async Task<ActionResult<IEnumerable<AuditLogResponse>>> SearchAuditLogs([FromQuery] string query, CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResponse<AuditLogResponse>>> SearchAuditLogs([FromQuery] string query, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken cancellationToken = default)
     {
+        (page, pageSize) = NormalizePaging(page, pageSize);
         var logs = await _unitOfWork.AuditLogRepository.GetAllAsync(cancellationToken);
-        var filtered = logs.Where(l => l.ActionType.Contains(query, StringComparison.OrdinalIgnoreCase) || 
-                                       l.EntityName.Contains(query, StringComparison.OrdinalIgnoreCase) || 
-                                       (l.Description != null && l.Description.Contains(query, StringComparison.OrdinalIgnoreCase)));
-        return Ok(filtered.Select(MapLogToResponse));
+        var filtered = logs.Where(l => l.ActionType.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                                       l.EntityName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                                       (l.Description != null && l.Description.Contains(query, StringComparison.OrdinalIgnoreCase)))
+                             .OrderByDescending(l => l.AuditLogId)
+                             .ToList();
+        var pageItems = filtered.Skip((page - 1) * pageSize).Take(pageSize).Select(MapLogToResponse);
+        return Ok(new PagedResponse<AuditLogResponse>(pageItems, filtered.Count, page, pageSize));
+    }
+
+    private static (int Page, int PageSize) NormalizePaging(int page, int pageSize)
+    {
+        return (Math.Max(page, 1), Math.Clamp(pageSize, 1, 100));
     }
 
     private static AuditLogResponse MapLogToResponse(AuditLog l)

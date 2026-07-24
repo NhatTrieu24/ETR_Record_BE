@@ -1,6 +1,8 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace ETR.Application.DTOs;
 
 public record UpdateAttendanceRecordRequest(
-    string Status,
-    string? Remarks
+    [Required, MaxLength(20)] string Status,
+    [MaxLength(500)] string? Remarks
 );
