@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ETR.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260721112703_AddETRCourseRecordIdToExportJob")]
-    partial class AddETRCourseRecordIdToExportJob
+    [Migration("20260724082245_CleanBaseData")]
+    partial class CleanBaseData
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

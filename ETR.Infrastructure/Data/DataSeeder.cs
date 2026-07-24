@@ -55,7 +55,8 @@ public static class DataSeeder
                 new Role { RoleName = "QA", Description = "Quality Assurance" },
                 new Role { RoleName = "Academic", Description = "Academic Staff" },
                 new Role { RoleName = "TrainingManager", Description = "Training Manager" },
-                new Role { RoleName = "Student", Description = "Student / Learner" });
+                new Role { RoleName = "Student", Description = "Student / Learner" },
+                new Role { RoleName = "Audit", Description = "Auditor" });
             await context.SaveChangesAsync();
         }
 
@@ -78,7 +79,8 @@ public static class DataSeeder
                 CreateAccount(QaUsername, roleIds["QA"], deptIds["Administration"], "QA-01", "QA Specialist", new DateTime(1990, 1, 1), "Female"),
                 CreateAccount("academic@etr.com", roleIds["Academic"], deptIds["Administration"], "ACA-01", "Academic Staff", new DateTime(1992, 1, 1), "Female"),
                 CreateAccount(ManagerUsername, roleIds["TrainingManager"], deptIds["Training"], "MGR-01", "Training Manager", new DateTime(1988, 1, 1), "Male"),
-                CreateAccount(StudentUsername, roleIds["Student"], deptIds["Training"], "STU-01", "Jane Student", new DateTime(2000, 1, 1), "Female"));
+                CreateAccount(StudentUsername, roleIds["Student"], deptIds["Training"], "STU-01", "Jane Student", new DateTime(2000, 1, 1), "Female"),
+                CreateAccount("audit@etr.com", roleIds["Audit"], deptIds["Administration"], "AUD-01", "Audit Staff", new DateTime(1985, 1, 1), "Other"));
             await context.SaveChangesAsync();
         }
     }
@@ -90,7 +92,7 @@ public static class DataSeeder
             Username = username,
             // Demo credential remains "123456" for local/dev login convenience, but is
             // now stored as a bcrypt hash rather than plaintext.
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("123456"),
+            PasswordHash = "$2a$11$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy",
             RoleId = roleId,
             DepartmentId = departmentId,
             Status = "Active",

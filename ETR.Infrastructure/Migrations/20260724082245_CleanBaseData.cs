@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace ETR.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class CleanBaseData : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -44,6 +44,8 @@ namespace ETR.Infrastructure.Migrations
                     Description = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     IsMandatory = table.Column<bool>(type: "bit", nullable: false),
                     DisplayOrder = table.Column<int>(type: "int", nullable: false),
+                    RequirementType = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ThresholdValue = table.Column<decimal>(type: "decimal(5,2)", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
@@ -347,6 +349,7 @@ namespace ETR.Infrastructure.Migrations
                     RequestedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CompletedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     DownloadExpiredAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    ETRCourseRecordId = table.Column<int>(type: "int", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
@@ -379,6 +382,8 @@ namespace ETR.Infrastructure.Migrations
                     IsConfirmed = table.Column<bool>(type: "bit", nullable: false),
                     ConfirmedByAccountId = table.Column<int>(type: "int", nullable: true),
                     ConfirmedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    IsAssessmentRequired = table.Column<bool>(type: "bit", nullable: false),
+                    IsChecklistRequired = table.Column<bool>(type: "bit", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
@@ -716,6 +721,7 @@ namespace ETR.Infrastructure.Migrations
                     AssessmentId = table.Column<int>(type: "int", nullable: false),
                     AccountId = table.Column<int>(type: "int", nullable: false),
                     SubjectResultId = table.Column<int>(type: "int", nullable: false),
+                    SessionId = table.Column<int>(type: "int", nullable: true),
                     Score = table.Column<decimal>(type: "decimal(5,2)", nullable: false),
                     ResultStatus = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     GradedByAccountId = table.Column<int>(type: "int", nullable: false),
@@ -754,6 +760,12 @@ namespace ETR.Infrastructure.Migrations
                         principalColumn: "AssessmentId",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
+                        name: "FK_AssessmentResults_Sessions_SessionId",
+                        column: x => x.SessionId,
+                        principalTable: "Sessions",
+                        principalColumn: "SessionId",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
                         name: "FK_AssessmentResults_SubjectResults_SubjectResultId",
                         column: x => x.SubjectResultId,
                         principalTable: "SubjectResults",
@@ -767,12 +779,16 @@ namespace ETR.Infrastructure.Migrations
                 {
                     PracticalChecklistResultId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
+                    SessionId = table.Column<int>(type: "int", nullable: true),
                     SubjectResultId = table.Column<int>(type: "int", nullable: false),
                     PracticalChecklistId = table.Column<int>(type: "int", nullable: false),
-                    IsCompleted = table.Column<bool>(type: "bit", nullable: false),
+                    Score = table.Column<decimal>(type: "decimal(5,2)", nullable: false),
+                    ResultStatus = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     VerifiedByAccountId = table.Column<int>(type: "int", nullable: true),
                     CompletedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     VerificationComment = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    IsPublished = table.Column<bool>(type: "bit", nullable: false),
+                    PublishedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedByAccountId = table.Column<int>(type: "int", nullable: true),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
@@ -982,15 +998,21 @@ namespace ETR.Infrastructure.Migrations
                 column: "AccountId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_AssessmentResults_AssessmentId_AccountId",
+                name: "IX_AssessmentResults_AssessmentId_AccountId_SessionId",
                 table: "AssessmentResults",
-                columns: new[] { "AssessmentId", "AccountId" },
-                unique: true);
+                columns: new[] { "AssessmentId", "AccountId", "SessionId" },
+                unique: true,
+                filter: "[SessionId] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_AssessmentResults_GradedByAccountId",
                 table: "AssessmentResults",
                 column: "GradedByAccountId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AssessmentResults_SessionId",
+                table: "AssessmentResults",
+                column: "SessionId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_AssessmentResults_SubjectResultId",
