@@ -92,7 +92,7 @@ public static class DataSeeder
             Username = username,
             // Demo credential remains "123456" for local/dev login convenience, but is
             // now stored as a bcrypt hash rather than plaintext.
-            PasswordHash = "$2a$11$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("123456"),
             RoleId = roleId,
             DepartmentId = departmentId,
             Status = "Active",
