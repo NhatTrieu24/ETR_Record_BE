@@ -8,4 +8,6 @@ public class Course : BaseEntity
     public string Description { get; set; } = string.Empty;
     public int DurationHours { get; set; }
     public string Status { get; set; } = string.Empty;
+    public int? ValidityMonths { get; set; }
+    public string? CourseType { get; set; }
 }

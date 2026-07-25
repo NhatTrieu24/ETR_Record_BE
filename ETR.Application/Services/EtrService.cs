@@ -25,7 +25,10 @@ public class EtrService : IEtrService
             e.IsLocked,
             e.SubmittedAt,
             e.VerifiedAt,
-            e.CompletedAt));
+            e.CompletedAt,
+            e.IssuedDate,
+            e.ExpiryDate,
+            e.PreviousRecordId));
     }
 
     public async Task<IEnumerable<EtrRecordResponse>> GetMyEtrsAsync(int accountId, CancellationToken cancellationToken = default)
@@ -43,7 +46,10 @@ public class EtrService : IEtrService
             e.IsLocked,
             e.SubmittedAt,
             e.VerifiedAt,
-            e.CompletedAt));
+            e.CompletedAt,
+            e.IssuedDate,
+            e.ExpiryDate,
+            e.PreviousRecordId));
     }
 
     public async Task<EtrDetailsResponse> GetEtrByIdAsync(int etrCourseRecordId, CancellationToken cancellationToken = default)
@@ -214,7 +220,7 @@ public class EtrService : IEtrService
         _unitOfWork.ETRCourseRecordRepository.Update(etr);
         await _unitOfWork.SaveAsync(cancellationToken);
 
-        return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt);
+        return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt, etr.IssuedDate, etr.ExpiryDate, etr.PreviousRecordId);
     }
 
     public async Task<EtrRecordResponse> VerifyEtrAsync(int etrCourseRecordId, int accountId, CancellationToken cancellationToken = default)
@@ -247,7 +253,7 @@ public class EtrService : IEtrService
         _unitOfWork.ETRCourseRecordRepository.Update(etr);
         await _unitOfWork.SaveAsync(cancellationToken);
 
-        return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt);
+        return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt, etr.IssuedDate, etr.ExpiryDate, etr.PreviousRecordId);
     }
 
     public async Task<EtrRecordResponse> ReturnEtrAsync(int etrCourseRecordId, int accountId, string? comment, CancellationToken cancellationToken = default)
@@ -282,7 +288,7 @@ public class EtrService : IEtrService
         _unitOfWork.ETRCourseRecordRepository.Update(etr);
         await _unitOfWork.SaveAsync(cancellationToken);
 
-        return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt);
+        return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt, etr.IssuedDate, etr.ExpiryDate, etr.PreviousRecordId);
     }
 
     public async Task<EtrRecordResponse> CompleteEtrAsync(int etrCourseRecordId, int accountId, CancellationToken cancellationToken = default)
@@ -340,9 +346,16 @@ public class EtrService : IEtrService
         };
         await _unitOfWork.AuditLogRepository.AddAsync(auditLog, cancellationToken);
 
+        var course = await _unitOfWork.CourseRepository.GetByIdAsync(trainingClass.CourseId, cancellationToken);
+
         etr.Status = "Completed";
         etr.CompletedAt = DateTime.UtcNow;
         etr.IsLocked = true;
+        etr.IssuedDate = DateTime.UtcNow;
+        if (course != null && course.ValidityMonths.HasValue)
+        {
+            etr.ExpiryDate = DateTime.UtcNow.AddMonths(course.ValidityMonths.Value);
+        }
         etr.UpdatedAt = DateTime.UtcNow;
         etr.UpdatedByAccountId = accountId;
 
@@ -353,7 +366,7 @@ public class EtrService : IEtrService
         _unitOfWork.ETRCourseRecordRepository.Update(etr);
         await _unitOfWork.SaveAsync(cancellationToken);
 
-        return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt);
+        return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt, etr.IssuedDate, etr.ExpiryDate, etr.PreviousRecordId);
     }
 
     public async Task<EtrRecordResponse> LockEtrAsync(int etrCourseRecordId, int accountId, CancellationToken cancellationToken = default)
@@ -368,7 +381,7 @@ public class EtrService : IEtrService
         _unitOfWork.ETRCourseRecordRepository.Update(etr);
         await _unitOfWork.SaveAsync(cancellationToken);
 
-        return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt);
+        return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt, etr.IssuedDate, etr.ExpiryDate, etr.PreviousRecordId);
     }
 
     public async Task<EtrRecordResponse> UnlockEtrAsync(int etrCourseRecordId, int accountId, CancellationToken cancellationToken = default)
@@ -383,6 +396,121 @@ public class EtrService : IEtrService
         _unitOfWork.ETRCourseRecordRepository.Update(etr);
         await _unitOfWork.SaveAsync(cancellationToken);
 
-        return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt);
+        return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt, etr.IssuedDate, etr.ExpiryDate, etr.PreviousRecordId);
+    }
+
+    public async Task<IEnumerable<EtrRecordResponse>> GetStudentEtrHistoryAsync(int studentId, CancellationToken cancellationToken = default)
+    {
+        var enrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken);
+        var studentEnrollmentIds = enrollments.Where(e => e.AccountId == studentId).Select(e => e.EnrollmentId).ToList();
+
+        var etrs = await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken);
+        return etrs
+            .Where(e => studentEnrollmentIds.Contains(e.EnrollmentId))
+            .OrderByDescending(e => e.IssuedDate ?? e.CreatedAt)
+            .Select(e => new EtrRecordResponse(
+                e.ETRCourseRecordId,
+                e.EnrollmentId,
+                e.Status,
+                e.IsLocked,
+                e.SubmittedAt,
+                e.VerifiedAt,
+                e.CompletedAt,
+                e.IssuedDate,
+                e.ExpiryDate,
+                e.PreviousRecordId));
+    }
+
+    public async Task<IEnumerable<StudentEtrStatusResponse>> GetStudentEtrCurrentStatusAsync(int studentId, CancellationToken cancellationToken = default)
+    {
+        var enrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken);
+        var studentEnrollments = enrollments.Where(e => e.AccountId == studentId).ToList();
+        
+        var classes = await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken);
+        var courses = await _unitOfWork.CourseRepository.GetAllAsync(cancellationToken);
+        
+        var etrs = await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken);
+        
+        var result = new List<StudentEtrStatusResponse>();
+        var groupedByCourse = studentEnrollments
+            .Join(classes, e => e.ClassId, c => c.ClassId, (e, c) => new { e.EnrollmentId, c.CourseId })
+            .Join(etrs, ec => ec.EnrollmentId, etr => etr.EnrollmentId, (ec, etr) => new { ec.CourseId, Etr = etr })
+            .GroupBy(x => x.CourseId);
+
+        foreach (var group in groupedByCourse)
+        {
+            var latestEtr = group.OrderByDescending(x => x.Etr.IssuedDate ?? x.Etr.CreatedAt).First().Etr;
+            var course = courses.FirstOrDefault(c => c.CourseId == group.Key);
+            
+            string validityStatus = "Valid";
+            if (latestEtr.ExpiryDate.HasValue)
+            {
+                if (latestEtr.ExpiryDate.Value < DateTime.UtcNow)
+                {
+                    validityStatus = "Expired";
+                }
+                else if ((latestEtr.ExpiryDate.Value - DateTime.UtcNow).TotalDays <= 30)
+                {
+                    validityStatus = "ExpiringSoon";
+                }
+            }
+            
+            result.Add(new StudentEtrStatusResponse(
+                group.Key,
+                course?.CourseName ?? "Unknown",
+                latestEtr.ETRCourseRecordId,
+                latestEtr.IssuedDate,
+                latestEtr.ExpiryDate,
+                validityStatus
+            ));
+        }
+
+        return result;
+    }
+
+    public async Task<IEnumerable<ExpiringStudentResponse>> GetExpiringStudentsAsync(int courseId, int daysThreshold, CancellationToken cancellationToken = default)
+    {
+        var enrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken);
+        var classes = (await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken)).Where(c => c.CourseId == courseId).ToList();
+        var classIds = classes.Select(c => c.ClassId).ToList();
+        var courseEnrollments = enrollments.Where(e => classIds.Contains(e.ClassId)).ToList();
+        
+        var etrs = await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken);
+        var accounts = await _unitOfWork.AccountRepository.GetAllAsync(cancellationToken);
+        var userProfiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
+        
+        var result = new List<ExpiringStudentResponse>();
+        
+        var groupedByStudent = courseEnrollments
+            .Join(etrs, e => e.EnrollmentId, etr => etr.EnrollmentId, (e, etr) => new { e.AccountId, Etr = etr })
+            .GroupBy(x => x.AccountId);
+
+        foreach (var group in groupedByStudent)
+        {
+            var latestEtr = group.OrderByDescending(x => x.Etr.IssuedDate ?? x.Etr.CreatedAt).First().Etr;
+            if (latestEtr.ExpiryDate.HasValue)
+            {
+                var daysUntilExpiry = (latestEtr.ExpiryDate.Value - DateTime.UtcNow).TotalDays;
+                if (daysUntilExpiry <= daysThreshold)
+                {
+                    var account = accounts.FirstOrDefault(a => a.AccountId == group.Key);
+                    var profile = userProfiles.FirstOrDefault(p => p.AccountId == group.Key);
+                    
+                    string validityStatus = daysUntilExpiry < 0 ? "Expired" : "ExpiringSoon";
+                    
+                    result.Add(new ExpiringStudentResponse(
+                        group.Key,
+                        account?.Username ?? "Unknown",
+                        profile?.FullName ?? "Unknown",
+                        courseId,
+                        latestEtr.ETRCourseRecordId,
+                        latestEtr.ExpiryDate,
+                        validityStatus
+                    ));
+                }
+            }
+        }
+
+        return result;
     }
 }

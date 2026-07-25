@@ -169,6 +169,63 @@ public class EtrController : ControllerBase
         await _etrService.DeleteEtrAsync(id, accountId, cancellationToken);
         return NoContent();
     }
+
+    /// <summary>
+    /// [Module/Flow]: Xử lý ETR
+    /// [Core Responsibility]: Lấy lịch sử tất cả hồ sơ ETR của một học viên cụ thể.
+    /// [Target Audience]: Admin, Instructor, QA, Audit, Student (nếu là chính họ)
+    /// </summary>
+    [HttpGet("student/{studentId}/history")]
+    [Authorize(Roles = "Admin,Instructor,QA,Audit,Student")]
+    public async Task<ActionResult<IEnumerable<EtrRecordResponse>>> GetStudentEtrHistory(int studentId, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+            
+        // If Student, only allow accessing their own history
+        if (_currentUserService.RoleName == "Student" && accountId != studentId)
+        {
+            return Forbid();
+        }
+
+        var history = await _etrService.GetStudentEtrHistoryAsync(studentId, cancellationToken);
+        return Ok(history);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Xử lý ETR
+    /// [Core Responsibility]: Lấy trạng thái hiện tại (hiệu lực) của các chứng chỉ/ETR của một học viên cụ thể.
+    /// [Target Audience]: Admin, Instructor, QA, Audit, Student (nếu là chính họ)
+    /// </summary>
+    [HttpGet("student/{studentId}/current-status")]
+    [Authorize(Roles = "Admin,Instructor,QA,Audit,Student")]
+    public async Task<ActionResult<IEnumerable<StudentEtrStatusResponse>>> GetStudentEtrCurrentStatus(int studentId, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+            
+        // If Student, only allow accessing their own status
+        if (_currentUserService.RoleName == "Student" && accountId != studentId)
+        {
+            return Forbid();
+        }
+
+        var statusList = await _etrService.GetStudentEtrCurrentStatusAsync(studentId, cancellationToken);
+        return Ok(statusList);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Xử lý ETR
+    /// [Core Responsibility]: Lấy danh sách học viên có ETR sắp hết hạn hoặc đã hết hạn cho một khóa học.
+    /// [Target Audience]: Admin, Instructor, QA, TrainingManager
+    /// </summary>
+    [HttpGet("expiring-students")]
+    [Authorize(Roles = "Admin,Instructor,QA,TrainingManager")]
+    public async Task<ActionResult<IEnumerable<ExpiringStudentResponse>>> GetExpiringStudents([FromQuery] int courseId, [FromQuery] int daysThreshold = 30, CancellationToken cancellationToken = default)
+    {
+        var expiringStudents = await _etrService.GetExpiringStudentsAsync(courseId, daysThreshold, cancellationToken);
+        return Ok(expiringStudents);
+    }
 }
 
 

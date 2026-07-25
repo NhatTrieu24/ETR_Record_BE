@@ -7,4 +7,7 @@ public record EtrRecordResponse(
     bool IsLocked,
     DateTime? SubmittedAt,
     DateTime? VerifiedAt,
-    DateTime? CompletedAt);
+    DateTime? CompletedAt,
+    DateTime? IssuedDate,
+    DateTime? ExpiryDate,
+    int? PreviousRecordId);

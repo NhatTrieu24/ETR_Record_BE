@@ -73,25 +73,22 @@ public class EnrollmentService : IEnrollmentService
                     throw new BusinessRuleViolationException($"Cannot enroll. Course (ID: {trainingClass.CourseId}) has no subjects configured. Please add subjects to the course first.");
                 }
 
-                var activeEnrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct);
-                var activeLearnerEnrollments = activeEnrollments
-                    .Where(e => e.AccountId == accountId && e.Status == "Active")
-                    .Select(e => e.ClassId)
-                    .ToList();
-                
-                if (activeLearnerEnrollments.Count > 0)
-                {
-                    var classes = await _unitOfWork.ClassRepository.GetAllAsync(ct);
-                    var activeCourseIds = classes
-                        .Where(c => activeLearnerEnrollments.Contains(c.ClassId))
-                        .Select(c => c.CourseId)
-                        .ToList();
+                var allEtrs = await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(ct);
+                var allEnrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct);
+                var allClasses = await _unitOfWork.ClassRepository.GetAllAsync(ct);
 
-                    if (activeCourseIds.Contains(trainingClass.CourseId))
-                    {
-                        throw new BusinessRuleViolationException("Learner is already enrolled in an active class for this course.");
-                    }
+                var studentEnrollments = allEnrollments.Where(e => e.AccountId == accountId).ToList();
+                var studentEtrsForCourse = allEtrs
+                    .Where(etr => studentEnrollments.Any(e => e.EnrollmentId == etr.EnrollmentId && 
+                                  allClasses.Any(c => c.ClassId == e.ClassId && c.CourseId == trainingClass.CourseId)))
+                    .ToList();
+
+                if (studentEtrsForCourse.Any(etr => !etr.IsLocked))
+                {
+                    throw new BusinessRuleViolationException("Learner is already enrolled in an active class for this course and has an ongoing ETR.");
                 }
+
+                var previousEtr = studentEtrsForCourse.OrderByDescending(etr => etr.CompletedAt ?? DateTime.MinValue).FirstOrDefault();
 
                 var enrollment = new CourseEnrollment
                 {
@@ -113,7 +110,8 @@ public class EnrollmentService : IEnrollmentService
                     IsLocked = false,
                     CreatedBySystem = true,
                     CreatedAt = DateTime.UtcNow,
-                    CreatedByAccountId = createdByAccountId
+                    CreatedByAccountId = createdByAccountId,
+                    PreviousRecordId = previousEtr?.ETRCourseRecordId
                 };
 
                 await _unitOfWork.ETRCourseRecordRepository.AddAsync(etrRecord, ct);
