@@ -14,7 +14,7 @@ namespace ETR.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Admin,Audit")]
 public class ExportsController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;

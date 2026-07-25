@@ -12,7 +12,7 @@ namespace ETR.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin,QA,Student,Instructor")] // Secure all endpoints in this controller by default
+[Authorize(Roles = "Admin,QA,Student,Instructor,Audit")] // Secure all endpoints in this controller by default
 public class EtrController : ControllerBase
 {
     private readonly IEtrService _etrService;
@@ -36,7 +36,7 @@ public class EtrController : ControllerBase
     /// <response code="200">Returns the list of ETR records.</response>
     /// <response code="401">If the user is not authenticated.</response>
     [HttpGet]
-    [Authorize(Roles = "Instructor,QA,Admin")]
+    [Authorize(Roles = "Instructor,QA,Admin,Audit")]
     public async Task<ActionResult<IEnumerable<EtrRecordResponse>>> GetAllEtrs(CancellationToken cancellationToken)
     {
         var etrs = await _etrService.GetAllEtrsAsync(cancellationToken);
@@ -71,7 +71,7 @@ public class EtrController : ControllerBase
     /// <response code="401">If the user is not authenticated.</response>
     /// <response code="404">If the ETR record is not found.</response>
     [HttpGet("{id}")]
-    [Authorize(Roles = "Instructor,QA,Admin")]
+    [Authorize(Roles = "Instructor,QA,Admin,Audit")]
     public async Task<ActionResult<EtrDetailsResponse>> GetEtrById(int id, CancellationToken cancellationToken)
     {
         var etr = await _etrService.GetEtrByIdAsync(id, cancellationToken);

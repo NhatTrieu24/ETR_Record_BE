@@ -12,7 +12,7 @@ namespace ETR.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin,Instructor,TrainingManager")]
+[Authorize(Roles = "Admin,Instructor,TrainingManager,Audit")]
 public class ApprovalsController : ControllerBase
 {
     private readonly IApprovalService _approvalService;
@@ -32,6 +32,7 @@ public class ApprovalsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin,Instructor,TrainingManager")]
     public async Task<IActionResult> CreateApprovalRequest([FromBody] CreateApprovalRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -42,6 +43,7 @@ public class ApprovalsController : ControllerBase
     }
 
     [HttpPost("{id}/process")]
+    [Authorize(Roles = "Admin,Instructor,TrainingManager")]
     public async Task<IActionResult> ProcessApproval(int id, [FromQuery] string action, [FromQuery] string? comment, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -51,6 +53,7 @@ public class ApprovalsController : ControllerBase
         return Ok(response);
     }
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin,Instructor,TrainingManager")]
     public async Task<IActionResult> UpdateApprovalRequest(int id, [FromBody] UpdateApprovalRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -61,6 +64,7 @@ public class ApprovalsController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin,Instructor,TrainingManager")]
     public async Task<IActionResult> DeleteApprovalRequest(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
