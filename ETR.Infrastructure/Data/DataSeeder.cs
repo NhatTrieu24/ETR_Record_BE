@@ -60,13 +60,24 @@ public static class DataSeeder
             await context.SaveChangesAsync();
         }
 
-        if (!await context.Departments.AnyAsync())
+        var defaultDepartments = new[]
         {
-            context.Departments.AddRange(
-                new Department { DepartmentName = "Administration", Description = "General Admin" },
-                new Department { DepartmentName = "Training", Description = "Training Dept" });
-            await context.SaveChangesAsync();
+            new Department { DepartmentName = "Administration", Description = "General Admin" },
+            new Department { DepartmentName = "Training", Description = "Training Dept" },
+            new Department { DepartmentName = "Flight Crew", Description = "Flight Crew Dept" },
+            new Department { DepartmentName = "Cabin Crew", Description = "Cabin Crew Dept" },
+            new Department { DepartmentName = "Engineering & Maintenance", Description = "Engineering & Maintenance Dept" },
+            new Department { DepartmentName = "Ground Operations", Description = "Ground Operations Dept" }
+        };
+
+        foreach (var dept in defaultDepartments)
+        {
+            if (!await context.Departments.AnyAsync(d => d.DepartmentName == dept.DepartmentName))
+            {
+                context.Departments.Add(dept);
+            }
         }
+        await context.SaveChangesAsync();
 
         if (!await context.Accounts.AnyAsync())
         {

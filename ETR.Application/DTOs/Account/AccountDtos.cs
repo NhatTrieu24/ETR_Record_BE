@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace ETR.Application.DTOs;
 
 public record AccountResponse(
@@ -5,13 +7,17 @@ public record AccountResponse(
     string Username,
     int RoleId,
     int DepartmentId,
-    string Status);
+    string Status,
+    bool IsActive);
 
 public record CreateAccountRequest(
-    string Username,
-    string Password,
-    int RoleId,
-    int DepartmentId);
+    [Required, EmailAddress, MaxLength(255)] string Username,
+    [Required, MaxLength(100)] string Password,
+    [Required] int RoleId,
+    [Required] int DepartmentId);
 
 public record UpdateAccountStatusRequest(
-    string Status);
+    [Required, MaxLength(20)] string Status);
+
+public record UpdateAccountRoleRequest(
+    [Required] int RoleId);

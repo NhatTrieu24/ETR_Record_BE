@@ -8,6 +8,8 @@ public class Account : BaseEntity
     public int RoleId { get; set; }
     public int DepartmentId { get; set; }
     public string Status { get; set; } = string.Empty;
+    public bool IsActive { get; set; } = true;
 
     public UserProfile Profile { get; set; } = null!;
 }
+

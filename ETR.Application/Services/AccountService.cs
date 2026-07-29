@@ -16,7 +16,7 @@ public class AccountService : IAccountService
     public async Task<IEnumerable<AccountResponse>> GetAllAccountsAsync(CancellationToken cancellationToken = default)
     {
         var accounts = await _unitOfWork.AccountRepository.GetAllAsync(cancellationToken);
-        return accounts.Select(a => new AccountResponse(a.AccountId, a.Username, a.RoleId, a.DepartmentId, a.Status));
+        return accounts.Select(a => new AccountResponse(a.AccountId, a.Username, a.RoleId, a.DepartmentId, a.Status, a.IsActive));
     }
 
     public async Task<AccountResponse> GetAccountByIdAsync(int accountId, CancellationToken cancellationToken = default)
@@ -24,7 +24,7 @@ public class AccountService : IAccountService
         var account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken)
             ?? throw new KeyNotFoundException($"Account {accountId} not found.");
             
-        return new AccountResponse(account.AccountId, account.Username, account.RoleId, account.DepartmentId, account.Status);
+        return new AccountResponse(account.AccountId, account.Username, account.RoleId, account.DepartmentId, account.Status, account.IsActive);
     }
 
     public async Task<AccountResponse> CreateAccountAsync(CreateAccountRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
@@ -36,6 +36,7 @@ public class AccountService : IAccountService
             RoleId = request.RoleId,
             DepartmentId = request.DepartmentId,
             Status = "Active",
+            IsActive = true,
             CreatedAt = DateTime.UtcNow,
             CreatedByAccountId = createdByAccountId
         };
@@ -43,7 +44,7 @@ public class AccountService : IAccountService
         await _unitOfWork.AccountRepository.AddAsync(account, cancellationToken);
         await _unitOfWork.SaveAsync(cancellationToken);
 
-        return new AccountResponse(account.AccountId, account.Username, account.RoleId, account.DepartmentId, account.Status);
+        return new AccountResponse(account.AccountId, account.Username, account.RoleId, account.DepartmentId, account.Status, account.IsActive);
     }
 
     public async Task UpdateAccountStatusAsync(int accountId, string status, int updatedByAccountId, CancellationToken cancellationToken = default)
@@ -59,12 +60,29 @@ public class AccountService : IAccountService
         await _unitOfWork.SaveAsync(cancellationToken);
     }
 
+    public async Task UpdateAccountRoleAsync(int accountId, int roleId, int updatedByAccountId, CancellationToken cancellationToken = default)
+    {
+        var account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken)
+            ?? throw new KeyNotFoundException($"Account {accountId} not found.");
+
+        account.RoleId = roleId;
+        account.UpdatedAt = DateTime.UtcNow;
+        account.UpdatedByAccountId = updatedByAccountId;
+
+        _unitOfWork.AccountRepository.Update(account);
+        await _unitOfWork.SaveAsync(cancellationToken);
+    }
+
     public async Task DeleteAccountAsync(int accountId, CancellationToken cancellationToken = default)
     {
         var account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken)
             ?? throw new KeyNotFoundException($"Account {accountId} not found.");
 
-        _unitOfWork.AccountRepository.Delete(account);
+        account.IsActive = false;
+        account.Status = "Inactive";
+        account.UpdatedAt = DateTime.UtcNow;
+
+        _unitOfWork.AccountRepository.Update(account);
         await _unitOfWork.SaveAsync(cancellationToken);
     }
 }

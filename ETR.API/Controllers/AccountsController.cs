@@ -76,7 +76,20 @@ public class AccountsController : ControllerBase
 
     /// <summary>
     /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
-    /// [Core Responsibility]: Xóa một tài khoản khỏi hệ thống.
+    /// [Core Responsibility]: Cập nhật quyền (Role) của một tài khoản hiện có.
+    /// [Target Audience]: Admin
+    /// </summary>
+    [HttpPut("{id:int}/role")]
+    public async Task<ActionResult> UpdateAccountRole(int id, [FromBody] UpdateAccountRoleRequest request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        await _accountService.UpdateAccountRoleAsync(id, request.RoleId, accountId, cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Xóa một tài khoản khỏi hệ thống (Soft Delete).
     /// [Target Audience]: Admin
     /// </summary>
     [HttpDelete("{id:int}")]
