@@ -12,7 +12,7 @@ namespace ETR.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin")]
+[Authorize]
 public class AccountsController : ControllerBase
 {
     private readonly IAccountService _accountService;
@@ -30,6 +30,7 @@ public class AccountsController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpGet]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<ActionResult<IEnumerable<AccountResponse>>> GetAllAccounts(CancellationToken cancellationToken)
     {
         var accounts = await _accountService.GetAllAccountsAsync(cancellationToken);
@@ -42,6 +43,7 @@ public class AccountsController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpGet("{id:int}")]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<ActionResult<AccountResponse>> GetAccountById(int id, CancellationToken cancellationToken)
     {
         var account = await _accountService.GetAccountByIdAsync(id, cancellationToken);
@@ -54,6 +56,7 @@ public class AccountsController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<AccountResponse>> CreateAccount([FromBody] CreateAccountRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -67,6 +70,7 @@ public class AccountsController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPut("{id:int}/status")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult> UpdateAccountStatus(int id, [FromBody] UpdateAccountStatusRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -80,6 +84,7 @@ public class AccountsController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPut("{id:int}/role")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult> UpdateAccountRole(int id, [FromBody] UpdateAccountRoleRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -93,6 +98,7 @@ public class AccountsController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult> DeleteAccount(int id, CancellationToken cancellationToken)
     {
         await _accountService.DeleteAccountAsync(id, cancellationToken);
