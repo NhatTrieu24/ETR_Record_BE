@@ -91,10 +91,11 @@ public class EvidencesController : ControllerBase
     }
 
     /// <summary>
-    /// Phê duyệt hoặc từ chối một tệp bằng chứng (Dành cho Instructor/Admin).
+    /// Phê duyệt hoặc từ chối một tệp bằng chứng (Dành cho QA/Admin — Instructor không được tự
+    /// verify minh chứng do chính mình tải lên, xem EvidenceService.VerifyEvidenceAsync).
     /// </summary>
     [HttpPut("{id}/verify")]
-    [Authorize(Roles = "Instructor,QA,Admin")]
+    [Authorize(Roles = "QA,Admin")]
     public async Task<IActionResult> VerifyEvidence(int id, [FromBody] VerifyEvidenceRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();

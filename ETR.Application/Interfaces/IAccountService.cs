@@ -9,5 +9,5 @@ public interface IAccountService
     Task<AccountResponse> CreateAccountAsync(CreateAccountRequest request, int createdByAccountId, bool isCallerAdmin, CancellationToken cancellationToken = default);
     Task UpdateAccountStatusAsync(int accountId, string status, int updatedByAccountId, CancellationToken cancellationToken = default);
     Task UpdateAccountRoleAsync(int accountId, int roleId, int updatedByAccountId, CancellationToken cancellationToken = default);
-    Task DeleteAccountAsync(int accountId, CancellationToken cancellationToken = default);
+    Task DeleteAccountAsync(int accountId, int deletedByAccountId, CancellationToken cancellationToken = default);
 }

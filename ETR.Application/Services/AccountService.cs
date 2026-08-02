@@ -60,6 +60,17 @@ public class AccountService : IAccountService
         var account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken)
             ?? throw new KeyNotFoundException($"Account {accountId} not found.");
 
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = updatedByAccountId,
+            ActionType = "UPDATE",
+            EntityName = nameof(Account),
+            RecordId = accountId,
+            OldValue = account.Status,
+            NewValue = status,
+            Description = $"Account #{accountId} status changed from '{account.Status}' to '{status}'"
+        }, cancellationToken);
+
         account.Status = status;
         account.UpdatedAt = DateTime.UtcNow;
         account.UpdatedByAccountId = updatedByAccountId;
@@ -73,6 +84,19 @@ public class AccountService : IAccountService
         var account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken)
             ?? throw new KeyNotFoundException($"Account {accountId} not found.");
 
+        // Role assignment is the most compliance-sensitive account action (grants system access) —
+        // the FRD explicitly calls it out as the one most requiring an audit trail.
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = updatedByAccountId,
+            ActionType = "UPDATE",
+            EntityName = nameof(Account),
+            RecordId = accountId,
+            OldValue = account.RoleId.ToString(),
+            NewValue = roleId.ToString(),
+            Description = $"Account #{accountId} role changed from RoleId {account.RoleId} to {roleId}"
+        }, cancellationToken);
+
         account.RoleId = roleId;
         account.UpdatedAt = DateTime.UtcNow;
         account.UpdatedByAccountId = updatedByAccountId;
@@ -81,14 +105,26 @@ public class AccountService : IAccountService
         await _unitOfWork.SaveAsync(cancellationToken);
     }
 
-    public async Task DeleteAccountAsync(int accountId, CancellationToken cancellationToken = default)
+    public async Task DeleteAccountAsync(int accountId, int deletedByAccountId, CancellationToken cancellationToken = default)
     {
         var account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken)
             ?? throw new KeyNotFoundException($"Account {accountId} not found.");
 
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = deletedByAccountId,
+            ActionType = "DELETE",
+            EntityName = nameof(Account),
+            RecordId = accountId,
+            OldValue = account.Status,
+            NewValue = "Inactive",
+            Description = $"Account #{accountId} deactivated (soft delete)"
+        }, cancellationToken);
+
         account.IsActive = false;
         account.Status = "Inactive";
         account.UpdatedAt = DateTime.UtcNow;
+        account.UpdatedByAccountId = deletedByAccountId;
 
         _unitOfWork.AccountRepository.Update(account);
         await _unitOfWork.SaveAsync(cancellationToken);

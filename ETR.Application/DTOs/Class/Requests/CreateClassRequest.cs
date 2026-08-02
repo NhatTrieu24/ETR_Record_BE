@@ -10,4 +10,5 @@ public record CreateClassRequest(
     DateTime EndDate,
     [MaxLength(200)] string? Location,
     int Capacity,
-    [Required, MaxLength(20)] string Status);
+    [Required, MaxLength(20)] string Status,
+    int? InstructorAccountId = null);

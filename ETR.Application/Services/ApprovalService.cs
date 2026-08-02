@@ -45,8 +45,30 @@ public class ApprovalService : IApprovalService
         return new ApprovalRequestResponse(request.ApprovalRequestId, request.ETRCourseRecordId, request.CurrentStatus, request.SubmittedByAccountId, request.SubmittedAt, request.CurrentApproverId, request.CompletedAt);
     }
 
-    public async Task<ApprovalRequestResponse> ProcessApprovalActionAsync(int approvalRequestId, string action, int actionByAccountId, string? comment, CancellationToken cancellationToken = default)
+    // Which role is allowed to perform each workflow action — enforced here (not just via the
+    // controller's [Authorize]) because the controller grants a broad role set to cover all 4
+    // actions at once; without this, any of those roles could perform any action (e.g. Instructor
+    // self-approving their own submission), defeating the QA/TrainingManager segregation of duties.
+    private static readonly Dictionary<string, string[]> AllowedRolesByAction = new()
     {
+        ["Verify"] = ["QA", "Admin"],
+        ["Approve"] = ["TrainingManager", "Admin"],
+        ["Reject"] = ["QA", "Admin"],
+        ["Return"] = ["QA", "Admin"],
+    };
+
+    public async Task<ApprovalRequestResponse> ProcessApprovalActionAsync(int approvalRequestId, string action, int actionByAccountId, string? actionByRoleName, string? comment, CancellationToken cancellationToken = default)
+    {
+        if (!AllowedRolesByAction.TryGetValue(action, out var allowedRoles))
+        {
+            throw new BusinessRuleViolationException("Invalid action.");
+        }
+
+        if (actionByRoleName == null || !allowedRoles.Contains(actionByRoleName))
+        {
+            throw new ForbiddenAccessException($"Role '{actionByRoleName}' is not authorized to perform the '{action}' action.");
+        }
+
         if ((action == "Reject" || action == "Return") && string.IsNullOrWhiteSpace(comment))
         {
             throw new ValidationException("A comment is required when rejecting or returning an ApprovalRequest.");
@@ -79,7 +101,7 @@ public class ApprovalService : IApprovalService
                 }
 
                 _unitOfWork.ApprovalRequestRepository.Update(request);
-                
+
                 var history = new ApprovalHistory
                 {
                     ApprovalRequestId = request.ApprovalRequestId,
@@ -92,8 +114,46 @@ public class ApprovalService : IApprovalService
                     CreatedAt = DateTime.UtcNow,
                     CreatedByAccountId = actionByAccountId
                 };
-                
+
                 await _unitOfWork.ApprovalHistoryRepository.AddAsync(history, ct);
+
+                // Every ApprovalRequest transition also lands in the main AuditLog — previously only
+                // ApprovalHistory captured this, leaving the system-wide audit trail (and the CAA
+                // export's Audit_History.pdf, which reads ApprovalHistory but not AuditLog) blind to
+                // who acted and why outside this one table.
+                var auditLog = new AuditLog
+                {
+                    ETRRecordId = request.ETRCourseRecordId,
+                    AccountId = actionByAccountId,
+                    ActionType = action.ToUpperInvariant(),
+                    EntityName = nameof(ApprovalRequest),
+                    RecordId = request.ApprovalRequestId,
+                    OldValue = prevStatus,
+                    NewValue = newStatus,
+                    Description = $"ApprovalRequest #{request.ApprovalRequestId} for ETR #{request.ETRCourseRecordId}: {action}. Comment: {comment ?? "N/A"}"
+                };
+                await _unitOfWork.AuditLogRepository.AddAsync(auditLog, ct);
+
+                // Reject/Return must also push the underlying ETR back to "ReturnedForCorrection" —
+                // previously only "Approve" touched ETRCourseRecord.Status, so a QA rejection left the
+                // ETR stuck at "Submitted" forever with no visible outcome to Academic Staff. There is
+                // no separate terminal "Rejected" status on ETRCourseRecord (only ApprovalRequest.
+                // CurrentStatus distinguishes Rejected from ReturnedForCorrection, which is what the
+                // Dashboard's RejectedCount already reads) — both actions send the record back for the
+                // same practical next step: correct and resubmit.
+                if (newStatus == "Rejected" || newStatus == "ReturnedForCorrection")
+                {
+                    var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(request.ETRCourseRecordId, ct)
+                        ?? throw new BusinessRuleViolationException("ETRCourseRecord not found.");
+
+                    if (etr.Status == "Submitted")
+                    {
+                        etr.Status = "ReturnedForCorrection";
+                        etr.UpdatedAt = DateTime.UtcNow;
+                        etr.UpdatedByAccountId = actionByAccountId;
+                        _unitOfWork.ETRCourseRecordRepository.Update(etr);
+                    }
+                }
 
                 await _unitOfWork.SaveAsync(ct);
 

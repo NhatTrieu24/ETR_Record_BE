@@ -12,7 +12,10 @@ namespace ETR.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin,Instructor,TrainingManager,Audit")]
+// NOTE: ASP.NET Core combines class-level and method-level [Authorize(Roles=...)] via AND, not OR —
+// every role a method attribute grants (e.g. QA on ProcessApproval below) MUST also appear here, or
+// the method-level grant is silently voided. Keep this list a superset of every method's role list.
+[Authorize(Roles = "Admin,Instructor,QA,TrainingManager,Audit")]
 public class ApprovalsController : ControllerBase
 {
     private readonly IApprovalService _approvalService;
@@ -43,13 +46,13 @@ public class ApprovalsController : ControllerBase
     }
 
     [HttpPost("{id}/process")]
-    [Authorize(Roles = "Admin,Instructor,TrainingManager")]
+    [Authorize(Roles = "Admin,QA,TrainingManager")]
     public async Task<IActionResult> ProcessApproval(int id, [FromQuery] string action, [FromQuery] string? comment, CancellationToken cancellationToken)
     {
-        var accountId = _currentUserService.AccountId 
+        var accountId = _currentUserService.AccountId
             ?? throw new UnauthorizedAccessException("User is not authenticated.");
-            
-        var response = await _approvalService.ProcessApprovalActionAsync(id, action, accountId, comment, cancellationToken);
+
+        var response = await _approvalService.ProcessApprovalActionAsync(id, action, accountId, _currentUserService.RoleName, comment, cancellationToken);
         return Ok(response);
     }
     [HttpPut("{id}")]

@@ -165,6 +165,7 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<CourseSubject>().HasOne<Course>().WithMany().HasForeignKey(cs => cs.CourseId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<CourseSubject>().HasOne<Subject>().WithMany().HasForeignKey(cs => cs.SubjectId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<Class>().HasOne<Course>().WithMany().HasForeignKey(tc => tc.CourseId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<Class>().HasOne<Account>().WithMany().HasForeignKey(tc => tc.InstructorAccountId).OnDelete(cascadeDeleteConfig);
         
         // Enrollment & ClassStudent
         modelBuilder.Entity<CourseEnrollment>().HasOne<Account>().WithMany().HasForeignKey(e => e.AccountId).OnDelete(cascadeDeleteConfig);

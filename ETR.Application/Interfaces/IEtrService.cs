@@ -16,6 +16,6 @@ public interface IEtrService
     Task<EtrRecordResponse> VerifyEtrAsync(int etrCourseRecordId, int accountId, CancellationToken cancellationToken = default);
     Task<EtrRecordResponse> ReturnEtrAsync(int etrCourseRecordId, int accountId, string? comment, CancellationToken cancellationToken = default);
     Task<EtrRecordResponse> CompleteEtrAsync(int etrCourseRecordId, int accountId, CancellationToken cancellationToken = default);
-    Task<EtrRecordResponse> LockEtrAsync(int etrCourseRecordId, int accountId, CancellationToken cancellationToken = default);
-    Task<EtrRecordResponse> UnlockEtrAsync(int etrCourseRecordId, int accountId, CancellationToken cancellationToken = default);
+    Task<EtrRecordResponse> LockEtrAsync(int etrCourseRecordId, int accountId, string? reason, CancellationToken cancellationToken = default);
+    Task<EtrRecordResponse> UnlockEtrAsync(int etrCourseRecordId, int accountId, string? reason, CancellationToken cancellationToken = default);
 }
