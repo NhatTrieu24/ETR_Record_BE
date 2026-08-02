@@ -36,7 +36,7 @@ public class EtrController : ControllerBase
     /// <response code="200">Returns the list of ETR records.</response>
     /// <response code="401">If the user is not authenticated.</response>
     [HttpGet]
-    [Authorize(Roles = "Instructor,QA,Admin,Audit")]
+    [Authorize(Roles = "Instructor,QA,Admin,Audit,Academic")]
     public async Task<ActionResult<IEnumerable<EtrRecordResponse>>> GetAllEtrs(CancellationToken cancellationToken)
     {
         var etrs = await _etrService.GetAllEtrsAsync(cancellationToken);
@@ -71,7 +71,7 @@ public class EtrController : ControllerBase
     /// <response code="401">If the user is not authenticated.</response>
     /// <response code="404">If the ETR record is not found.</response>
     [HttpGet("{id}")]
-    [Authorize(Roles = "Instructor,QA,Admin,Audit")]
+    [Authorize(Roles = "Instructor,QA,Admin,Audit,Academic")]
     public async Task<ActionResult<EtrDetailsResponse>> GetEtrById(int id, CancellationToken cancellationToken)
     {
         var etr = await _etrService.GetEtrByIdAsync(id, cancellationToken);
@@ -176,7 +176,7 @@ public class EtrController : ControllerBase
     /// [Target Audience]: Admin, Instructor, QA, Audit, Student (nếu là chính họ)
     /// </summary>
     [HttpGet("student/{studentId}/history")]
-    [Authorize(Roles = "Admin,Instructor,QA,Audit,Student")]
+    [Authorize(Roles = "Admin,Instructor,QA,Audit,Student,Academic")]
     public async Task<ActionResult<IEnumerable<EtrRecordResponse>>> GetStudentEtrHistory(int studentId, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -198,7 +198,7 @@ public class EtrController : ControllerBase
     /// [Target Audience]: Admin, Instructor, QA, Audit, Student (nếu là chính họ)
     /// </summary>
     [HttpGet("student/{studentId}/current-status")]
-    [Authorize(Roles = "Admin,Instructor,QA,Audit,Student")]
+    [Authorize(Roles = "Admin,Instructor,QA,Audit,Student,Academic")]
     public async Task<ActionResult<IEnumerable<StudentEtrStatusResponse>>> GetStudentEtrCurrentStatus(int studentId, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -220,12 +220,10 @@ public class EtrController : ControllerBase
     /// [Target Audience]: Admin, Instructor, QA, TrainingManager
     /// </summary>
     [HttpGet("expiring-students")]
-    [Authorize(Roles = "Admin,Instructor,QA,TrainingManager")]
+    [Authorize(Roles = "Admin,Instructor,QA,TrainingManager,Academic")]
     public async Task<ActionResult<IEnumerable<ExpiringStudentResponse>>> GetExpiringStudents([FromQuery] int courseId, [FromQuery] int daysThreshold = 30, CancellationToken cancellationToken = default)
     {
         var expiringStudents = await _etrService.GetExpiringStudentsAsync(courseId, daysThreshold, cancellationToken);
         return Ok(expiringStudents);
     }
 }
-
-

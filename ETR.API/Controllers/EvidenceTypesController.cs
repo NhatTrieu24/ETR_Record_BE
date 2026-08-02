@@ -7,7 +7,7 @@ namespace ETR.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Admin,Academic")]
 public class EvidenceTypesController : ControllerBase
 {
     private readonly IEvidenceTypeService _evidenceTypeService;

@@ -7,7 +7,7 @@ namespace ETR.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin,Instructor")]
+[Authorize(Roles = "Admin,Instructor,Academic,QA")]
 public class PracticalChecklistsController : ControllerBase
 {
     private readonly IPracticalChecklistService _service;

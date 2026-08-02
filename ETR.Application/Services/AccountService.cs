@@ -27,8 +27,16 @@ public class AccountService : IAccountService
         return new AccountResponse(account.AccountId, account.Username, account.RoleId, account.DepartmentId, account.Status, account.IsActive);
     }
 
-    public async Task<AccountResponse> CreateAccountAsync(CreateAccountRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
+    public async Task<AccountResponse> CreateAccountAsync(CreateAccountRequest request, int createdByAccountId, bool isCallerAdmin, CancellationToken cancellationToken = default)
     {
+        if (!isCallerAdmin)
+        {
+            var targetRole = await _unitOfWork.RoleRepository.GetByIdAsync(request.RoleId, cancellationToken);
+            if (targetRole == null || targetRole.RoleName != "Student")
+            {
+                throw new UnauthorizedAccessException("Academic staff can only create Student accounts.");
+            }
+        }
         var account = new Account
         {
             Username = request.Username,

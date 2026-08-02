@@ -12,7 +12,7 @@ namespace ETR.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin,TrainingManager,Audit")]
+[Authorize(Roles = "Admin,TrainingManager,Audit,Academic")]
 public class ReportsController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;

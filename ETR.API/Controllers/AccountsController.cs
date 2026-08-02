@@ -56,11 +56,12 @@ public class AccountsController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<ActionResult<AccountResponse>> CreateAccount([FromBody] CreateAccountRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
-        var account = await _accountService.CreateAccountAsync(request, accountId, cancellationToken);
+        var isCallerAdmin = User.IsInRole("Admin");
+        var account = await _accountService.CreateAccountAsync(request, accountId, isCallerAdmin, cancellationToken);
         return CreatedAtAction(nameof(GetAccountById), new { id = account.AccountId }, account);
     }
 

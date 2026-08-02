@@ -30,8 +30,8 @@ public class UserProfilesController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = "Admin")]
-    public async Task<ActionResult<IEnumerable<UserProfileResponse>>> GetAllProfiles(CancellationToken cancellationToken)
+    [Authorize(Roles = "Admin,Academic")]
+    public async Task<ActionResult<IEnumerable<UserProfileResponse>>> GetAllUserProfiles(CancellationToken cancellationToken)
     {
         var profiles = await _userProfileService.GetAllProfilesAsync(cancellationToken);
         return Ok(profiles);
@@ -69,8 +69,8 @@ public class UserProfilesController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpGet("{accountId:int}")]
-    [Authorize(Roles = "Admin")]
-    public async Task<ActionResult<UserProfileResponse>> GetProfileByAccountId(int accountId, CancellationToken cancellationToken)
+    [Authorize(Roles = "Admin,Academic")]
+    public async Task<ActionResult<UserProfileResponse>> GetUserProfileByAccountId(int accountId, CancellationToken cancellationToken)
     {
         var profile = await _userProfileService.GetProfileByAccountIdAsync(accountId, cancellationToken);
         return Ok(profile);
@@ -82,12 +82,12 @@ public class UserProfilesController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPost("{accountId:int}")]
-    [Authorize(Roles = "Admin")]
-    public async Task<ActionResult<UserProfileResponse>> CreateProfile(int accountId, [FromBody] CreateUserProfileRequest request, CancellationToken cancellationToken)
+    [Authorize(Roles = "Admin,Academic")]
+    public async Task<ActionResult<UserProfileResponse>> CreateUserProfile(int accountId, [FromBody] CreateUserProfileRequest request, CancellationToken cancellationToken)
     {
         var currentAccountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
         var profile = await _userProfileService.CreateProfileAsync(request, accountId, currentAccountId, cancellationToken);
-        return CreatedAtAction(nameof(GetProfileByAccountId), new { accountId = profile.AccountId }, profile);
+        return CreatedAtAction(nameof(GetUserProfileByAccountId), new { accountId = profile.AccountId }, profile);
     }
 
     /// <summary>
@@ -109,13 +109,12 @@ public class UserProfilesController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPut("{accountId:int}")]
-    [Authorize(Roles = "Admin")]
-    public async Task<ActionResult<UserProfileResponse>> UpdateProfile(int accountId, [FromBody] UpdateUserProfileRequest request, CancellationToken cancellationToken)
+    [Authorize(Roles = "Admin,Academic")]
+    public async Task<ActionResult<UserProfileResponse>> UpdateUserProfile(int accountId, [FromBody] UpdateUserProfileRequest request, CancellationToken cancellationToken)
     {
         var currentAccountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
         var profile = await _userProfileService.UpdateProfileAsync(accountId, request, currentAccountId, cancellationToken);
         return Ok(profile);
     }
 }
-
 
