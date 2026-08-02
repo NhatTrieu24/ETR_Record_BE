@@ -363,37 +363,104 @@ public class EtrService : IEtrService
         enrollment.ActualCompletionDate = DateTime.UtcNow;
         _unitOfWork.CourseEnrollmentRepository.Update(enrollment);
 
+        // Keep ApprovalHistory in sync even when completion happens via this direct route rather than
+        // ApprovalService.ProcessApprovalActionAsync(action:"Approve") — ExportService.BuildAuditHistoryPdf
+        // (the CAA audit export) reads exclusively from ApprovalHistory, so without this the exported
+        // Audit_History.pdf would silently be missing the final approval entry.
+        var approvalRequest = (await _unitOfWork.ApprovalRequestRepository.GetAllAsync(cancellationToken))
+            .FirstOrDefault(a => a.ETRCourseRecordId == etrCourseRecordId);
+        if (approvalRequest != null && approvalRequest.CurrentStatus != "Approved")
+        {
+            var previousApprovalStatus = approvalRequest.CurrentStatus;
+            approvalRequest.CurrentStatus = "Approved";
+            approvalRequest.CompletedAt = DateTime.UtcNow;
+            approvalRequest.UpdatedAt = DateTime.UtcNow;
+            approvalRequest.UpdatedByAccountId = accountId;
+            _unitOfWork.ApprovalRequestRepository.Update(approvalRequest);
+
+            await _unitOfWork.ApprovalHistoryRepository.AddAsync(new ApprovalHistory
+            {
+                ApprovalRequestId = approvalRequest.ApprovalRequestId,
+                ActionByAccountId = accountId,
+                ActionType = "Approve",
+                PreviousStatus = previousApprovalStatus,
+                NewStatus = "Approved",
+                Comments = "ETR completed directly via /api/etr/{id}/complete",
+                ActionAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow,
+                CreatedByAccountId = accountId
+            }, cancellationToken);
+        }
+
         _unitOfWork.ETRCourseRecordRepository.Update(etr);
         await _unitOfWork.SaveAsync(cancellationToken);
 
         return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt, etr.IssuedDate, etr.ExpiryDate, etr.PreviousRecordId);
     }
 
-    public async Task<EtrRecordResponse> LockEtrAsync(int etrCourseRecordId, int accountId, CancellationToken cancellationToken = default)
+    public async Task<EtrRecordResponse> LockEtrAsync(int etrCourseRecordId, int accountId, string? reason, CancellationToken cancellationToken = default)
     {
         var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(etrCourseRecordId, cancellationToken)
             ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
 
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            ETRRecordId = etrCourseRecordId,
+            AccountId = accountId,
+            ActionType = "LOCK",
+            EntityName = nameof(ETRCourseRecord),
+            RecordId = etrCourseRecordId,
+            OldValue = etr.IsLocked.ToString(),
+            NewValue = "True",
+            Description = $"ETR #{etrCourseRecordId} manually locked. Reason: {reason ?? "N/A"}"
+        }, cancellationToken);
+
+        // No explicit Update(etr) call here: GetByIdAsync above already tracks this entity in the
+        // same DbContext, so EF Core's own change detection picks up the mutation automatically.
+        // Calling Update() (DbSet.Update) would force EVERY property to IsModified=true, not just
+        // IsLocked — which breaks ImmutabilityValidator's fine-grained IsBeingUnlocked check below.
         etr.IsLocked = true;
         etr.UpdatedAt = DateTime.UtcNow;
         etr.UpdatedByAccountId = accountId;
 
-        _unitOfWork.ETRCourseRecordRepository.Update(etr);
         await _unitOfWork.SaveAsync(cancellationToken);
 
         return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt, etr.IssuedDate, etr.ExpiryDate, etr.PreviousRecordId);
     }
 
-    public async Task<EtrRecordResponse> UnlockEtrAsync(int etrCourseRecordId, int accountId, CancellationToken cancellationToken = default)
+    public async Task<EtrRecordResponse> UnlockEtrAsync(int etrCourseRecordId, int accountId, string? reason, CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new ValidationException("A reason is required to re-open a locked ETR.");
+
         var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(etrCourseRecordId, cancellationToken)
             ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
 
+        if (!etr.IsLocked)
+            throw new BusinessRuleViolationException("ETR is not locked.");
+
+        // Re-opening a Completed/Locked ETR is the FRD's explicitly-named exception to absolute
+        // immutability — it must always leave a full audit trail, since it's the one path that lets
+        // previously-frozen data become editable again.
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            ETRRecordId = etrCourseRecordId,
+            AccountId = accountId,
+            ActionType = "UNLOCK",
+            EntityName = nameof(ETRCourseRecord),
+            RecordId = etrCourseRecordId,
+            OldValue = "True",
+            NewValue = "False",
+            Description = $"ETR #{etrCourseRecordId} re-opened (unlocked). Reason: {reason}"
+        }, cancellationToken);
+
+        // No explicit Update(etr) call — see LockEtrAsync above for why: it would mark every
+        // property Modified and defeat ImmutabilityValidator's IsBeingUnlocked check, which requires
+        // ONLY IsLocked to have changed for the re-open exception to apply.
         etr.IsLocked = false;
         etr.UpdatedAt = DateTime.UtcNow;
         etr.UpdatedByAccountId = accountId;
 
-        _unitOfWork.ETRCourseRecordRepository.Update(etr);
         await _unitOfWork.SaveAsync(cancellationToken);
 
         return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt, etr.IssuedDate, etr.ExpiryDate, etr.PreviousRecordId);

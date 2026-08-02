@@ -11,4 +11,5 @@ public class Class : BaseEntity
     public string? Location { get; set; }
     public int Capacity { get; set; }
     public string Status { get; set; } = string.Empty;
+    public int? InstructorAccountId { get; set; }
 }

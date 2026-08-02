@@ -102,7 +102,10 @@ public class AccountsController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<ActionResult> DeleteAccount(int id, CancellationToken cancellationToken)
     {
-        await _accountService.DeleteAccountAsync(id, cancellationToken);
+        var accountId = _currentUserService.AccountId
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
+        await _accountService.DeleteAccountAsync(id, accountId, cancellationToken);
         return NoContent();
     }
 }

@@ -157,6 +157,23 @@ public class EtrController : ControllerBase
         return Ok(response);
     }
     /// <summary>
+    /// [Module/Flow]: Xử lý ETR
+    /// [Core Responsibility]: Mở khoá lại một ETR đã Completed/Locked (Re-open) — ngoại lệ duy nhất
+    /// cho nguyên tắc bất biến tuyệt đối, bắt buộc phải nêu lý do và luôn được ghi vào Audit Log.
+    /// [Target Audience]: Admin
+    /// </summary>
+    [HttpPost("{id}/reopen")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> ReopenEtr(int id, [FromBody] ReturnEtrRequest request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
+        var response = await _etrService.UnlockEtrAsync(id, accountId, request.Comment, cancellationToken);
+        return Ok(response);
+    }
+
+    /// <summary>
     /// Xóa mềm (soft delete) một hồ sơ ETR.
     /// </summary>
     [HttpDelete("{id}")]

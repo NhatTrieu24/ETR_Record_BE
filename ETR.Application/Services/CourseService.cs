@@ -46,6 +46,17 @@ public class CourseService : ICourseService
         await _unitOfWork.CourseRepository.AddAsync(course, cancellationToken);
         await _unitOfWork.SaveAsync(cancellationToken);
 
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = createdByAccountId,
+            ActionType = "INSERT",
+            EntityName = nameof(Course),
+            RecordId = course.CourseId,
+            NewValue = course.CourseCode,
+            Description = $"Course #{course.CourseId} ({course.CourseCode}) created"
+        }, cancellationToken);
+        await _unitOfWork.SaveAsync(cancellationToken);
+
         return new CourseResponse(course.CourseId, course.CourseCode, course.CourseName, course.Description, course.DurationHours, course.Status);
     }
 
@@ -56,6 +67,8 @@ public class CourseService : ICourseService
 
         if (course.IsDeleted) throw new KeyNotFoundException("Course not found.");
 
+        var oldStatus = course.Status;
+
         course.CourseCode = request.CourseCode;
         course.CourseName = request.CourseName;
         course.Description = request.Description;
@@ -65,6 +78,18 @@ public class CourseService : ICourseService
         course.UpdatedByAccountId = updatedByAccountId;
 
         _unitOfWork.CourseRepository.Update(course);
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = updatedByAccountId,
+            ActionType = "UPDATE",
+            EntityName = nameof(Course),
+            RecordId = course.CourseId,
+            OldValue = oldStatus,
+            NewValue = course.Status,
+            Description = $"Course #{course.CourseId} ({course.CourseCode}) updated"
+        }, cancellationToken);
+
         await _unitOfWork.SaveAsync(cancellationToken);
 
         return new CourseResponse(course.CourseId, course.CourseCode, course.CourseName, course.Description, course.DurationHours, course.Status);
@@ -84,6 +109,18 @@ public class CourseService : ICourseService
         course.UpdatedByAccountId = deletedByAccountId;
 
         _unitOfWork.CourseRepository.Update(course);
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = deletedByAccountId,
+            ActionType = "DELETE",
+            EntityName = nameof(Course),
+            RecordId = course.CourseId,
+            OldValue = course.Status,
+            NewValue = "Deleted",
+            Description = $"Course #{course.CourseId} ({course.CourseCode}) deleted"
+        }, cancellationToken);
+
         await _unitOfWork.SaveAsync(cancellationToken);
     }
 }

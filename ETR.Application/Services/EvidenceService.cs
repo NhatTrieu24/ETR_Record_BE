@@ -133,6 +133,13 @@ public class EvidenceService : IEvidenceService
         if (evidence == null)
             throw new KeyNotFoundException($"Evidence with ID {id} not found.");
 
+        // Segregation of duties: the person who uploaded evidence must not be the one who
+        // verifies it — an independent QA review is the whole point of this gate.
+        if (evidence.UploadedByAccountId == verifiedByAccountId)
+        {
+            throw new ForbiddenAccessException("You cannot verify evidence that you uploaded yourself.");
+        }
+
         evidence.VerificationStatus = request.VerificationStatus;
         evidence.VerificationComment = request.VerificationComment;
         evidence.VerifiedByAccountId = verifiedByAccountId;

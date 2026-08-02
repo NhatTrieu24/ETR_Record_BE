@@ -202,6 +202,17 @@ public class EnrollmentService : IEnrollmentService
             throw new BusinessRuleViolationException($"Cannot delete enrollment because its ETRCourseRecord is already {etrRecord.Status}{(etrRecord.IsLocked ? " and locked" : string.Empty)}.");
         }
 
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = deletedByAccountId,
+            ActionType = "DELETE",
+            EntityName = nameof(CourseEnrollment),
+            RecordId = id,
+            OldValue = item.Status,
+            NewValue = "Deleted",
+            Description = $"Enrollment #{id} (Account {item.AccountId}, Class {item.ClassId}) deleted"
+        }, cancellationToken);
+
         item.IsDeleted = true;
         item.DeletedAt = DateTime.UtcNow;
         item.UpdatedAt = DateTime.UtcNow;
