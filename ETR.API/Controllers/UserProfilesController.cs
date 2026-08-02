@@ -27,7 +27,7 @@ public class UserProfilesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
     /// [Core Responsibility]: Lấy danh sách tất cả các hồ sơ người dùng (user profiles).
-    /// [Target Audience]: Admin
+    /// [Target Audience]: Admin, Academic
     /// </summary>
     [HttpGet]
     [Authorize(Roles = "Admin,Academic")]
@@ -66,7 +66,7 @@ public class UserProfilesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
     /// [Core Responsibility]: Lấy hồ sơ người dùng theo ID tài khoản.
-    /// [Target Audience]: Admin
+    /// [Target Audience]: Admin, Academic
     /// </summary>
     [HttpGet("{accountId:int}")]
     [Authorize(Roles = "Admin,Academic")]
@@ -79,7 +79,7 @@ public class UserProfilesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
     /// [Core Responsibility]: Tạo một hồ sơ người dùng mới cho một tài khoản.
-    /// [Target Audience]: Admin
+    /// [Target Audience]: Admin, Academic
     /// </summary>
     [HttpPost("{accountId:int}")]
     [Authorize(Roles = "Admin,Academic")]
@@ -106,7 +106,7 @@ public class UserProfilesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
     /// [Core Responsibility]: Cập nhật một hồ sơ người dùng cụ thể theo ID tài khoản.
-    /// [Target Audience]: Admin
+    /// [Target Audience]: Admin, Academic
     /// </summary>
     [HttpPut("{accountId:int}")]
     [Authorize(Roles = "Admin,Academic")]

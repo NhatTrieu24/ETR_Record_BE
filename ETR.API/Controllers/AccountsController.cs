@@ -52,8 +52,8 @@ public class AccountsController : ControllerBase
 
     /// <summary>
     /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
-    /// [Core Responsibility]: Tạo một tài khoản hệ thống mới.
-    /// [Target Audience]: Admin
+    /// [Core Responsibility]: Tạo tài khoản người dùng mới
+    /// [Target Audience]: Admin, Academic
     /// </summary>
     [HttpPost]
     [Authorize(Roles = "Admin,Academic")]

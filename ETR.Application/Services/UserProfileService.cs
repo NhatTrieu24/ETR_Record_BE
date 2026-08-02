@@ -21,9 +21,17 @@ public class UserProfileService : IUserProfileService
 
     public async Task<IEnumerable<UserProfileResponse>> GetLearnerProfilesAsync(CancellationToken cancellationToken = default)
     {
+        var roles = await _unitOfWork.RoleRepository.GetAllAsync(cancellationToken);
+        var studentRole = roles.FirstOrDefault(r => r.RoleName == "Student");
+        if (studentRole == null) return Enumerable.Empty<UserProfileResponse>();
+
+        var accounts = await _unitOfWork.AccountRepository.GetAllAsync(cancellationToken);
+        var studentAccountIds = accounts.Where(a => a.RoleId == studentRole.RoleId).Select(a => a.AccountId).ToHashSet();
+
         var profiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
-        // TODO: Refactor to filter by Account Role
-        return profiles.Select(MapToResponse);
+        var learnerProfiles = profiles.Where(p => studentAccountIds.Contains(p.AccountId));
+
+        return learnerProfiles.Select(MapToResponse);
     }
 
     public async Task<UserProfileResponse> GetProfileByAccountIdAsync(int accountId, CancellationToken cancellationToken = default)
