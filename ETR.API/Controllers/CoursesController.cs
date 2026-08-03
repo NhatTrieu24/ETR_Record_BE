@@ -12,7 +12,7 @@ namespace ETR.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin,Academic,TrainingManager,Instructor")]
+[Authorize]
 public class CoursesController : ControllerBase
 {
     private readonly ICourseService _courseService;
@@ -30,6 +30,7 @@ public class CoursesController : ControllerBase
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpGet]
+    [Authorize(Roles = "Admin,Academic,TrainingManager,Instructor,QA,Audit")]
     public async Task<IActionResult> GetAllCourses(CancellationToken cancellationToken)
     {
         var courses = await _courseService.GetAllCoursesAsync(cancellationToken);
@@ -42,6 +43,7 @@ public class CoursesController : ControllerBase
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpGet("{id}")]
+    [Authorize(Roles = "Admin,Academic,TrainingManager,Instructor,QA,Audit")]
     public async Task<IActionResult> GetCourse(int id, CancellationToken cancellationToken)
     {
         var course = await _courseService.GetCourseByIdAsync(id, cancellationToken);
@@ -54,6 +56,7 @@ public class CoursesController : ControllerBase
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Admin,Academic,TrainingManager")]
     public async Task<IActionResult> CreateCourse([FromBody] CreateCourseRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -67,6 +70,7 @@ public class CoursesController : ControllerBase
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin,Academic,TrainingManager")]
     public async Task<IActionResult> UpdateCourse(int id, [FromBody] UpdateCourseRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -80,6 +84,7 @@ public class CoursesController : ControllerBase
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin,Academic,TrainingManager")]
     public async Task<IActionResult> DeleteCourse(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();

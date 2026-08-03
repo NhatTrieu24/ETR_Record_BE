@@ -43,7 +43,7 @@ public class AccountsController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpGet("{id:int}")]
-    [Authorize(Roles = "Admin,Academic")]
+    [Authorize(Roles = "Admin,Academic,QA,Instructor,Audit,TrainingManager")]
     public async Task<ActionResult<AccountResponse>> GetAccountById(int id, CancellationToken cancellationToken)
     {
         var account = await _accountService.GetAccountByIdAsync(id, cancellationToken);
