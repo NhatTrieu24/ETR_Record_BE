@@ -105,6 +105,30 @@ public class AccountService : IAccountService
         await _unitOfWork.SaveAsync(cancellationToken);
     }
 
+    public async Task UpdateAccountDepartmentAsync(int accountId, int departmentId, int updatedByAccountId, CancellationToken cancellationToken = default)
+    {
+        var account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken)
+            ?? throw new KeyNotFoundException($"Account {accountId} not found.");
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = updatedByAccountId,
+            ActionType = "UPDATE",
+            EntityName = nameof(Account),
+            RecordId = accountId,
+            OldValue = account.DepartmentId.ToString(),
+            NewValue = departmentId.ToString(),
+            Description = $"Account #{accountId} department changed from DepartmentId {account.DepartmentId} to {departmentId}"
+        }, cancellationToken);
+
+        account.DepartmentId = departmentId;
+        account.UpdatedAt = DateTime.UtcNow;
+        account.UpdatedByAccountId = updatedByAccountId;
+
+        _unitOfWork.AccountRepository.Update(account);
+        await _unitOfWork.SaveAsync(cancellationToken);
+    }
+
     public async Task DeleteAccountAsync(int accountId, int deletedByAccountId, CancellationToken cancellationToken = default)
     {
         var account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken)

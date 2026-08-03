@@ -30,7 +30,7 @@ public class UserProfilesController : ControllerBase
     /// [Target Audience]: Admin, Academic
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = "Admin,Academic")]
+    [Authorize(Roles = "Admin,Academic,QA,Instructor,Audit")]
     public async Task<ActionResult<IEnumerable<UserProfileResponse>>> GetAllUserProfiles(CancellationToken cancellationToken)
     {
         var profiles = await _userProfileService.GetAllProfilesAsync(cancellationToken);
@@ -43,7 +43,7 @@ public class UserProfilesController : ControllerBase
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpGet("learners")]
-    [Authorize(Roles = "Admin,Academic,TrainingManager")]
+    [Authorize(Roles = "Admin,Academic,TrainingManager,QA,Instructor,Audit")]
     public async Task<ActionResult<IEnumerable<UserProfileResponse>>> GetLearnerProfiles(CancellationToken cancellationToken)
     {
         var profiles = await _userProfileService.GetLearnerProfilesAsync(cancellationToken);
@@ -69,7 +69,7 @@ public class UserProfilesController : ControllerBase
     /// [Target Audience]: Admin, Academic
     /// </summary>
     [HttpGet("{accountId:int}")]
-    [Authorize(Roles = "Admin,Academic")]
+    [Authorize(Roles = "Admin,Academic,QA,Instructor,Audit")]
     public async Task<ActionResult<UserProfileResponse>> GetUserProfileByAccountId(int accountId, CancellationToken cancellationToken)
     {
         var profile = await _userProfileService.GetProfileByAccountIdAsync(accountId, cancellationToken);

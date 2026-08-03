@@ -12,7 +12,7 @@ namespace ETR.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin,QA,Student,Instructor,Audit")] // Secure all endpoints in this controller by default
+[Authorize(Roles = "Admin,QA,Student,Instructor,Audit,Academic,TrainingManager")] // Secure all endpoints in this controller by default
 public class EtrController : ControllerBase
 {
     private readonly IEtrService _etrService;

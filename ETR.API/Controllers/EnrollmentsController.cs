@@ -12,7 +12,7 @@ namespace ETR.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin,Academic")]
+[Authorize(Roles = "Admin,Academic,QA,Instructor,Audit")]
 public class EnrollmentsController : ControllerBase
 {
     private readonly IEnrollmentService _enrollmentService;
@@ -80,6 +80,7 @@ public class EnrollmentsController : ControllerBase
     /// <response code="401">If the user is not authenticated.</response>
     /// <response code="403">If the user is not an Admin.</response>
     [HttpPost]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<IActionResult> CreateEnrollment([FromBody] CreateEnrollmentRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -89,6 +90,7 @@ public class EnrollmentsController : ControllerBase
         return Ok(response);
     }
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<IActionResult> UpdateEnrollment(int id, [FromBody] UpdateEnrollmentRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -99,6 +101,7 @@ public class EnrollmentsController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<IActionResult> DeleteEnrollment(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 

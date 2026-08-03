@@ -95,6 +95,20 @@ public class AccountsController : ControllerBase
 
     /// <summary>
     /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Cập nhật phòng ban (Department) của một tài khoản hiện có.
+    /// [Target Audience]: Admin
+    /// </summary>
+    [HttpPut("{id:int}/department")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult> UpdateAccountDepartment(int id, [FromBody] UpdateAccountDepartmentRequest request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        await _accountService.UpdateAccountDepartmentAsync(id, request.DepartmentId, accountId, cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
     /// [Core Responsibility]: Xóa một tài khoản khỏi hệ thống (Soft Delete).
     /// [Target Audience]: Admin
     /// </summary>

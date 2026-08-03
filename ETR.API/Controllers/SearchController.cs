@@ -32,7 +32,10 @@ public class SearchController : ControllerBase
     public async Task<IActionResult> SearchClasses([FromQuery] string query, CancellationToken cancellationToken)
     {
         var classes = await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken);
-        var result = classes.Where(c => c.ClassName.Contains(query, StringComparison.OrdinalIgnoreCase)).ToList();
+        var result = classes
+            .Where(c => string.IsNullOrWhiteSpace(query) || c.ClassName.Contains(query, StringComparison.OrdinalIgnoreCase))
+            .Select(c => new { c.ClassId, c.ClassCode, c.ClassName, c.Status })
+            .ToList();
         return Ok(result);
     }
 
@@ -72,7 +75,22 @@ public class SearchController : ControllerBase
             });
         }
 
-        return Ok(etrs.ToList());
+        var classes = (await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken)).ToList();
+
+        var resultList = etrs.Select(etr => {
+            var enrollment = enrollments.FirstOrDefault(e => e.EnrollmentId == etr.EnrollmentId);
+            var profile = enrollment == null ? null : profiles.FirstOrDefault(p => p.AccountId == enrollment.AccountId);
+            var cls = enrollment == null ? null : classes.FirstOrDefault(c => c.ClassId == enrollment.ClassId);
+            return new {
+                etr.ETRCourseRecordId,
+                etr.Status,
+                etr.EnrollmentId,
+                StudentName = profile?.FullName ?? "Unknown",
+                ClassName = cls?.ClassName ?? "Unknown"
+            };
+        }).ToList();
+
+        return Ok(resultList);
     }
 }
 
