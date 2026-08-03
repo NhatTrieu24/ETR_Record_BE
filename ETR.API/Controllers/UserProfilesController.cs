@@ -29,8 +29,12 @@ public class UserProfilesController : ControllerBase
     /// [Core Responsibility]: Lấy danh sách tất cả các hồ sơ người dùng (user profiles).
     /// [Target Audience]: Admin
     /// </summary>
+    // QA/Audit need full visibility for verification/audit purposes. Instructor is deliberately NOT
+    // added here (unlike the single-profile lookup below) — enumerating every profile in the system
+    // is a bigger over-provisioning risk than looking up one known accountId; scoping Instructor to
+    // "students in classes they teach" is tracked separately (see H6 in LO_TRINH_HOAN_THIEN_DU_AN.md).
     [HttpGet]
-    [Authorize(Roles = "Admin,Academic")]
+    [Authorize(Roles = "Admin,Academic,QA,Audit")]
     public async Task<ActionResult<IEnumerable<UserProfileResponse>>> GetAllUserProfiles(CancellationToken cancellationToken)
     {
         var profiles = await _userProfileService.GetAllProfilesAsync(cancellationToken);
@@ -43,7 +47,7 @@ public class UserProfilesController : ControllerBase
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpGet("learners")]
-    [Authorize(Roles = "Admin,Academic,TrainingManager")]
+    [Authorize(Roles = "Admin,Academic,TrainingManager,QA,Audit")]
     public async Task<ActionResult<IEnumerable<UserProfileResponse>>> GetLearnerProfiles(CancellationToken cancellationToken)
     {
         var profiles = await _userProfileService.GetLearnerProfilesAsync(cancellationToken);
@@ -68,8 +72,11 @@ public class UserProfilesController : ControllerBase
     /// [Core Responsibility]: Lấy hồ sơ người dùng theo ID tài khoản.
     /// [Target Audience]: Admin
     /// </summary>
+    // Single-profile-by-ID lookup is lower risk than enumerating all profiles (caller already needs
+    // to know the accountId from some other legitimate join, e.g. ClassStudent) — Instructor included
+    // here to unblock the common "look up this student's real name" enrichment case FE needs.
     [HttpGet("{accountId:int}")]
-    [Authorize(Roles = "Admin,Academic")]
+    [Authorize(Roles = "Admin,Academic,QA,Audit,Instructor")]
     public async Task<ActionResult<UserProfileResponse>> GetUserProfileByAccountId(int accountId, CancellationToken cancellationToken)
     {
         var profile = await _userProfileService.GetProfileByAccountIdAsync(accountId, cancellationToken);

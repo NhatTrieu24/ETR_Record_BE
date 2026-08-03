@@ -62,7 +62,8 @@ public class EtrService : IEtrService
             sr.SubjectId,
             sr.Status,
             sr.CreatedAt,
-            sr.AttendanceRate)) ?? Array.Empty<SubjectResultResponse>();
+            sr.AttendanceRate,
+            sr.Score)) ?? Array.Empty<SubjectResultResponse>();
 
         return new EtrDetailsResponse(
             e.ETRCourseRecordId,

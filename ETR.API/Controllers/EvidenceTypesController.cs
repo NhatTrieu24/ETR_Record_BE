@@ -7,7 +7,7 @@ namespace ETR.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin,Academic")]
+[Authorize(Roles = "Admin,Academic,Instructor")]
 public class EvidenceTypesController : ControllerBase
 {
     private readonly IEvidenceTypeService _evidenceTypeService;
@@ -34,6 +34,7 @@ public class EvidenceTypesController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<IActionResult> Create([FromBody] CreateEvidenceTypeRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -42,6 +43,7 @@ public class EvidenceTypesController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateEvidenceTypeRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -50,6 +52,7 @@ public class EvidenceTypesController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();

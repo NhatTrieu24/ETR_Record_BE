@@ -12,7 +12,7 @@ namespace ETR.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin,Academic,TrainingManager")]
+[Authorize(Roles = "Admin,Academic,TrainingManager,Instructor")]
 public class CoursesController : ControllerBase
 {
     private readonly ICourseService _courseService;
@@ -54,6 +54,7 @@ public class CoursesController : ControllerBase
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Admin,Academic,TrainingManager")]
     public async Task<IActionResult> CreateCourse([FromBody] CreateCourseRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -67,6 +68,7 @@ public class CoursesController : ControllerBase
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin,Academic,TrainingManager")]
     public async Task<IActionResult> UpdateCourse(int id, [FromBody] UpdateCourseRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -80,6 +82,7 @@ public class CoursesController : ControllerBase
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin,Academic,TrainingManager")]
     public async Task<IActionResult> DeleteCourse(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();

@@ -21,3 +21,6 @@ public record UpdateAccountStatusRequest(
 
 public record UpdateAccountRoleRequest(
     [Required] int RoleId);
+
+public record UpdateAccountDepartmentRequest(
+    [Required] int DepartmentId);

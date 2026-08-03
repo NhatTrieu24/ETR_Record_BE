@@ -76,7 +76,7 @@ public class EvidencesController : ControllerBase
     /// Tải lên một bản ghi tệp bằng chứng mới.
     /// </summary>
     [HttpPost("upload")]
-    [Authorize(Roles = "Instructor,Admin")]
+    [Authorize(Roles = "Instructor,Admin,Academic")]
     public async Task<IActionResult> UploadEvidence([FromForm] UploadEvidenceRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -107,7 +107,7 @@ public class EvidencesController : ControllerBase
     /// Xóa mềm (soft delete) một tệp bằng chứng.
     /// </summary>
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Instructor,Admin")]
+    [Authorize(Roles = "Instructor,Admin,Academic")]
     public async Task<IActionResult> DeleteEvidence(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
