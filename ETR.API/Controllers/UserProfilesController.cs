@@ -27,7 +27,7 @@ public class UserProfilesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
     /// [Core Responsibility]: Lấy danh sách tất cả các hồ sơ người dùng (user profiles).
-    /// [Target Audience]: Admin
+    /// [Target Audience]: Admin, Academic
     /// </summary>
     // QA/Audit need full visibility for verification/audit purposes. Instructor is deliberately NOT
     // added here (unlike the single-profile lookup below) — enumerating every profile in the system
@@ -70,7 +70,7 @@ public class UserProfilesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
     /// [Core Responsibility]: Lấy hồ sơ người dùng theo ID tài khoản.
-    /// [Target Audience]: Admin
+    /// [Target Audience]: Admin, Academic
     /// </summary>
     // Single-profile-by-ID lookup is lower risk than enumerating all profiles (caller already needs
     // to know the accountId from some other legitimate join, e.g. ClassStudent) — Instructor included
@@ -86,7 +86,7 @@ public class UserProfilesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
     /// [Core Responsibility]: Tạo một hồ sơ người dùng mới cho một tài khoản.
-    /// [Target Audience]: Admin
+    /// [Target Audience]: Admin, Academic
     /// </summary>
     [HttpPost("{accountId:int}")]
     [Authorize(Roles = "Admin,Academic")]
@@ -113,7 +113,7 @@ public class UserProfilesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
     /// [Core Responsibility]: Cập nhật một hồ sơ người dùng cụ thể theo ID tài khoản.
-    /// [Target Audience]: Admin
+    /// [Target Audience]: Admin, Academic
     /// </summary>
     [HttpPut("{accountId:int}")]
     [Authorize(Roles = "Admin,Academic")]

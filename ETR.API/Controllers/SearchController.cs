@@ -35,7 +35,7 @@ public class SearchController : ControllerBase
         var classes = await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken);
         var courses = (await _unitOfWork.CourseRepository.GetAllAsync(cancellationToken)).ToList();
 
-        var matches = classes.Where(c => c.ClassName.Contains(query, StringComparison.OrdinalIgnoreCase));
+        var matches = classes.Where(c => string.IsNullOrWhiteSpace(query) || c.ClassName.Contains(query, StringComparison.OrdinalIgnoreCase));
 
         var result = matches.Select(c =>
         {

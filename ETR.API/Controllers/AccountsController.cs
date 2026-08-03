@@ -43,7 +43,7 @@ public class AccountsController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpGet("{id:int}")]
-    [Authorize(Roles = "Admin,Academic")]
+    [Authorize(Roles = "Admin,Academic,QA,Instructor,Audit,TrainingManager")]
     public async Task<ActionResult<AccountResponse>> GetAccountById(int id, CancellationToken cancellationToken)
     {
         var account = await _accountService.GetAccountByIdAsync(id, cancellationToken);
@@ -52,8 +52,8 @@ public class AccountsController : ControllerBase
 
     /// <summary>
     /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
-    /// [Core Responsibility]: Tạo một tài khoản hệ thống mới.
-    /// [Target Audience]: Admin
+    /// [Core Responsibility]: Tạo tài khoản người dùng mới
+    /// [Target Audience]: Admin, Academic
     /// </summary>
     [HttpPost]
     [Authorize(Roles = "Admin,Academic")]

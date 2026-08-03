@@ -42,7 +42,7 @@ public class EvidencesController : ControllerBase
     /// Lấy thông tin một tệp bằng chứng cụ thể theo ID.
     /// </summary>
     [HttpGet("{id}")]
-    [Authorize(Roles = "Instructor,QA,Admin")]
+    [Authorize(Roles = "Instructor,QA,Admin,Academic")]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
     {
         var file = await _evidenceService.GetEvidenceByIdAsync(id, cancellationToken);
@@ -53,7 +53,7 @@ public class EvidencesController : ControllerBase
     /// Tải xuống tệp bằng chứng vật lý theo ID.
     /// </summary>
     [HttpGet("{id}/download")]
-    [Authorize(Roles = "Instructor,QA,Admin")]
+    [Authorize(Roles = "Instructor,QA,Admin,Academic")]
     public async Task<IActionResult> Download(int id, CancellationToken cancellationToken)
     {
         var file = await _evidenceService.GetEvidenceByIdAsync(id, cancellationToken);
