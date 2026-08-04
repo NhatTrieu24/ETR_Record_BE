@@ -1,4 +1,5 @@
 using ETR.Application.Compliance;
+using ETR.Application.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -54,6 +55,7 @@ public class GlobalExceptionHandler : IExceptionHandler
     private static (int StatusCode, string Title, string Detail) Classify(Exception exception) => exception switch
     {
         BusinessRuleViolationException => (StatusCodes.Status400BadRequest, "Business rule violation", exception.Message),
+        ImmutabilityViolationException => (StatusCodes.Status400BadRequest, "Business rule violation", exception.Message),
         ForbiddenAccessException => (StatusCodes.Status403Forbidden, "Forbidden", exception.Message),
         KeyNotFoundException => (StatusCodes.Status404NotFound, "Resource not found", exception.Message),
         UnauthorizedAccessException => (StatusCodes.Status401Unauthorized, "Not authenticated", "Authentication is required to perform this action."),

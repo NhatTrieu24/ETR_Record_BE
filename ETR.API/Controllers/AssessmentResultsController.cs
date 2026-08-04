@@ -25,7 +25,7 @@ public class AssessmentResultsController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Roles = "Instructor,Admin,Academic")]
+    [Authorize(Roles = "Instructor,Admin,Academic,Audit")]
     public async Task<ActionResult<IEnumerable<AssessmentResultResponse>>> GetAllResults(CancellationToken cancellationToken)
     {
         return Ok(await _assessmentResultService.GetAllAssessmentResultsAsync(cancellationToken));
@@ -80,7 +80,7 @@ public class AssessmentResultsController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    [Authorize(Roles = "Instructor,Admin,Academic")]
+    [Authorize(Roles = "Instructor,Admin,Academic,Audit")]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
     {
         return Ok(await _assessmentResultService.GetAssessmentResultByIdAsync(id, cancellationToken));

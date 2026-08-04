@@ -30,7 +30,7 @@ public class AccountsController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = "Admin,Academic")]
+    [Authorize(Roles = "Admin,Academic,Audit")]
     public async Task<ActionResult<IEnumerable<AccountResponse>>> GetAllAccounts(CancellationToken cancellationToken)
     {
         var accounts = await _accountService.GetAllAccountsAsync(cancellationToken);

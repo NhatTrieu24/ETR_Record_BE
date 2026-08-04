@@ -25,7 +25,7 @@ public class AttendanceController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Roles = "Instructor,Admin,Academic")]
+    [Authorize(Roles = "Instructor,Admin,Academic,Audit")]
     public async Task<ActionResult<IEnumerable<AttendanceRecordResponse>>> GetAllRecords(CancellationToken cancellationToken)
     {
         return Ok(await _attendanceService.GetAllAttendanceRecordsAsync(cancellationToken));
@@ -98,7 +98,7 @@ public class AttendanceController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    [Authorize(Roles = "Instructor,Admin,Academic")]
+    [Authorize(Roles = "Instructor,Admin,Academic,Audit")]
     public async Task<ActionResult<AttendanceRecordResponse>> GetRecordById(int id, CancellationToken cancellationToken)
     {
         return Ok(await _attendanceService.GetAttendanceRecordByIdAsync(id, cancellationToken));
