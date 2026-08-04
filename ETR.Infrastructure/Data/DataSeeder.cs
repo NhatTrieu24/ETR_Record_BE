@@ -24,6 +24,7 @@ public static class DataSeeder
     private const string InstructorUsername = "instructor@etr.com";
     private const string QaUsername = "qa@etr.com";
     private const string ManagerUsername = "manager@etr.com";
+    private const string ManagementViewerUsername = "management-viewer@etr.com";
     private const string CourseCode = "AMT-101";
     private const string ClassCode = "AMT101-C1";
 
@@ -56,7 +57,16 @@ public static class DataSeeder
                 new Role { RoleName = "Academic", Description = "Academic Staff" },
                 new Role { RoleName = "TrainingManager", Description = "Training Manager" },
                 new Role { RoleName = "Student", Description = "Student / Learner" },
-                new Role { RoleName = "Audit", Description = "Auditor" });
+                new Role { RoleName = "Audit", Description = "Auditor" },
+                new Role { RoleName = "ManagementViewer", Description = "Read-only leadership dashboard/report viewer" });
+            await context.SaveChangesAsync();
+        }
+        else if (!await context.Roles.AnyAsync(r => r.RoleName == "ManagementViewer"))
+        {
+            // Added after the initial 7-role seed (FRD `DS_các_role_cuối_cùng_.txt`) — on a database
+            // already seeded before this role existed, the AnyAsync() guard above is a no-op, so it
+            // needs its own idempotent insert here (same pattern as the per-item Department loop below).
+            context.Roles.Add(new Role { RoleName = "ManagementViewer", Description = "Read-only leadership dashboard/report viewer" });
             await context.SaveChangesAsync();
         }
 
@@ -91,7 +101,16 @@ public static class DataSeeder
                 CreateAccount("academic@etr.com", roleIds["Academic"], deptIds["Administration"], "ACA-01", "Academic Staff", new DateTime(1992, 1, 1), "Female"),
                 CreateAccount(ManagerUsername, roleIds["TrainingManager"], deptIds["Training"], "MGR-01", "Training Manager", new DateTime(1988, 1, 1), "Male"),
                 CreateAccount(StudentUsername, roleIds["Student"], deptIds["Training"], "STU-01", "Jane Student", new DateTime(2000, 1, 1), "Female"),
-                CreateAccount("audit@etr.com", roleIds["Audit"], deptIds["Administration"], "AUD-01", "Audit Staff", new DateTime(1985, 1, 1), "Other"));
+                CreateAccount("audit@etr.com", roleIds["Audit"], deptIds["Administration"], "AUD-01", "Audit Staff", new DateTime(1985, 1, 1), "Other"),
+                CreateAccount(ManagementViewerUsername, roleIds["ManagementViewer"], deptIds["Administration"], "MGV-01", "Management Viewer", new DateTime(1978, 1, 1), "Other"));
+            await context.SaveChangesAsync();
+        }
+        else if (!await context.Accounts.AnyAsync(a => a.Username == ManagementViewerUsername))
+        {
+            // Same "added after initial seed" situation as the ManagementViewer role above.
+            var roleIds = await context.Roles.ToDictionaryAsync(r => r.RoleName, r => r.RoleId);
+            var deptIds = await context.Departments.ToDictionaryAsync(d => d.DepartmentName, d => d.DepartmentId);
+            context.Accounts.Add(CreateAccount(ManagementViewerUsername, roleIds["ManagementViewer"], deptIds["Administration"], "MGV-01", "Management Viewer", new DateTime(1978, 1, 1), "Other"));
             await context.SaveChangesAsync();
         }
     }

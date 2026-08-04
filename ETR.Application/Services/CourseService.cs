@@ -17,7 +17,7 @@ public class CourseService : ICourseService
     {
         var courses = await _unitOfWork.CourseRepository.GetAllAsync(cancellationToken);
         return courses.Where(c => !c.IsDeleted).Select(c => new CourseResponse(
-            c.CourseId, c.CourseCode, c.CourseName, c.Description, c.DurationHours, c.Status));
+            c.CourseId, c.CourseCode, c.CourseName, c.Description, c.DurationHours, c.Status, c.ValidityMonths, c.CourseType));
     }
 
     public async Task<CourseResponse> GetCourseByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -27,7 +27,7 @@ public class CourseService : ICourseService
 
         if (c.IsDeleted) throw new KeyNotFoundException("Course not found.");
 
-        return new CourseResponse(c.CourseId, c.CourseCode, c.CourseName, c.Description, c.DurationHours, c.Status);
+        return new CourseResponse(c.CourseId, c.CourseCode, c.CourseName, c.Description, c.DurationHours, c.Status, c.ValidityMonths, c.CourseType);
     }
 
     public async Task<CourseResponse> CreateCourseAsync(CreateCourseRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
@@ -39,6 +39,8 @@ public class CourseService : ICourseService
             Description = request.Description,
             DurationHours = request.DurationHours,
             Status = request.Status,
+            ValidityMonths = request.ValidityMonths,
+            CourseType = request.CourseType,
             CreatedAt = DateTime.UtcNow,
             CreatedByAccountId = createdByAccountId
         };
@@ -57,7 +59,7 @@ public class CourseService : ICourseService
         }, cancellationToken);
         await _unitOfWork.SaveAsync(cancellationToken);
 
-        return new CourseResponse(course.CourseId, course.CourseCode, course.CourseName, course.Description, course.DurationHours, course.Status);
+        return new CourseResponse(course.CourseId, course.CourseCode, course.CourseName, course.Description, course.DurationHours, course.Status, course.ValidityMonths, course.CourseType);
     }
 
     public async Task<CourseResponse> UpdateCourseAsync(int id, UpdateCourseRequest request, int updatedByAccountId, CancellationToken cancellationToken = default)
@@ -74,6 +76,8 @@ public class CourseService : ICourseService
         course.Description = request.Description;
         course.DurationHours = request.DurationHours;
         course.Status = request.Status;
+        course.ValidityMonths = request.ValidityMonths;
+        course.CourseType = request.CourseType;
         course.UpdatedAt = DateTime.UtcNow;
         course.UpdatedByAccountId = updatedByAccountId;
 
@@ -92,7 +96,7 @@ public class CourseService : ICourseService
 
         await _unitOfWork.SaveAsync(cancellationToken);
 
-        return new CourseResponse(course.CourseId, course.CourseCode, course.CourseName, course.Description, course.DurationHours, course.Status);
+        return new CourseResponse(course.CourseId, course.CourseCode, course.CourseName, course.Description, course.DurationHours, course.Status, course.ValidityMonths, course.CourseType);
     }
 
     public async Task DeleteCourseAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default)

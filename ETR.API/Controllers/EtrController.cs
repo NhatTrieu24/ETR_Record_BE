@@ -166,6 +166,8 @@ public class EtrController : ControllerBase
     /// [Module/Flow]: Xử lý ETR
     /// [Core Responsibility]: Mở khoá lại một ETR đã Completed/Locked (Re-open) — ngoại lệ duy nhất
     /// cho nguyên tắc bất biến tuyệt đối, bắt buộc phải nêu lý do và luôn được ghi vào Audit Log.
+    /// Status chuyển từ Completed về Verified để cho phép sửa Evidence/Attendance/AssessmentResult;
+    /// phải gọi lại `/complete` sau khi sửa xong để khoá lại.
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPost("{id}/reopen")]

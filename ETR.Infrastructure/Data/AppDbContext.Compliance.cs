@@ -111,10 +111,15 @@ public partial class AppDbContext
                     Action = action,
                     OriginalEtrStatus = entry.Property(nameof(ETRCourseRecord.Status)).OriginalValue as string,
                     OriginalEtrIsLocked = entry.Property(nameof(ETRCourseRecord.IsLocked)).OriginalValue as bool?,
+                    // Status is allowed to change ONLY as part of the Reopen transition itself
+                    // (Completed -> Verified, see EtrService.UnlockEtrAsync) — any other status change
+                    // combined with an unlock is not the recognized Reopen shape and stays blocked.
                     IsBeingUnlocked = action == EntityChangeAction.Update
                         && entry.Property(nameof(ETRCourseRecord.IsLocked)).OriginalValue is true
                         && entry.Property(nameof(ETRCourseRecord.IsLocked)).CurrentValue is false
-                        && !entry.Property(nameof(ETRCourseRecord.Status)).IsModified
+                        && (!entry.Property(nameof(ETRCourseRecord.Status)).IsModified
+                            || (entry.Property(nameof(ETRCourseRecord.Status)).OriginalValue as string == "Completed"
+                                && entry.Property(nameof(ETRCourseRecord.Status)).CurrentValue as string == "Verified"))
                         && !entry.Property(nameof(ETRCourseRecord.SubmittedAt)).IsModified
                         && !entry.Property(nameof(ETRCourseRecord.VerifiedAt)).IsModified
                         && !entry.Property(nameof(ETRCourseRecord.CompletedAt)).IsModified

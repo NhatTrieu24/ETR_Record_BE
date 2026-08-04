@@ -11,7 +11,7 @@ using System.IO.Compression;
 
 namespace ETR.Application.Services;
 
-public class ExportService : IExportService
+public partial class ExportService : IExportService
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<ExportService> _logger;

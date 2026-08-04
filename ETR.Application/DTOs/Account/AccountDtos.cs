@@ -5,8 +5,8 @@ namespace ETR.Application.DTOs;
 public record AccountResponse(
     int AccountId,
     string Username,
-    int RoleId,
-    int DepartmentId,
+    int? RoleId,
+    int? DepartmentId,
     string Status,
     bool IsActive);
 

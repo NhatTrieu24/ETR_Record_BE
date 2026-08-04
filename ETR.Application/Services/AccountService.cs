@@ -51,8 +51,17 @@ public class AccountService : IAccountService
                 throw new KeyNotFoundException($"Account {accountId} not found.");
             }
         }
-            
-        return new AccountResponse(account.AccountId, account.Username, account.RoleId, account.DepartmentId, account.Status, account.IsActive);
+
+        // TrainingManager's role is training oversight/approval, not general account administration —
+        // unlike Admin/Academic (who manage accounts) or QA/Audit (who need full visibility for
+        // verification/compliance), TrainingManager has no FRD-backed need to see another account's
+        // RoleId/DepartmentId. Hide those two fields rather than the whole record, since the lookup
+        // itself (e.g. resolving a display name) is still legitimate.
+        var (roleId, departmentId) = _currentUserService.RoleName == "TrainingManager"
+            ? ((int?)null, (int?)null)
+            : (account.RoleId, account.DepartmentId);
+
+        return new AccountResponse(account.AccountId, account.Username, roleId, departmentId, account.Status, account.IsActive);
     }
 
     public async Task<AccountResponse> CreateAccountAsync(CreateAccountRequest request, int createdByAccountId, bool isCallerAdmin, CancellationToken cancellationToken = default)

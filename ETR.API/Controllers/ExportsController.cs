@@ -57,38 +57,94 @@ public class ExportsController : ControllerBase
             return BadRequest("ETRCourseRecordId is required to export a Training Package.");
         }
 
-        var webRootPath = _env.WebRootPath;
-        if (string.IsNullOrEmpty(webRootPath))
-        {
-            webRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-        }
-
-        var response = await _exportService.ExportTrainingPackageAsync(etrCourseRecordId, accountId, webRootPath, cancellationToken);
+        var response = await _exportService.ExportTrainingPackageAsync(etrCourseRecordId, accountId, ResolveWebRootPath(), cancellationToken);
         return Ok(response);
     }
 
     /// <summary>
     /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
-    /// [Core Responsibility]: Kích hoạt một công việc xuất tệp cho báo cáo PDF.
+    /// [Core Responsibility]: Kích hoạt một công việc xuất tệp PDF độc lập cho tóm tắt 1 hồ sơ ETR.
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPost("pdf")]
     public async Task<ActionResult<ExportJobResponse>> ExportPdf([FromBody] ExportRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
-        return await CreateMockExportJob("PDF", accountId, cancellationToken);
+        if (request.ETRCourseRecordId is not int etrCourseRecordId)
+        {
+            return BadRequest("ETRCourseRecordId is required to export a standalone PDF summary.");
+        }
+
+        var response = await _exportService.ExportEtrPdfAsync(etrCourseRecordId, accountId, ResolveWebRootPath(), cancellationToken);
+        return Ok(response);
     }
 
     /// <summary>
     /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
-    /// [Core Responsibility]: Kích hoạt một công việc xuất tệp cho bản tóm tắt dashboard.
+    /// [Core Responsibility]: Kích hoạt một công việc xuất tệp PDF cho bản tóm tắt dashboard.
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPost("dashboard")]
     public async Task<ActionResult<ExportJobResponse>> ExportDashboard([FromBody] ExportRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
-        return await CreateMockExportJob("Dashboard", accountId, cancellationToken);
+        var response = await _exportService.ExportDashboardReportAsync(accountId, ResolveWebRootPath(), cancellationToken);
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
+    /// [Core Responsibility]: Kích hoạt một công việc xuất báo cáo điểm danh độc lập cho 1 lớp học.
+    /// [Target Audience]: Admin
+    /// </summary>
+    [HttpPost("attendance")]
+    public async Task<ActionResult<ExportJobResponse>> ExportAttendanceReport([FromBody] ExportRequest request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        if (request.ClassId is not int classId)
+        {
+            return BadRequest("ClassId is required to export an Attendance report.");
+        }
+
+        var response = await _exportService.ExportAttendanceReportAsync(classId, accountId, ResolveWebRootPath(), cancellationToken);
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
+    /// [Core Responsibility]: Kích hoạt một công việc xuất báo cáo đánh giá độc lập cho 1 lớp học.
+    /// [Target Audience]: Admin
+    /// </summary>
+    [HttpPost("assessment")]
+    public async Task<ActionResult<ExportJobResponse>> ExportAssessmentReport([FromBody] ExportRequest request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        if (request.ClassId is not int classId)
+        {
+            return BadRequest("ClassId is required to export an Assessment report.");
+        }
+
+        var response = await _exportService.ExportAssessmentReportAsync(classId, accountId, ResolveWebRootPath(), cancellationToken);
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
+    /// [Core Responsibility]: Kích hoạt một công việc xuất báo cáo Excel tổng hợp toàn bộ học viên
+    /// trong 1 lớp/khoá (đa dòng), khác với báo cáo tóm tắt theo từng ETR riêng lẻ.
+    /// [Target Audience]: Admin
+    /// </summary>
+    [HttpPost("class-summary")]
+    public async Task<ActionResult<ExportJobResponse>> ExportClassSummary([FromBody] ExportRequest request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        if (request.ClassId is not int classId)
+        {
+            return BadRequest("ClassId is required to export a Class Summary report.");
+        }
+
+        var response = await _exportService.ExportClassSummaryReportAsync(classId, accountId, ResolveWebRootPath(), cancellationToken);
+        return Ok(response);
     }
 
     /// <summary>
@@ -105,47 +161,22 @@ public class ExportsController : ControllerBase
 
         if (!string.IsNullOrEmpty(job.FilePath))
         {
-            var webRootPath = _env.WebRootPath;
-            if (string.IsNullOrEmpty(webRootPath))
-            {
-                webRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-            }
-
-            var physicalPath = Path.Combine(webRootPath, job.FilePath);
+            var physicalPath = Path.Combine(ResolveWebRootPath(), job.FilePath);
             if (System.IO.File.Exists(physicalPath))
             {
                 return PhysicalFile(physicalPath, "application/octet-stream", job.FileName);
             }
         }
 
-        // ExportType chưa có file thật trên đĩa (VD "PDF"/"Dashboard", vẫn còn mock) — trả nội dung placeholder.
-        var mockFileContent = $"Nội dung tệp xuất loại: {job.ExportType}, Tên tệp: {job.FileName}";
-        var bytes = System.Text.Encoding.UTF8.GetBytes(mockFileContent);
-        var stream = new System.IO.MemoryStream(bytes);
-
-        return File(stream, "application/octet-stream", job.FileName);
+        // Every export type now writes a real file to disk (see ExportService) — reaching here means
+        // the file is missing (e.g. deleted out-of-band), not that the export type is still mocked.
+        return NotFound($"Tệp xuất dữ liệu cho công việc #{id} không còn tồn tại trên đĩa.");
     }
 
-    private async Task<ActionResult<ExportJobResponse>> CreateMockExportJob(string exportType, int requestedBy, CancellationToken cancellationToken)
+    private string ResolveWebRootPath()
     {
-        var job = new ExportJob
-        {
-            RequestedByAccountId = requestedBy,
-            ExportType = exportType,
-            FileName = $"{exportType.ToLower()}_export_{DateTime.UtcNow:yyyyMMddHHmmss}.zip",
-            FilePath = $"/exports/{Guid.NewGuid()}",
-            Status = "Completed", // Complete synchronously for testing convenience
-            RequestedAt = DateTime.UtcNow,
-            CompletedAt = DateTime.UtcNow,
-            DownloadExpiredAt = DateTime.UtcNow.AddDays(7),
-            CreatedAt = DateTime.UtcNow,
-            IsDeleted = false
-        };
-
-        await _unitOfWork.ExportJobRepository.AddAsync(job, cancellationToken);
-        await _unitOfWork.SaveAsync(cancellationToken);
-
-        return Ok(MapJobToResponse(job));
+        var webRootPath = _env.WebRootPath;
+        return string.IsNullOrEmpty(webRootPath) ? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot") : webRootPath;
     }
 
     private static ExportJobResponse MapJobToResponse(ExportJob j)

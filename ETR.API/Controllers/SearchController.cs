@@ -54,11 +54,23 @@ public class SearchController : ControllerBase
 
     /// <summary>
     /// [Module/Flow]: Khám phá Hệ thống (System Discovery)
-    /// [Core Responsibility]: Tìm kiếm các hồ sơ ETR.
+    /// [Core Responsibility]: Tìm kiếm các hồ sơ ETR, có thể lọc thêm theo Khoá học/Giảng viên/Khoảng ngày.
     /// [Target Audience]: All Roles
     /// </summary>
+    /// <param name="query">Từ khoá tìm theo Status/ID/tên học viên.</param>
+    /// <param name="courseId">Lọc theo khoá học cụ thể.</param>
+    /// <param name="instructorId">Lọc theo giảng viên phụ trách lớp.</param>
+    /// <param name="dateFrom">Lọc ETR có ngày cấp (hoặc ngày tạo, nếu chưa cấp) từ ngày này trở đi.</param>
+    /// <param name="dateTo">Lọc ETR có ngày cấp (hoặc ngày tạo, nếu chưa cấp) tới ngày này.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     [HttpGet("etrs")]
-    public async Task<IActionResult> SearchEtrs([FromQuery] string query, CancellationToken cancellationToken)
+    public async Task<IActionResult> SearchEtrs(
+        [FromQuery] string? query,
+        [FromQuery] int? courseId,
+        [FromQuery] int? instructorId,
+        [FromQuery] DateTime? dateFrom,
+        [FromQuery] DateTime? dateTo,
+        CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId
             ?? throw new UnauthorizedAccessException("User is not authenticated.");
@@ -88,6 +100,30 @@ public class SearchController : ControllerBase
                 var profile = enrollment == null ? null : profiles.FirstOrDefault(p => p.AccountId == enrollment.AccountId);
                 return profile != null && profile.FullName.Contains(query, StringComparison.OrdinalIgnoreCase);
             });
+        }
+
+        if (courseId.HasValue)
+        {
+            var courseClassIds = classes.Where(c => c.CourseId == courseId.Value).Select(c => c.ClassId).ToHashSet();
+            var courseEnrollmentIds = enrollments.Where(e => courseClassIds.Contains(e.ClassId)).Select(e => e.EnrollmentId).ToHashSet();
+            etrs = etrs.Where(e => courseEnrollmentIds.Contains(e.EnrollmentId));
+        }
+
+        if (instructorId.HasValue)
+        {
+            var instructorClassIds = classes.Where(c => c.InstructorAccountId == instructorId.Value).Select(c => c.ClassId).ToHashSet();
+            var instructorEnrollmentIds = enrollments.Where(e => instructorClassIds.Contains(e.ClassId)).Select(e => e.EnrollmentId).ToHashSet();
+            etrs = etrs.Where(e => instructorEnrollmentIds.Contains(e.EnrollmentId));
+        }
+
+        if (dateFrom.HasValue)
+        {
+            etrs = etrs.Where(e => (e.IssuedDate ?? e.CreatedAt) >= dateFrom.Value);
+        }
+
+        if (dateTo.HasValue)
+        {
+            etrs = etrs.Where(e => (e.IssuedDate ?? e.CreatedAt) <= dateTo.Value);
         }
 
         // Enrich with display names — FE needs student/class/course names, not just raw IDs.

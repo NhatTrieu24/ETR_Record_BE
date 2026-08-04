@@ -474,6 +474,8 @@ public class EtrService : IEtrService
         // Re-opening a Completed/Locked ETR is the FRD's explicitly-named exception to absolute
         // immutability — it must always leave a full audit trail, since it's the one path that lets
         // previously-frozen data become editable again.
+        var wasCompleted = etr.Status == "Completed";
+
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
         {
             ETRRecordId = etrCourseRecordId,
@@ -481,15 +483,26 @@ public class EtrService : IEtrService
             ActionType = "UNLOCK",
             EntityName = nameof(ETRCourseRecord),
             RecordId = etrCourseRecordId,
-            OldValue = "True",
-            NewValue = "False",
-            Description = $"ETR #{etrCourseRecordId} re-opened (unlocked). Reason: {reason}"
+            OldValue = wasCompleted ? "True / Completed" : "True",
+            NewValue = wasCompleted ? "False / Verified" : "False",
+            Description = wasCompleted
+                ? $"ETR #{etrCourseRecordId} re-opened (unlocked, status reverted to Verified so child evidence/attendance/assessment data can be amended). Reason: {reason}"
+                : $"ETR #{etrCourseRecordId} re-opened (unlocked). Reason: {reason}"
         }, cancellationToken);
 
         // No explicit Update(etr) call — see LockEtrAsync above for why: it would mark every
-        // property Modified and defeat ImmutabilityValidator's IsBeingUnlocked check, which requires
-        // ONLY IsLocked to have changed for the re-open exception to apply.
+        // property Modified and defeat ImmutabilityValidator's IsBeingUnlocked check. That check now
+        // also permits ONE specific status change alongside IsLocked: Completed -> Verified (see
+        // AppDbContext.Compliance.cs) — this is what actually unblocks child-entity edits after
+        // Reopen (H13): once Status is no longer "Completed", ValidateEtrChildEntity's own
+        // IsEtrImmutable check naturally allows Evidence/Attendance/AssessmentResult edits again,
+        // with no separate exception needed for child entities. Re-completing goes through the
+        // normal CompleteEtrAsync flow again (it already requires Status == "Verified").
         etr.IsLocked = false;
+        if (wasCompleted)
+        {
+            etr.Status = "Verified";
+        }
         etr.UpdatedAt = DateTime.UtcNow;
         etr.UpdatedByAccountId = accountId;
 
