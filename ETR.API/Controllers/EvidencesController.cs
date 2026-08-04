@@ -31,7 +31,7 @@ public class EvidencesController : ControllerBase
     /// Lấy danh sách tất cả các tệp bằng chứng (evidence) đã tải lên.
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = "Instructor,QA,Admin")]
+    [Authorize(Roles = "Instructor,QA,Admin,Academic")]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
         var files = await _evidenceService.GetAllEvidencesAsync(cancellationToken);

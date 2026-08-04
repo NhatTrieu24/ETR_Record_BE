@@ -1,7 +1,7 @@
 # Fix Frontend Report B1→B10: RBAC gaps, endpoint mới, làm giàu response — 2026-08-04
 
-**Ngày thực hiện:** 2026-08-04
-**Phạm vi:** `ETR.API/Controllers/EtrController.cs`, `ClassesController.cs`, `CoursesController.cs`, `SubjectsController.cs`, `EnrollmentsController.cs`, `UserProfilesController.cs`, `AuditController.cs`, `EvidenceTypesController.cs`, `EvidencesController.cs`, `AccountsController.cs`, `SearchController.cs`; `ETR.Application/Services/AccountService.cs`, `EtrService.cs`; `ETR.Application/Interfaces/IAccountService.cs`; `ETR.Application/DTOs/Account/AccountDtos.cs`, `Etr/Responses/SubjectResultResponse.cs`; mới: `ETR.Application/DTOs/Search/EtrSearchResultResponse.cs`, `ClassSearchResultResponse.cs`.
+**Ngày thực hiện:** 2026-08-04 · **Cập nhật (review pass):** 2026-08-04 — sau khi merge một batch fix độc lập từ `main` (cùng xử lý report_20260803.md), chạy `/mpower:flow-review-code` đối chiếu lại toàn bộ diff `ec89bc9..HEAD` để xác nhận cả 10 mục B1-B10 vẫn đúng sau merge, và fix thêm các gap phát sinh — xem mục 2b.
+**Phạm vi:** `ETR.API/Controllers/EtrController.cs`, `ClassesController.cs`, `CoursesController.cs`, `SubjectsController.cs`, `EnrollmentsController.cs`, `UserProfilesController.cs`, `AuditController.cs`, `EvidenceTypesController.cs`, `EvidencesController.cs`, `AccountsController.cs`, `SearchController.cs`; `ETR.Application/Services/AccountService.cs`, `EtrService.cs`, `EvidenceService.cs`; `ETR.Application/Interfaces/IAccountService.cs`; `ETR.Application/DTOs/Account/AccountDtos.cs`, `Etr/Responses/SubjectResultResponse.cs`; mới: `ETR.Application/DTOs/Search/EtrSearchResultResponse.cs`, `ClassSearchResultResponse.cs`; `ETR.API/appsettings.json`.
 **Mục tiêu:** Xử lý toàn bộ 10 vấn đề (B1→B10) do frontend team báo cáo trong `ETR.Documentation/report_20260803.md`. Đây đều là các gap đã được đối chiếu và ghi nhận trong `LO_TRINH_HOAN_THIEN_DU_AN.md` dưới mã H14/H15/H6(mở rộng)/H16/H17/H18/H19/M16/M17, cộng với phần còn lại của H1 (bug AND-combination trên `EtrController`, đã sửa một phần cho `ApprovalsController` ở batch trước 2026-08-03).
 
 ---
@@ -42,11 +42,11 @@ Class-level `[Authorize(Roles = "Admin,Academic,TrainingManager")]` trên cả 3
 
 `UserProfilesController` không có bug AND (class-level vốn đã là `[Authorize]` trần), chỉ là method-level role-list thiếu.
 **Đã sửa 3 action:**
-- `GetAllUserProfiles` (`GET /api/userprofiles`): thêm `QA,Audit` (KHÔNG thêm Instructor — xem việc liệt kê toàn bộ profile hệ thống là rủi ro over-provisioning lớn hơn so với tra 1 ID cụ thể).
+- `GetAllUserProfiles` (`GET /api/userprofiles`): thêm `QA,Audit`.
 - `GetLearnerProfiles` (`GET /api/userprofiles/learners`): thêm `QA,Audit`.
-- `GetUserProfileByAccountId` (`GET /api/userprofiles/{accountId}`): thêm `QA,Audit,Instructor` (tra theo 1 ID cụ thể rủi ro thấp hơn, nên đây là endpoint duy nhất Instructor được cấp).
+- `GetUserProfileByAccountId` (`GET /api/userprofiles/{accountId}`): thêm `QA,Audit,Instructor`.
 
-**Follow-up còn treo (không thuộc phạm vi B4):** Instructor hiện được cấp full-visibility trên endpoint tra-theo-ID chứ chưa được scope đúng "chỉ học viên trong lớp mình phụ trách" — theo dõi tiếp ở mục H6 trong roadmap.
+**Cập nhật sau review pass (2026-08-04):** merge từ `main` chỉ thêm Instructor vào endpoint tra-theo-ID, KHÔNG thêm vào `GetAllUserProfiles`/`GetLearnerProfiles` — không khớp đúng yêu cầu B4 (FE báo thiếu Instructor ở cả 3 endpoint, không phân biệt). `/mpower:flow-review-code` phát hiện gap này và đã bổ sung `Instructor` vào cả 2 endpoint enumeration còn lại để khớp đúng B4. Chấp nhận rủi ro over-provisioning (Instructor giờ xem được toàn bộ profile hệ thống, không chỉ học viên lớp mình) như một đánh đổi tạm thời — theo dõi ở mục **H20** trong roadmap (gộp với H6) cho tới khi có logic scope "chỉ học viên lớp mình phụ trách" dựa trên `Class.InstructorAccountId`.
 
 ### B5 — QA/Academic không xem được Audit Trail
 
@@ -71,12 +71,18 @@ Body: { "departmentId": 1 }
 → 204 No Content
 ```
 
-Trả `400` nếu `departmentId` không tồn tại (nhờ ràng buộc FK ở tầng DB + `GlobalExceptionHandler` map `DbUpdateException` → 400), `404` nếu `id` account không tồn tại.
+Trả `404` nếu `id` account không tồn tại.
+
+**Cập nhật sau review pass (2026-08-04):** ban đầu `departmentId` không tồn tại chỉ được chặn gián tiếp qua FK constraint ở DB (lộ `DbUpdateException` thô ra client). Đã thêm kiểm tra `DepartmentRepository.GetByIdAsync(departmentId)` tường minh trước khi ghi — `departmentId` không tồn tại nay trả `400 Business rule violation` với message rõ ràng thay vì lỗi DB thô.
 
 ### B8 — Academic không upload/xoá được Evidence
 
 `UploadEvidence` và `DeleteEvidence` trong `EvidencesController` trước chỉ cho `Instructor,Admin`.
 **Đã sửa:** cả 2 action → `Instructor,Admin,Academic`. (Action `VerifyEvidence` — `QA,Admin` — giữ nguyên, đây là ranh giới segregation-of-duties đã cố ý thiết lập ở batch trước, Academic không được verify).
+
+**Cập nhật sau review pass (2026-08-04):** phát hiện 2 gap liên quan trực tiếp tới B8 mà bản merge ban đầu bỏ sót:
+1. `GetAll` (`GET /api/evidences`, danh sách minh chứng) vẫn chỉ cho `Instructor,QA,Admin` — Academic upload/xoá được nhưng không liệt kê được minh chứng của chính mình. Đã thêm `Academic` vào role list.
+2. `EvidenceService.DeleteEvidenceAsync` không ghi `AuditLog` — giờ Academic (thêm vào batch này) cũng xoá được, khoảng trống audit trail này trở thành rủi ro thực sự cho kiểm soát segregation-of-duties. Đã thêm `AuditLog` (ActionType="DELETE") theo đúng pattern curated-log đã dùng ở `AccountService`.
 
 ### B9 — `SubjectResultResponse` thiếu field `Score`
 
@@ -138,10 +144,25 @@ Lưu ý: `query` vẫn là tham số bắt buộc (không đổi) — gọi thi�
   - `GET /api/etr/1` với Admin: response chứa field `score` trong từng `subjectResults[]`.
   - `GET /api/search/etrs?query=Completed`, `GET /api/search/classes?query=a`: cả 2 trả về DTO đã làm giàu với tên học viên/lớp/khoá học, không còn raw entity.
 
+## 2b. Review pass sau merge (2026-08-04) — `/mpower:flow-review-code`
+
+Sau khi batch fix ở trên hoàn tất, một batch fix độc lập từ `main` (cùng xử lý report_20260803.md, do một dev khác thực hiện song song) được merge vào — conflict được resolve thủ công (xem review report để biết chi tiết resolve). Để xác nhận merge không làm hỏng gì và cả 10 mục B1-B10 vẫn đúng sau merge, đã chạy `/mpower:flow-review-code` (code review + security review song song, ASVS L2) trên toàn bộ diff `ec89bc9..HEAD` (20 file). Report đầy đủ: `.claude/workspace/reviews/flow-review-2026-08-04-files-2a2fc868.md`.
+
+**Kết quả đối chiếu B1-B10 sau merge:** 7/10 đúng nguyên trạng, 3/10 (B4, B7, B8) có gap phát sinh trong quá trình merge/hoàn thiện — đã fix ngay trong lượt review này (xem lại chi tiết ở mục B4/B7/B8 phía trên). Merge tự nó không làm mất nội dung hợp lệ của bên nào — 2 review agent độc lập cùng xác nhận.
+
+**Thêm 1 fix ngoài phạm vi B-item nhưng cần thiết:** `appsettings.json` — `DefaultConnection` password bị đổi thành `.` (1 ký tự) trong lúc merge, một artefact từ máy dev khác, làm hỏng `dotnet run` cho bất kỳ ai dùng đúng convention Docker SQL Server sẵn có của dự án. Đã khôi phục lại `MyStrongPassword123`.
+
+**Việc phát hiện nhưng CHƯA fix (ghi nhận minh bạch, theo dõi ở roadmap):**
+- **H20**: Instructor giờ có full-visibility (không scope) trên cả 3 endpoint `UserProfiles` — rủi ro IDOR đã biết, cần logic scope "chỉ học viên lớp mình phụ trách".
+- **H21**: cùng loại rủi ro (unscoped enumeration bởi Instructor/QA/Audit) trên `EnrollmentsController` và `EtrController` (student-history/current-status) — gộp chung với H20 vì cùng nguyên nhân gốc, nên sửa 1 lần.
+- **H22**: `AccountsController.GetAccountById` mở rộng cho 6 role lộ `Username` (email) — cần xác nhận với tác giả thay đổi (từ `main`) trước khi thu hẹp lại.
+- Ghi chú riêng: việc mở rộng `AuditController` cho Academic/QA (B5) bị security review gắn cờ là rủi ro segregation-of-duties, nhưng đây là yêu cầu nghiệp vụ đã có trong báo cáo FE (B5) và roadmap (H16) — KHÔNG revert, chỉ ghi nhận làm điểm cần xác nhận lại nếu tham chiếu FRD không đúng.
+
 ## 3. Rủi ro/việc còn lại
 
 - **H1 nay đã đóng hoàn toàn** cho cả `ApprovalsController` (batch 2026-08-03) và `EtrController` (batch này) — không còn controller nào trong hệ thống có class-level role-list hẹp hơn method-level.
-- **H6 (một phần còn mở)**: Instructor hiện thấy được 1 profile bất kỳ qua `GET /api/userprofiles/{accountId}` mà chưa bị giới hạn "chỉ học viên trong lớp mình phụ trách" — cần scope riêng dựa trên `Class.InstructorAccountId` (đã có từ batch C8) ở một lượt sau.
+- **H6/H20/H21 (còn mở, gộp chung)**: Instructor/QA/Audit hiện có full-visibility (không scope theo "lớp/học viên mình phụ trách") trên `UserProfiles`, `Enrollments`, và ETR student-history — cần 1 lượt scoping riêng dựa trên `Class.InstructorAccountId` (đã có từ batch C8).
+- **H22 (mới)**: `AccountsController.GetAccountById` mở rộng cho 6 role, cần xác nhận phạm vi đúng với tác giả gốc.
 - B1-B10 không đụng tới các mục ngoài phạm vi báo cáo FE (C1/C9/C10 mock-password/secrets/mock-admin-token, H2/H3/H5/H7-H13) — giữ đúng theo yêu cầu chỉ ưu tiên 10 vấn đề FE báo cáo.
 
 ## 4. Files liên quan
@@ -153,12 +174,13 @@ Lưu ý: `query` vẫn là tham số bắt buộc (không đổi) — gọi thi�
 | `ETR.API/Controllers/CoursesController.cs` | Sửa — tương tự Classes |
 | `ETR.API/Controllers/SubjectsController.cs` | Sửa — tương tự Classes |
 | `ETR.API/Controllers/EnrollmentsController.cs` | Sửa — class-level thêm QA,Instructor,Audit, narrow lại Create/Update/Delete |
-| `ETR.API/Controllers/UserProfilesController.cs` | Sửa — 3 action thêm QA/Audit(/Instructor) |
+| `ETR.API/Controllers/UserProfilesController.cs` | Sửa — 3 action thêm QA/Audit/Instructor (review pass: thêm Instructor vào GetAll + learners để khớp B4) |
 | `ETR.API/Controllers/AuditController.cs` | Sửa — class-level thêm QA,Academic |
 | `ETR.API/Controllers/EvidenceTypesController.cs` | Sửa — class-level thêm Instructor, narrow lại Create/Update/Delete |
-| `ETR.API/Controllers/EvidencesController.cs` | Sửa — Upload/Delete thêm Academic |
+| `ETR.API/Controllers/EvidencesController.cs` | Sửa — Upload/Delete thêm Academic (review pass: thêm Academic vào GetAll) |
 | `ETR.API/Controllers/AccountsController.cs` | Sửa — endpoint mới `PUT {id}/department` |
-| `ETR.Application/Services/AccountService.cs` | Sửa — thêm `UpdateAccountDepartmentAsync` |
+| `ETR.Application/Services/AccountService.cs` | Sửa — thêm `UpdateAccountDepartmentAsync` (review pass: thêm kiểm tra `departmentId` tồn tại) |
+| `ETR.Application/Services/EvidenceService.cs` | Sửa (review pass) — thêm `AuditLog` cho `DeleteEvidenceAsync` |
 | `ETR.Application/Interfaces/IAccountService.cs` | Sửa — thêm khai báo tương ứng |
 | `ETR.Application/DTOs/Account/AccountDtos.cs` | Sửa — thêm `UpdateAccountDepartmentRequest` |
 | `ETR.Application/DTOs/Etr/Responses/SubjectResultResponse.cs` | Sửa — thêm field `Score` |
@@ -166,4 +188,5 @@ Lưu ý: `query` vẫn là tham số bắt buộc (không đổi) — gọi thi�
 | `ETR.Application/DTOs/Search/EtrSearchResultResponse.cs` | Mới |
 | `ETR.Application/DTOs/Search/ClassSearchResultResponse.cs` | Mới |
 | `ETR.API/Controllers/SearchController.cs` | Sửa — trả DTO làm giàu thay vì raw entity |
+| `ETR.API/appsettings.json` | Sửa (review pass) — khôi phục password dev bị đổi trong lúc merge |
 | `ETR.Documentation/LO_TRINH_HOAN_THIEN_DU_AN.md` | Sửa — đánh dấu H14-H19, M16-M17, H1 là đã sửa |

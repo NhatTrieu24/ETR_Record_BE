@@ -1,3 +1,4 @@
+using ETR.Application.Compliance;
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
@@ -109,6 +110,9 @@ public class AccountService : IAccountService
     {
         var account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken)
             ?? throw new KeyNotFoundException($"Account {accountId} not found.");
+
+        _ = await _unitOfWork.DepartmentRepository.GetByIdAsync(departmentId, cancellationToken)
+            ?? throw new BusinessRuleViolationException($"Department {departmentId} does not exist.");
 
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
         {

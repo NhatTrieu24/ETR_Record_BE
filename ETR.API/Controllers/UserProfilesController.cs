@@ -29,12 +29,12 @@ public class UserProfilesController : ControllerBase
     /// [Core Responsibility]: Lấy danh sách tất cả các hồ sơ người dùng (user profiles).
     /// [Target Audience]: Admin, Academic
     /// </summary>
-    // QA/Audit need full visibility for verification/audit purposes. Instructor is deliberately NOT
-    // added here (unlike the single-profile lookup below) — enumerating every profile in the system
-    // is a bigger over-provisioning risk than looking up one known accountId; scoping Instructor to
-    // "students in classes they teach" is tracked separately (see H6 in LO_TRINH_HOAN_THIEN_DU_AN.md).
+    // QA/Audit need full visibility for verification/audit purposes. Instructor is granted here per
+    // FE report B4 (report_20260803.md) despite the over-provisioning risk of full enumeration —
+    // scoping Instructor to "students in classes they teach" is tracked separately as H20 in
+    // LO_TRINH_HOAN_THIEN_DU_AN.md and should replace this blanket grant once implemented.
     [HttpGet]
-    [Authorize(Roles = "Admin,Academic,QA,Audit")]
+    [Authorize(Roles = "Admin,Academic,QA,Audit,Instructor")]
     public async Task<ActionResult<IEnumerable<UserProfileResponse>>> GetAllUserProfiles(CancellationToken cancellationToken)
     {
         var profiles = await _userProfileService.GetAllProfilesAsync(cancellationToken);
@@ -47,7 +47,7 @@ public class UserProfilesController : ControllerBase
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpGet("learners")]
-    [Authorize(Roles = "Admin,Academic,TrainingManager,QA,Audit")]
+    [Authorize(Roles = "Admin,Academic,TrainingManager,QA,Audit,Instructor")]
     public async Task<ActionResult<IEnumerable<UserProfileResponse>>> GetLearnerProfiles(CancellationToken cancellationToken)
     {
         var profiles = await _userProfileService.GetLearnerProfilesAsync(cancellationToken);
