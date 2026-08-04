@@ -9,4 +9,5 @@ public interface IUserProfileService
     Task<UserProfileResponse> GetProfileByAccountIdAsync(int accountId, CancellationToken cancellationToken = default);
     Task<UserProfileResponse> CreateProfileAsync(CreateUserProfileRequest request, int accountId, int createdByAccountId, CancellationToken cancellationToken = default);
     Task<UserProfileResponse> UpdateProfileAsync(int accountId, UpdateUserProfileRequest request, int updatedByAccountId, CancellationToken cancellationToken = default);
+    Task<UserProfileResponse> UpdateProfileStatusAsync(int accountId, string status, int updatedByAccountId, CancellationToken cancellationToken = default);
 }

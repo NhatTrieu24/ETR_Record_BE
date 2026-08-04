@@ -243,12 +243,39 @@ public class EnrollmentService : IEnrollmentService
             Description = $"Enrollment #{id} (Account {item.AccountId}, Class {item.ClassId}) deleted"
         }, cancellationToken);
 
+        item.Status = "Withdrawn";
         item.IsDeleted = true;
         item.DeletedAt = DateTime.UtcNow;
         item.UpdatedAt = DateTime.UtcNow;
         item.UpdatedByAccountId = deletedByAccountId;
 
         _unitOfWork.CourseEnrollmentRepository.Update(item);
+
+        // Cascade: an Enrollment cannot be withdrawn while leaving its ETR/ClassStudent behind in
+        // an "active" state — the guard above only allows this while the ETR is still Draft/InProgress,
+        // so cancelling it here is safe (no completed/locked data is being touched).
+        if (etrRecord != null)
+        {
+            etrRecord.Status = "Cancelled";
+            etrRecord.IsDeleted = true;
+            etrRecord.DeletedAt = DateTime.UtcNow;
+            etrRecord.UpdatedAt = DateTime.UtcNow;
+            etrRecord.UpdatedByAccountId = deletedByAccountId;
+            _unitOfWork.ETRCourseRecordRepository.Update(etrRecord);
+        }
+
+        var classStudent = (await _unitOfWork.ClassStudentRepository.GetAllAsync(cancellationToken))
+            .FirstOrDefault(cs => cs.CourseEnrollmentId == id);
+        if (classStudent != null)
+        {
+            classStudent.Status = "Withdrawn";
+            classStudent.IsDeleted = true;
+            classStudent.DeletedAt = DateTime.UtcNow;
+            classStudent.UpdatedAt = DateTime.UtcNow;
+            classStudent.UpdatedByAccountId = deletedByAccountId;
+            _unitOfWork.ClassStudentRepository.Update(classStudent);
+        }
+
         await _unitOfWork.SaveAsync(cancellationToken);
     }
 }

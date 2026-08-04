@@ -11,5 +11,9 @@ public class UserProfile : BaseEntity
     public string Gender { get; set; } = string.Empty;
     public string? Organization { get; set; }
 
+    /// <summary>Overall learner status (Active/Withdrawn/Graduated) — independent of any single
+    /// Enrollment.Status, which tracks a specific class enrollment rather than the person overall.</summary>
+    public string Status { get; set; } = "Active";
+
     public Account Account { get; set; } = null!;
 }

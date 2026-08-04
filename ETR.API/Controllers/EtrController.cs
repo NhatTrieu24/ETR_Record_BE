@@ -85,6 +85,20 @@ public class EtrController : ControllerBase
     }
 
     /// <summary>
+    /// [Module/Flow]: Xử lý ETR
+    /// [Core Responsibility]: Xem % đáp ứng các điều kiện hoàn thành trước khi Submit, không cần
+    /// đợi Submit thất bại mới biết đang thiếu gì.
+    /// [Target Audience]: Instructor, QA, Admin, Audit, Academic, TrainingManager
+    /// </summary>
+    [HttpGet("{id}/completion-progress")]
+    [Authorize(Roles = "Instructor,QA,Admin,Audit,Academic,TrainingManager")]
+    public async Task<ActionResult<EtrCompletionProgressResponse>> GetCompletionProgress(int id, CancellationToken cancellationToken)
+    {
+        var progress = await _etrService.GetCompletionProgressAsync(id, cancellationToken);
+        return Ok(progress);
+    }
+
+    /// <summary>
     /// Gửi một ETR để chờ xác minh (verification).
     /// </summary>
     /// <param name="id">The ETR Course Record ID.</param>

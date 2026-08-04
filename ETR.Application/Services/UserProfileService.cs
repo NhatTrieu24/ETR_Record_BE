@@ -147,16 +147,46 @@ public class UserProfileService : IUserProfileService
         return MapToResponse(profile);
     }
 
+    public async Task<UserProfileResponse> UpdateProfileStatusAsync(int accountId, string status, int updatedByAccountId, CancellationToken cancellationToken = default)
+    {
+        var profiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
+        var profile = profiles.FirstOrDefault(p => p.AccountId == accountId)
+            ?? throw new KeyNotFoundException($"UserProfile for Account {accountId} not found.");
+
+        var oldStatus = profile.Status;
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = updatedByAccountId,
+            ActionType = "UPDATE",
+            EntityName = nameof(UserProfile),
+            RecordId = profile.AccountId,
+            OldValue = oldStatus,
+            NewValue = status,
+            Description = $"UserProfile for Account #{accountId} status changed from '{oldStatus}' to '{status}'"
+        }, cancellationToken);
+
+        profile.Status = status;
+        profile.UpdatedAt = DateTime.UtcNow;
+        profile.UpdatedByAccountId = updatedByAccountId;
+
+        _unitOfWork.UserProfileRepository.Update(profile);
+        await _unitOfWork.SaveAsync(cancellationToken);
+
+        return MapToResponse(profile);
+    }
+
     private static UserProfileResponse MapToResponse(UserProfile p)
     {
         return new UserProfileResponse(
-            p.AccountId, 
-            p.UserCode, 
-            p.FullName, 
-            p.Email, 
-            p.Phone, 
-            p.DateOfBirth, 
-            p.Gender, 
-            p.Organization);
+            p.AccountId,
+            p.UserCode,
+            p.FullName,
+            p.Email,
+            p.Phone,
+            p.DateOfBirth,
+            p.Gender,
+            p.Organization,
+            p.Status);
     }
 }

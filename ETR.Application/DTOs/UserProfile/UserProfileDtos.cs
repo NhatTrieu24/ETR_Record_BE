@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace ETR.Application.DTOs;
 
 public record UserProfileResponse(
@@ -8,7 +10,12 @@ public record UserProfileResponse(
     string? Phone,
     DateTime DateOfBirth,
     string Gender,
-    string? Organization);
+    string? Organization,
+    string Status);
+
+public record UpdateUserProfileStatusRequest(
+    [Required, RegularExpression("^(Active|Withdrawn|Graduated)$", ErrorMessage = "Status must be one of: Active, Withdrawn, Graduated.")]
+    string Status);
 
 public record CreateUserProfileRequest(
     string? UserCode,

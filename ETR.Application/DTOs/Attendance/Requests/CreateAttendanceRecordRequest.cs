@@ -5,5 +5,5 @@ namespace ETR.Application.DTOs;
 public record CreateAttendanceRecordRequest(
     int SessionId,
     int ClassStudentId,
-    [Required, MaxLength(20)] string Status,
+    [Required, RegularExpression("^(Present|Absent|Late)$", ErrorMessage = "Status must be one of: Present, Absent, Late.")] string Status,
     [MaxLength(500)] string? Remarks);

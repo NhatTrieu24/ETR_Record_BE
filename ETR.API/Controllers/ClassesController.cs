@@ -8,7 +8,7 @@ namespace ETR.API.Controllers;
 /// <summary>
 /// [Module/Flow]: Quản lý Dữ liệu Gốc (Master Data)
 /// [Core Responsibility]: Manages classes and scheduling.
-/// [Target Audience]: Admin, Academic, TrainingManager
+/// [Target Audience]: Admin, Academic
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
@@ -27,7 +27,7 @@ public class ClassesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Quản lý Dữ liệu Gốc (Master Data)
     /// [Core Responsibility]: Lấy danh sách tất cả các lớp học.
-    /// [Target Audience]: Admin, Academic, TrainingManager
+    /// [Target Audience]: Admin, Academic
     /// </summary>
     [HttpGet]
     public async Task<IActionResult> GetAllClasses(CancellationToken cancellationToken)
@@ -39,7 +39,7 @@ public class ClassesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Quản lý Dữ liệu Gốc (Master Data)
     /// [Core Responsibility]: Lấy thông tin một lớp học theo ID.
-    /// [Target Audience]: Admin, Academic, TrainingManager
+    /// [Target Audience]: Admin, Academic
     /// </summary>
     [HttpGet("{id}")]
     public async Task<IActionResult> GetClass(int id, CancellationToken cancellationToken)
@@ -51,10 +51,10 @@ public class ClassesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Quản lý Dữ liệu Gốc (Master Data)
     /// [Core Responsibility]: Tạo một lớp học mới.
-    /// [Target Audience]: Admin, Academic, TrainingManager
+    /// [Target Audience]: Admin, Academic
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "Admin,Academic,TrainingManager")]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<IActionResult> CreateClass([FromBody] CreateClassRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -65,10 +65,10 @@ public class ClassesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Quản lý Dữ liệu Gốc (Master Data)
     /// [Core Responsibility]: Cập nhật một lớp học hiện có.
-    /// [Target Audience]: Admin, Academic, TrainingManager
+    /// [Target Audience]: Admin, Academic
     /// </summary>
     [HttpPut("{id}")]
-    [Authorize(Roles = "Admin,Academic,TrainingManager")]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<IActionResult> UpdateClass(int id, [FromBody] UpdateClassRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -79,10 +79,10 @@ public class ClassesController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Quản lý Dữ liệu Gốc (Master Data)
     /// [Core Responsibility]: Xóa mềm (soft delete) một lớp học.
-    /// [Target Audience]: Admin, Academic, TrainingManager
+    /// [Target Audience]: Admin, Academic
     /// </summary>
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Admin,Academic,TrainingManager")]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<IActionResult> DeleteClass(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();

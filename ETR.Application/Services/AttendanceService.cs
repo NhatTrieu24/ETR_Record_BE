@@ -132,6 +132,10 @@ public class AttendanceService : IAttendanceService
                 var record = await _unitOfWork.AttendanceRecordRepository.GetByIdAsync(id, ct);
                 if (record == null) throw new KeyNotFoundException("AttendanceRecord not found.");
 
+                var session = await _unitOfWork.SessionRepository.GetByIdAsync(record.SessionId, ct);
+                if (session != null && session.IsConfirmed)
+                    throw new BusinessRuleViolationException("Cannot modify an attendance record for a session that has already been confirmed.");
+
                 record.Status = request.Status;
                 record.Remarks = request.Remarks;
                 record.UpdatedAt = DateTime.UtcNow;
@@ -165,6 +169,10 @@ public class AttendanceService : IAttendanceService
                 var record = await _unitOfWork.AttendanceRecordRepository.GetByIdAsync(id, ct);
                 if (record == null) throw new KeyNotFoundException("AttendanceRecord not found.");
 
+                var session = await _unitOfWork.SessionRepository.GetByIdAsync(record.SessionId, ct);
+                if (session != null && session.IsConfirmed)
+                    throw new BusinessRuleViolationException("Cannot delete an attendance record for a session that has already been confirmed.");
+
                 record.IsDeleted = true;
                 record.DeletedAt = DateTime.UtcNow;
                 record.UpdatedAt = DateTime.UtcNow;
@@ -184,6 +192,47 @@ public class AttendanceService : IAttendanceService
                 throw;
             }
         }, cancellationToken);
+    }
+
+    public async Task<IEnumerable<LowAttendanceStudentResponse>> GetLowAttendanceStudentsAsync(int? classId, CancellationToken cancellationToken = default)
+    {
+        var subjectResults = (await _unitOfWork.SubjectResultRepository.GetAllAsync(cancellationToken))
+            .Where(sr => sr.AttendanceRate.HasValue && sr.AttendanceRate.Value < BusinessRuleEngine.MinimumAttendanceThreshold)
+            .ToList();
+
+        if (subjectResults.Count == 0) return Enumerable.Empty<LowAttendanceStudentResponse>();
+
+        var etrs = (await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken)).ToList();
+        var enrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken)).ToList();
+        var profiles = (await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken)).ToList();
+        var classes = (await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken)).ToList();
+        var subjects = (await _unitOfWork.SubjectRepository.GetAllAsync(cancellationToken)).ToDictionary(s => s.SubjectId, s => s);
+
+        var result = new List<LowAttendanceStudentResponse>();
+        foreach (var sr in subjectResults)
+        {
+            var etr = etrs.FirstOrDefault(e => e.ETRCourseRecordId == sr.EtrId);
+            var enrollment = etr == null ? null : enrollments.FirstOrDefault(e => e.EnrollmentId == etr.EnrollmentId);
+            if (enrollment == null) continue;
+            if (classId.HasValue && enrollment.ClassId != classId.Value) continue;
+
+            var trainingClass = classes.FirstOrDefault(c => c.ClassId == enrollment.ClassId);
+            var profile = profiles.FirstOrDefault(p => p.AccountId == enrollment.AccountId);
+            var subject = subjects.GetValueOrDefault(sr.SubjectId);
+
+            result.Add(new LowAttendanceStudentResponse(
+                enrollment.AccountId,
+                profile?.UserCode ?? "-",
+                profile?.FullName ?? "-",
+                enrollment.ClassId,
+                trainingClass?.ClassCode ?? "-",
+                sr.SubjectId,
+                subject?.SubjectCode ?? "-",
+                sr.AttendanceRate!.Value,
+                BusinessRuleEngine.MinimumAttendanceThreshold));
+        }
+
+        return result.OrderBy(r => r.AttendanceRate);
     }
 
     // Ngưỡng đã diễn ra/đã confirm — không tính trên tổng session kế hoạch (mẫu số sai nếu lớp chưa học hết).
