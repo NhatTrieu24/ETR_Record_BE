@@ -54,6 +54,7 @@ public class SubjectsController : ControllerBase
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Admin,Academic,TrainingManager")]
     public async Task<IActionResult> CreateSubject([FromBody] CreateSubjectRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -67,6 +68,7 @@ public class SubjectsController : ControllerBase
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin,Academic,TrainingManager")]
     public async Task<IActionResult> UpdateSubject(int id, [FromBody] UpdateSubjectRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -80,6 +82,7 @@ public class SubjectsController : ControllerBase
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin,Academic,TrainingManager")]
     public async Task<IActionResult> DeleteSubject(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();

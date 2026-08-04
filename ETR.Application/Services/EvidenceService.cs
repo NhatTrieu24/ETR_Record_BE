@@ -160,6 +160,17 @@ public class EvidenceService : IEvidenceService
         if (evidence == null)
             throw new KeyNotFoundException($"Evidence with ID {id} not found.");
 
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = deletedByAccountId,
+            ActionType = "DELETE",
+            EntityName = nameof(EvidenceFile),
+            RecordId = id,
+            OldValue = evidence.VerificationStatus,
+            NewValue = "Deleted",
+            Description = $"EvidenceFile #{id} (status {evidence.VerificationStatus}) soft-deleted by AccountId {deletedByAccountId}"
+        }, cancellationToken);
+
         // Soft delete based on BaseEntity pattern
         evidence.IsDeleted = true;
         evidence.DeletedAt = DateTime.UtcNow;

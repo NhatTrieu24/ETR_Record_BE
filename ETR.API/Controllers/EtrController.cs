@@ -10,9 +10,15 @@ namespace ETR.API.Controllers;
 /// [Core Responsibility]: Handles the workflow and state transitions of the Electronic Training Record (ETR).
 /// [Target Audience]: Instructor, QA, Admin
 /// </summary>
+// NOTE: ASP.NET Core combines class-level and method-level [Authorize(Roles=...)] via AND, not
+// OR — a class-level role restriction here would silently void any method-level role this
+// controller's actions grant but the class-level list omits (this exact bug blocked Academic and
+// TrainingManager from several actions until 2026-08-04; same class of bug fixed on
+// ApprovalsController on 2026-08-03). Leave authentication-only at class-level and let each
+// action's own [Authorize(Roles=...)] be the sole source of truth for who can call it.
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin,QA,Student,Instructor,Audit,Academic,TrainingManager")] // Secure all endpoints in this controller by default
+[Authorize]
 public class EtrController : ControllerBase
 {
     private readonly IEtrService _etrService;
@@ -36,7 +42,7 @@ public class EtrController : ControllerBase
     /// <response code="200">Returns the list of ETR records.</response>
     /// <response code="401">If the user is not authenticated.</response>
     [HttpGet]
-    [Authorize(Roles = "Instructor,QA,Admin,Audit,Academic")]
+    [Authorize(Roles = "Instructor,QA,Admin,Audit,Academic,TrainingManager")]
     public async Task<ActionResult<IEnumerable<EtrRecordResponse>>> GetAllEtrs(CancellationToken cancellationToken)
     {
         var etrs = await _etrService.GetAllEtrsAsync(cancellationToken);
@@ -71,7 +77,7 @@ public class EtrController : ControllerBase
     /// <response code="401">If the user is not authenticated.</response>
     /// <response code="404">If the ETR record is not found.</response>
     [HttpGet("{id}")]
-    [Authorize(Roles = "Instructor,QA,Admin,Audit,Academic")]
+    [Authorize(Roles = "Instructor,QA,Admin,Audit,Academic,TrainingManager")]
     public async Task<ActionResult<EtrDetailsResponse>> GetEtrById(int id, CancellationToken cancellationToken)
     {
         var etr = await _etrService.GetEtrByIdAsync(id, cancellationToken);
@@ -86,9 +92,9 @@ public class EtrController : ControllerBase
     /// <returns>The updated ETR record.</returns>
     /// <response code="200">Returns the updated record.</response>
     /// <response code="401">If the user is not authenticated.</response>
-    /// <response code="403">If the user is not an Instructor or Admin.</response>
+    /// <response code="403">If the user is not an Instructor, Academic, or Admin.</response>
     [HttpPost("{id}/submit")]
-    [Authorize(Roles = "Instructor,Admin")]
+    [Authorize(Roles = "Instructor,Admin,Academic")]
     public async Task<IActionResult> SubmitEtr(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId

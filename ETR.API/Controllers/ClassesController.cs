@@ -54,6 +54,7 @@ public class ClassesController : ControllerBase
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Admin,Academic,TrainingManager")]
     public async Task<IActionResult> CreateClass([FromBody] CreateClassRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -67,6 +68,7 @@ public class ClassesController : ControllerBase
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin,Academic,TrainingManager")]
     public async Task<IActionResult> UpdateClass(int id, [FromBody] UpdateClassRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -80,6 +82,7 @@ public class ClassesController : ControllerBase
     /// [Target Audience]: Admin, Academic, TrainingManager
     /// </summary>
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin,Academic,TrainingManager")]
     public async Task<IActionResult> DeleteClass(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();

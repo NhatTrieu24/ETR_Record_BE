@@ -5,5 +5,5 @@ public record SubjectResultResponse(
     int SubjectId,
     string Status,
     DateTime CreatedAt,
-    decimal? Score = null,
-    decimal? AttendanceRate = null);
+    decimal? AttendanceRate = null,
+    decimal? Score = null);

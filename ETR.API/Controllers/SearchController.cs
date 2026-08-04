@@ -1,3 +1,4 @@
+using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -32,10 +33,22 @@ public class SearchController : ControllerBase
     public async Task<IActionResult> SearchClasses([FromQuery] string query, CancellationToken cancellationToken)
     {
         var classes = await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken);
-        var result = classes
-            .Where(c => string.IsNullOrWhiteSpace(query) || c.ClassName.Contains(query, StringComparison.OrdinalIgnoreCase))
-            .Select(c => new { c.ClassId, c.ClassCode, c.ClassName, c.Status })
-            .ToList();
+        var courses = (await _unitOfWork.CourseRepository.GetAllAsync(cancellationToken)).ToList();
+
+        var matches = classes.Where(c => string.IsNullOrWhiteSpace(query) || c.ClassName.Contains(query, StringComparison.OrdinalIgnoreCase));
+
+        var result = matches.Select(c =>
+        {
+            var course = courses.FirstOrDefault(co => co.CourseId == c.CourseId);
+            return new ClassSearchResultResponse(
+                c.ClassId,
+                c.ClassCode,
+                c.ClassName,
+                course?.CourseCode ?? "-",
+                course?.CourseName ?? "-",
+                c.Status);
+        }).ToList();
+
         return Ok(result);
     }
 
@@ -54,6 +67,8 @@ public class SearchController : ControllerBase
         var etrs = (await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken)).AsEnumerable();
         var enrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken)).ToList();
         var profiles = (await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken)).ToList();
+        var classes = (await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken)).ToList();
+        var courses = (await _unitOfWork.CourseRepository.GetAllAsync(cancellationToken)).ToList();
 
         // Zero-Trust: Students only search within their own ETRs.
         if (roleName == "Student")
@@ -75,22 +90,25 @@ public class SearchController : ControllerBase
             });
         }
 
-        var classes = (await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken)).ToList();
-
-        var resultList = etrs.Select(etr => {
+        // Enrich with display names — FE needs student/class/course names, not just raw IDs.
+        var result = etrs.Select(etr =>
+        {
             var enrollment = enrollments.FirstOrDefault(e => e.EnrollmentId == etr.EnrollmentId);
             var profile = enrollment == null ? null : profiles.FirstOrDefault(p => p.AccountId == enrollment.AccountId);
-            var cls = enrollment == null ? null : classes.FirstOrDefault(c => c.ClassId == enrollment.ClassId);
-            return new {
+            var trainingClass = enrollment == null ? null : classes.FirstOrDefault(c => c.ClassId == enrollment.ClassId);
+            var course = trainingClass == null ? null : courses.FirstOrDefault(co => co.CourseId == trainingClass.CourseId);
+
+            return new EtrSearchResultResponse(
                 etr.ETRCourseRecordId,
                 etr.Status,
-                etr.EnrollmentId,
-                StudentName = profile?.FullName ?? "Unknown",
-                ClassName = cls?.ClassName ?? "Unknown"
-            };
+                profile?.FullName ?? "-",
+                trainingClass?.ClassCode ?? "-",
+                trainingClass?.ClassName ?? "-",
+                course?.CourseCode ?? "-",
+                course?.CourseName ?? "-");
         }).ToList();
 
-        return Ok(resultList);
+        return Ok(result);
     }
 }
 
