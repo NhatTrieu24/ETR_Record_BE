@@ -8,15 +8,29 @@ namespace ETR.Application.Services;
 public class EnrollmentService : IEnrollmentService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICurrentUserService _currentUserService;
 
-    public EnrollmentService(IUnitOfWork unitOfWork)
+    public EnrollmentService(IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
     {
         _unitOfWork = unitOfWork;
+        _currentUserService = currentUserService;
+    }
+
+    private async Task<HashSet<int>> GetInstructorClassIdsAsync(int instructorAccountId, CancellationToken cancellationToken)
+    {
+        var classes = await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken);
+        return classes.Where(c => c.InstructorAccountId == instructorAccountId).Select(c => c.ClassId).ToHashSet();
     }
 
     public async Task<IEnumerable<EnrollmentResponse>> GetAllEnrollmentsAsync(CancellationToken cancellationToken = default)
     {
         var enrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken);
+        
+        if (_currentUserService.RoleName == "Instructor" && _currentUserService.AccountId.HasValue)
+        {
+            var myClassIds = await GetInstructorClassIdsAsync(_currentUserService.AccountId.Value, cancellationToken);
+            enrollments = enrollments.Where(e => myClassIds.Contains(e.ClassId)).ToList();
+        }
         return enrollments.Select(e => new EnrollmentResponse(
             e.EnrollmentId,
             e.AccountId,
@@ -30,6 +44,15 @@ public class EnrollmentService : IEnrollmentService
         var e = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(enrollmentId, cancellationToken)
             ?? throw new KeyNotFoundException("Enrollment not found");
 
+        if (_currentUserService.RoleName == "Instructor" && _currentUserService.AccountId.HasValue)
+        {
+            var myClassIds = await GetInstructorClassIdsAsync(_currentUserService.AccountId.Value, cancellationToken);
+            if (!myClassIds.Contains(e.ClassId))
+            {
+                throw new KeyNotFoundException("Enrollment not found");
+            }
+        }
+
         return new EnrollmentResponse(
             e.EnrollmentId,
             e.AccountId,
@@ -41,6 +64,13 @@ public class EnrollmentService : IEnrollmentService
     public async Task<IEnumerable<EnrollmentResponse>> GetEnrollmentsByStudentIdAsync(int studentId, CancellationToken cancellationToken = default)
     {
         var enrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken);
+        
+        if (_currentUserService.RoleName == "Instructor" && _currentUserService.AccountId.HasValue)
+        {
+            var myClassIds = await GetInstructorClassIdsAsync(_currentUserService.AccountId.Value, cancellationToken);
+            enrollments = enrollments.Where(e => myClassIds.Contains(e.ClassId)).ToList();
+        }
+        
         return enrollments
             .Where(e => e.AccountId == studentId)
             .Select(e => new EnrollmentResponse(

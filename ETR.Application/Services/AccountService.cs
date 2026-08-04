@@ -8,15 +8,33 @@ namespace ETR.Application.Services;
 public class AccountService : IAccountService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICurrentUserService _currentUserService;
 
-    public AccountService(IUnitOfWork unitOfWork)
+    public AccountService(IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
     {
         _unitOfWork = unitOfWork;
+        _currentUserService = currentUserService;
+    }
+
+    private async Task<HashSet<int>> GetInstructorStudentIdsAsync(int instructorAccountId, CancellationToken cancellationToken)
+    {
+        var classes = await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken);
+        var instructorClassIds = classes.Where(c => c.InstructorAccountId == instructorAccountId).Select(c => c.ClassId).ToHashSet();
+        
+        var enrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken);
+        return enrollments.Where(e => instructorClassIds.Contains(e.ClassId)).Select(e => e.AccountId).ToHashSet();
     }
 
     public async Task<IEnumerable<AccountResponse>> GetAllAccountsAsync(CancellationToken cancellationToken = default)
     {
         var accounts = await _unitOfWork.AccountRepository.GetAllAsync(cancellationToken);
+        
+        if (_currentUserService.RoleName == "Instructor" && _currentUserService.AccountId.HasValue)
+        {
+            var studentIds = await GetInstructorStudentIdsAsync(_currentUserService.AccountId.Value, cancellationToken);
+            accounts = accounts.Where(a => studentIds.Contains(a.AccountId)).ToList();
+        }
+
         return accounts.Select(a => new AccountResponse(a.AccountId, a.Username, a.RoleId, a.DepartmentId, a.Status, a.IsActive));
     }
 
@@ -24,6 +42,15 @@ public class AccountService : IAccountService
     {
         var account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken)
             ?? throw new KeyNotFoundException($"Account {accountId} not found.");
+            
+        if (_currentUserService.RoleName == "Instructor" && _currentUserService.AccountId.HasValue)
+        {
+            var studentIds = await GetInstructorStudentIdsAsync(_currentUserService.AccountId.Value, cancellationToken);
+            if (!studentIds.Contains(accountId))
+            {
+                throw new KeyNotFoundException($"Account {accountId} not found.");
+            }
+        }
             
         return new AccountResponse(account.AccountId, account.Username, account.RoleId, account.DepartmentId, account.Status, account.IsActive);
     }

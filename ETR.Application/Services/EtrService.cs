@@ -9,15 +9,37 @@ namespace ETR.Application.Services;
 public class EtrService : IEtrService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICurrentUserService _currentUserService;
 
-    public EtrService(IUnitOfWork unitOfWork)
+    public EtrService(IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
     {
         _unitOfWork = unitOfWork;
+        _currentUserService = currentUserService;
+    }
+
+    private async Task<HashSet<int>> GetInstructorClassIdsAsync(int instructorAccountId, CancellationToken cancellationToken)
+    {
+        var classes = await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken);
+        return classes.Where(c => c.InstructorAccountId == instructorAccountId).Select(c => c.ClassId).ToHashSet();
+    }
+
+    private async Task<HashSet<int>> GetInstructorEnrollmentIdsAsync(int instructorAccountId, CancellationToken cancellationToken)
+    {
+        var classIds = await GetInstructorClassIdsAsync(instructorAccountId, cancellationToken);
+        var enrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken);
+        return enrollments.Where(e => classIds.Contains(e.ClassId)).Select(e => e.EnrollmentId).ToHashSet();
     }
 
     public async Task<IEnumerable<EtrRecordResponse>> GetAllEtrsAsync(CancellationToken cancellationToken = default)
     {
         var etrs = await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken);
+        
+        if (_currentUserService.RoleName == "Instructor" && _currentUserService.AccountId.HasValue)
+        {
+            var myEnrollmentIds = await GetInstructorEnrollmentIdsAsync(_currentUserService.AccountId.Value, cancellationToken);
+            etrs = etrs.Where(e => myEnrollmentIds.Contains(e.EnrollmentId)).ToList();
+        }
+
         return etrs.Select(e => new EtrRecordResponse(
             e.ETRCourseRecordId,
             e.EnrollmentId,
@@ -56,6 +78,15 @@ public class EtrService : IEtrService
     {
         var e = await _unitOfWork.ETRCourseRecordRepository.GetWithSubjectResultsAsync(etrCourseRecordId, cancellationToken)
             ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
+
+        if (_currentUserService.RoleName == "Instructor" && _currentUserService.AccountId.HasValue)
+        {
+            var myEnrollmentIds = await GetInstructorEnrollmentIdsAsync(_currentUserService.AccountId.Value, cancellationToken);
+            if (!myEnrollmentIds.Contains(e.EnrollmentId))
+            {
+                throw new KeyNotFoundException($"ETRCourseRecord not found.");
+            }
+        }
 
         var subjectResults = e.SubjectResults?.Select(sr => new SubjectResultResponse(
             sr.SubjectResultId,
@@ -472,6 +503,12 @@ public class EtrService : IEtrService
         var enrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken);
         var studentEnrollmentIds = enrollments.Where(e => e.AccountId == studentId).Select(e => e.EnrollmentId).ToList();
 
+        if (_currentUserService.RoleName == "Instructor" && _currentUserService.AccountId.HasValue)
+        {
+            var myEnrollmentIds = await GetInstructorEnrollmentIdsAsync(_currentUserService.AccountId.Value, cancellationToken);
+            studentEnrollmentIds = studentEnrollmentIds.Intersect(myEnrollmentIds).ToList();
+        }
+
         var etrs = await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken);
         return etrs
             .Where(e => studentEnrollmentIds.Contains(e.EnrollmentId))
@@ -493,6 +530,12 @@ public class EtrService : IEtrService
     {
         var enrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken);
         var studentEnrollments = enrollments.Where(e => e.AccountId == studentId).ToList();
+        
+        if (_currentUserService.RoleName == "Instructor" && _currentUserService.AccountId.HasValue)
+        {
+            var myClassIds = await GetInstructorClassIdsAsync(_currentUserService.AccountId.Value, cancellationToken);
+            studentEnrollments = studentEnrollments.Where(e => myClassIds.Contains(e.ClassId)).ToList();
+        }
         
         var classes = await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken);
         var courses = await _unitOfWork.CourseRepository.GetAllAsync(cancellationToken);
@@ -540,6 +583,12 @@ public class EtrService : IEtrService
     {
         var enrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken);
         var classes = (await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken)).Where(c => c.CourseId == courseId).ToList();
+        
+        if (_currentUserService.RoleName == "Instructor" && _currentUserService.AccountId.HasValue)
+        {
+            classes = classes.Where(c => c.InstructorAccountId == _currentUserService.AccountId.Value).ToList();
+        }
+        
         var classIds = classes.Select(c => c.ClassId).ToList();
         var courseEnrollments = enrollments.Where(e => classIds.Contains(e.ClassId)).ToList();
         
