@@ -1,0 +1,317 @@
+﻿## AccountsController
+Class-level Auth: [Authorize]
+
+  - Endpoint: [HttpGet]
+    Auth: [Authorize(Roles = "Admin,Academic,Audit")]
+  - Endpoint: [HttpGet("{id:int}")]
+    Auth: [Authorize(Roles = "Admin,Academic,QA,Instructor,Audit,TrainingManager")]
+  - Endpoint: [HttpPost]
+    Auth: [Authorize(Roles = "Admin,Academic")]
+  - Endpoint: [HttpPut("{id:int}/status")]
+    Auth: [Authorize(Roles = "Admin")]
+  - Endpoint: [HttpPut("{id:int}/role")]
+    Auth: [Authorize(Roles = "Admin")]
+  - Endpoint: [HttpPut("{id:int}/department")]
+    Auth: [Authorize(Roles = "Admin")]
+  - Endpoint: [HttpDelete("{id:int}")]
+    Auth: [Authorize(Roles = "Admin")]
+
+## ApprovalsController
+Class-level Auth: [Authorize(Roles = "Admin,Instructor,QA,TrainingManager,Audit")]
+
+    Auth: // NOTE: ASP.NET Core combines class-level and method-level [Authorize(Roles=...)] via AND, not OR â€”
+  - Endpoint: [HttpGet]
+  - Endpoint: [HttpPost]
+    Auth: [Authorize(Roles = "Admin,Instructor,TrainingManager")]
+  - Endpoint: [HttpPost("{id}/process")]
+    Auth: [Authorize(Roles = "Admin,QA,TrainingManager")]
+  - Endpoint: [HttpPut("{id}")]
+    Auth: [Authorize(Roles = "Admin,Instructor,TrainingManager")]
+  - Endpoint: [HttpDelete("{id}")]
+    Auth: [Authorize(Roles = "Admin,Instructor,TrainingManager")]
+
+## AssessmentResultsController
+Class-level Auth: [Authorize]
+
+  - Endpoint: [HttpGet]
+    Auth: [Authorize(Roles = "Instructor,Admin,Academic,Audit")]
+  - Endpoint: [HttpPost("record")]
+    Auth: [Authorize(Roles = "Instructor,Admin")]
+  - Endpoint: [HttpGet("student/{classStudentId}")]
+    Auth: [Authorize] // Allow students to also fetch their own results, validation inside service
+  - Endpoint: [HttpGet("{id}")]
+    Auth: [Authorize(Roles = "Instructor,Admin,Academic,Audit")]
+  - Endpoint: [HttpPut("{id}")]
+    Auth: [Authorize(Roles = "Instructor,Admin")]
+    Auth: [Authorize(Roles = "Instructor,Admin")]
+  - Endpoint: [HttpDelete("{id}")]
+    Auth: [Authorize(Roles = "Instructor,Admin")]
+
+## AssessmentsController
+Class-level Auth: [Authorize(Roles = "Admin,Instructor")]
+
+  - Endpoint: [HttpGet]
+  - Endpoint: [HttpGet("{id}")]
+  - Endpoint: [HttpPost]
+  - Endpoint: [HttpPut("{id}")]
+  - Endpoint: [HttpDelete("{id}")]
+
+## AttendanceController
+Class-level Auth: [Authorize]
+
+  - Endpoint: [HttpGet]
+    Auth: [Authorize(Roles = "Instructor,Admin,Academic,Audit")]
+  - Endpoint: [HttpPost("record")]
+    Auth: [Authorize(Roles = "Instructor,Admin")]
+  - Endpoint: [HttpPost("sessions/{sessionId}/confirm")]
+    Auth: [Authorize(Roles = "Instructor,Admin")]
+  - Endpoint: [HttpGet("student/{classStudentId}")]
+    Auth: [Authorize] // Allow students to also fetch their own results, validation inside service
+  - Endpoint: [HttpGet("{id}")]
+    Auth: [Authorize(Roles = "Instructor,Admin,Academic,Audit")]
+  - Endpoint: [HttpPut("{id}")]
+    Auth: [Authorize(Roles = "Instructor,Admin")]
+  - Endpoint: [HttpDelete("{id}")]
+    Auth: [Authorize(Roles = "Instructor,Admin")]
+
+## AuditController
+Class-level Auth: [Authorize(Roles = "Admin,Audit,QA,Academic")]
+
+  - Endpoint: [HttpGet]
+  - Endpoint: [HttpGet("{id:long}")]
+  - Endpoint: [HttpGet("search")]
+
+## AuthController
+Class-level Auth: 
+
+  - Endpoint: [HttpPost("login")]
+  - Endpoint: [HttpGet("mock-admin-token")]
+  - Endpoint: [HttpPost("google-login")]
+  - Endpoint: [HttpPost("refresh-token")]
+  - Endpoint: [HttpPost("logout")]
+    Auth: [Authorize]
+  - Endpoint: [HttpPost("change-password")]
+    Auth: [Authorize]
+  - Endpoint: [HttpPost("forgot-password")]
+  - Endpoint: [HttpPost("reset-password")]
+  - Endpoint: [HttpGet("me")]
+    Auth: [Authorize]
+
+## ClassesController
+Class-level Auth: [Authorize(Roles = "Admin,Academic,TrainingManager,Instructor,Audit")]
+
+  - Endpoint: [HttpGet]
+  - Endpoint: [HttpGet("{id}")]
+  - Endpoint: [HttpPost]
+    Auth: [Authorize(Roles = "Admin,Academic,TrainingManager")]
+  - Endpoint: [HttpPut("{id}")]
+    Auth: [Authorize(Roles = "Admin,Academic,TrainingManager")]
+  - Endpoint: [HttpDelete("{id}")]
+    Auth: [Authorize(Roles = "Admin,Academic,TrainingManager")]
+
+## ClassStudentsController
+Class-level Auth: [Authorize(Roles = "Admin,Academic,TrainingManager,Instructor,Audit")]
+
+  - Endpoint: [HttpGet]
+
+## CompletionRequirementsController
+Class-level Auth: [Authorize(Roles = "Admin,Academic,TrainingManager")]
+
+  - Endpoint: [HttpGet]
+  - Endpoint: [HttpGet("{id}")]
+  - Endpoint: [HttpGet("course/{courseId}")]
+  - Endpoint: [HttpPost]
+  - Endpoint: [HttpPut("{id}")]
+  - Endpoint: [HttpDelete("{id}")]
+
+## CoursesController
+Class-level Auth: [Authorize]
+
+  - Endpoint: [HttpGet]
+    Auth: [Authorize(Roles = "Admin,Academic,TrainingManager,Instructor,QA,Audit")]
+  - Endpoint: [HttpGet("{id}")]
+    Auth: [Authorize(Roles = "Admin,Academic,TrainingManager,Instructor,QA,Audit")]
+  - Endpoint: [HttpPost]
+    Auth: [Authorize(Roles = "Admin,Academic,TrainingManager")]
+  - Endpoint: [HttpPut("{id}")]
+    Auth: [Authorize(Roles = "Admin,Academic,TrainingManager")]
+  - Endpoint: [HttpDelete("{id}")]
+    Auth: [Authorize(Roles = "Admin,Academic,TrainingManager")]
+
+## DashboardController
+Class-level Auth: [Authorize(Roles = "Admin,TrainingManager,Audit,Academic,ManagementViewer")]
+
+  - Endpoint: [HttpGet("stats")]
+
+## DepartmentsController
+Class-level Auth: [Authorize(Roles = "Admin")]
+
+  - Endpoint: [HttpGet]
+  - Endpoint: [HttpGet("{id}")]
+  - Endpoint: [HttpPost]
+  - Endpoint: [HttpPut("{id}")]
+  - Endpoint: [HttpDelete("{id}")]
+
+## EnrollmentsController
+Class-level Auth: [Authorize(Roles = "Admin,Academic,QA,Instructor,Audit")]
+
+  - Endpoint: [HttpGet]
+  - Endpoint: [HttpGet("{id}")]
+  - Endpoint: [HttpGet("student/{studentId}")]
+  - Endpoint: [HttpPost]
+    Auth: [Authorize(Roles = "Admin,Academic")]
+  - Endpoint: [HttpPut("{id}")]
+    Auth: [Authorize(Roles = "Admin,Academic")]
+  - Endpoint: [HttpDelete("{id}")]
+    Auth: [Authorize(Roles = "Admin,Academic")]
+
+## EtrController
+Class-level Auth: [Authorize]
+
+    Auth: // NOTE: ASP.NET Core combines class-level and method-level [Authorize(Roles=...)] via AND, not
+    Auth: // action's own [Authorize(Roles=...)] be the sole source of truth for who can call it.
+  - Endpoint: [HttpGet]
+    Auth: [Authorize(Roles = "Instructor,QA,Admin,Audit,Academic,TrainingManager")]
+  - Endpoint: [HttpGet("my-etr")]
+    Auth: [Authorize(Roles = "Student")]
+  - Endpoint: [HttpGet("{id}")]
+    Auth: [Authorize(Roles = "Instructor,QA,Admin,Audit,Academic,TrainingManager")]
+  - Endpoint: [HttpPost("{id}/submit")]
+    Auth: [Authorize(Roles = "Instructor,Admin,Academic")]
+  - Endpoint: [HttpPost("{id}/verify")]
+    Auth: [Authorize(Roles = "QA,Admin")]
+  - Endpoint: [HttpPost("{id}/return")]
+    Auth: [Authorize(Roles = "QA,Admin")]
+  - Endpoint: [HttpPost("{id}/complete")]
+    Auth: [Authorize(Roles = "Admin,TrainingManager")]
+  - Endpoint: [HttpPost("{id}/reopen")]
+    Auth: [Authorize(Roles = "Admin")]
+  - Endpoint: [HttpDelete("{id}")]
+    Auth: [Authorize(Roles = "Admin")]
+  - Endpoint: [HttpGet("student/{studentId}/history")]
+    Auth: [Authorize(Roles = "Admin,Instructor,QA,Audit,Student,Academic")]
+  - Endpoint: [HttpGet("student/{studentId}/current-status")]
+    Auth: [Authorize(Roles = "Admin,Instructor,QA,Audit,Student,Academic")]
+  - Endpoint: [HttpGet("expiring-students")]
+    Auth: [Authorize(Roles = "Admin,Instructor,QA,TrainingManager,Academic")]
+
+## EvidencesController
+Class-level Auth: [Authorize]
+
+  - Endpoint: [HttpGet]
+    Auth: [Authorize(Roles = "Instructor,QA,Admin,Academic,Audit")]
+  - Endpoint: [HttpGet("{id}")]
+    Auth: [Authorize(Roles = "Instructor,QA,Admin,Academic,Audit")]
+  - Endpoint: [HttpGet("{id}/download")]
+    Auth: [Authorize(Roles = "Instructor,QA,Admin,Academic,Audit")]
+  - Endpoint: [HttpPost("upload")]
+    Auth: [Authorize(Roles = "Instructor,Admin,Academic")]
+  - Endpoint: [HttpPut("{id}/verify")]
+    Auth: [Authorize(Roles = "QA,Admin")]
+  - Endpoint: [HttpDelete("{id}")]
+    Auth: [Authorize(Roles = "Instructor,Admin,Academic")]
+
+## EvidenceTypesController
+Class-level Auth: [Authorize(Roles = "Admin,Academic,Instructor")]
+
+  - Endpoint: [HttpGet]
+  - Endpoint: [HttpGet("{id}")]
+  - Endpoint: [HttpPost]
+    Auth: [Authorize(Roles = "Admin,Academic")]
+  - Endpoint: [HttpPut("{id}")]
+    Auth: [Authorize(Roles = "Admin,Academic")]
+  - Endpoint: [HttpDelete("{id}")]
+    Auth: [Authorize(Roles = "Admin,Academic")]
+
+## ExportsController
+Class-level Auth: [Authorize(Roles = "Admin,Audit,Academic")]
+
+  - Endpoint: [HttpGet("{id:int}")]
+  - Endpoint: [HttpPost("training-package")]
+  - Endpoint: [HttpPost("pdf")]
+  - Endpoint: [HttpPost("dashboard")]
+  - Endpoint: [HttpPost("attendance")]
+  - Endpoint: [HttpPost("assessment")]
+  - Endpoint: [HttpPost("class-summary")]
+  - Endpoint: [HttpGet("download/{id:int}")]
+
+## PracticalChecklistResultsController
+Class-level Auth: [Authorize(Roles = "Admin,Instructor,QA")]
+
+  - Endpoint: [HttpGet]
+  - Endpoint: [HttpGet("{id}")]
+  - Endpoint: [HttpPost]
+  - Endpoint: [HttpPut("{id}/progress")]
+
+## PracticalChecklistsController
+Class-level Auth: [Authorize(Roles = "Admin,Instructor,Academic,QA")]
+
+  - Endpoint: [HttpGet]
+  - Endpoint: [HttpGet("{id}")]
+  - Endpoint: [HttpGet("course/{courseId}/subject/{subjectId}")]
+  - Endpoint: [HttpPost]
+  - Endpoint: [HttpPut("{id}")]
+  - Endpoint: [HttpDelete("{id}")]
+
+## ReportsController
+Class-level Auth: [Authorize(Roles = "Admin,TrainingManager,Audit,Academic,ManagementViewer")]
+
+  - Endpoint: [HttpGet("summary")]
+
+## RetakeHistoryController
+Class-level Auth: [Authorize(Roles = "Admin,QA,Instructor,TrainingManager,Academic")]
+
+  - Endpoint: [HttpGet]
+  - Endpoint: [HttpGet("{id:int}")]
+  - Endpoint: [HttpGet("by-subject/{subjectResultId:int}")]
+
+## SearchController
+Class-level Auth: [Authorize]
+
+  - Endpoint: [HttpGet("classes")]
+  - Endpoint: [HttpGet("etrs")]
+
+## SessionsController
+Class-level Auth: [Authorize(Roles = "Admin,Instructor,Academic")]
+
+  - Endpoint: [HttpGet]
+  - Endpoint: [HttpGet("{id}")]
+  - Endpoint: [HttpPost]
+  - Endpoint: [HttpPut("{id}")]
+  - Endpoint: [HttpDelete("{id}")]
+
+## SubjectsController
+Class-level Auth: [Authorize(Roles = "Admin,Academic,TrainingManager,Instructor")]
+
+  - Endpoint: [HttpGet]
+  - Endpoint: [HttpGet("{id}")]
+  - Endpoint: [HttpPost]
+    Auth: [Authorize(Roles = "Admin,Academic,TrainingManager")]
+  - Endpoint: [HttpPut("{id}")]
+    Auth: [Authorize(Roles = "Admin,Academic,TrainingManager")]
+  - Endpoint: [HttpDelete("{id}")]
+    Auth: [Authorize(Roles = "Admin,Academic,TrainingManager")]
+
+## SubjectSignoffController
+Class-level Auth: [Authorize(Roles = "Instructor,Academic,Admin")]
+
+  - Endpoint: [HttpGet]
+  - Endpoint: [HttpPost]
+  - Endpoint: [HttpGet("check/{subjectResultId:int}")]
+
+## UserProfilesController
+Class-level Auth: [Authorize]
+
+  - Endpoint: [HttpGet]
+    Auth: [Authorize(Roles = "Admin,Academic,QA,Audit,Instructor")]
+  - Endpoint: [HttpGet("learners")]
+    Auth: [Authorize(Roles = "Admin,Academic,TrainingManager,QA,Audit,Instructor")]
+  - Endpoint: [HttpGet("me")]
+  - Endpoint: [HttpGet("{accountId:int}")]
+    Auth: [Authorize(Roles = "Admin,Academic,QA,Audit,Instructor")]
+  - Endpoint: [HttpPost("{accountId:int}")]
+    Auth: [Authorize(Roles = "Admin,Academic")]
+  - Endpoint: [HttpPut("me")]
+  - Endpoint: [HttpPut("{accountId:int}")]
+    Auth: [Authorize(Roles = "Admin,Academic")]
+

@@ -71,7 +71,7 @@ public class AccountsController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPut("{id:int}/status")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<ActionResult> UpdateAccountStatus(int id, [FromBody] UpdateAccountStatusRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -85,7 +85,7 @@ public class AccountsController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPut("{id:int}/role")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<ActionResult> UpdateAccountRole(int id, [FromBody] UpdateAccountRoleRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -99,7 +99,7 @@ public class AccountsController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpPut("{id:int}/department")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<ActionResult> UpdateAccountDepartment(int id, [FromBody] UpdateAccountDepartmentRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -113,7 +113,7 @@ public class AccountsController : ControllerBase
     /// [Target Audience]: Admin
     /// </summary>
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<ActionResult> DeleteAccount(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId
