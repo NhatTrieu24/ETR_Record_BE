@@ -44,7 +44,6 @@ public partial class AppDbContext : DbContext
     public DbSet<ApprovalHistory> ApprovalHistories => Set<ApprovalHistory>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<ExportJob> ExportJobs => Set<ExportJob>();
-    public DbSet<DashboardSnapshot> DashboardSnapshots => Set<DashboardSnapshot>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -88,7 +87,6 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<ApprovalHistory>().HasKey(e => e.ApprovalHistoryId);
         modelBuilder.Entity<AuditLog>().HasKey(e => e.AuditLogId);
         modelBuilder.Entity<ExportJob>().HasKey(e => e.ExportJobId);
-        modelBuilder.Entity<DashboardSnapshot>().HasKey(e => e.SnapshotId);
     }
 
     private static void ConfigureUniqueConstraints(ModelBuilder modelBuilder)
@@ -141,8 +139,6 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<AssessmentResult>().Property(a => a.Score).HasColumnType("decimal(5,2)");
         modelBuilder.Entity<RetakeHistory>().Property(rh => rh.PreviousScore).HasColumnType("decimal(5,2)");
         modelBuilder.Entity<RetakeHistory>().Property(rh => rh.NewScore).HasColumnType("decimal(5,2)");
-        modelBuilder.Entity<DashboardSnapshot>().Property(d => d.AverageAttendanceRate).HasColumnType("decimal(5,2)");
-        modelBuilder.Entity<DashboardSnapshot>().Property(d => d.AverageAssessmentScore).HasColumnType("decimal(5,2)");
         modelBuilder.Entity<PracticalChecklistResult>().Property(p => p.Score).HasColumnType("decimal(5,2)");
         modelBuilder.Entity<CompletionRequirement>().Property(c => c.ThresholdValue).HasColumnType("decimal(5,2)");
     }

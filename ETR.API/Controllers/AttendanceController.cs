@@ -25,10 +25,23 @@ public class AttendanceController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Roles = "Instructor,Admin,Academic,Audit")]
+    [Authorize(Roles = "Instructor,Admin,Academic,Audit,QA")]
     public async Task<ActionResult<IEnumerable<AttendanceRecordResponse>>> GetAllRecords(CancellationToken cancellationToken)
     {
         return Ok(await _attendanceService.GetAllAttendanceRecordsAsync(cancellationToken));
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Thực thi Đào tạo
+    /// [Core Responsibility]: Lấy danh sách học viên có tỷ lệ điểm danh dưới ngưỡng tối thiểu — dữ liệu
+    /// nền cho tính năng nhắc nhở (reminder); bản thân endpoint không gửi thông báo.
+    /// [Target Audience]: Instructor, Admin, Academic, QA, Audit
+    /// </summary>
+    [HttpGet("low-attendance")]
+    [Authorize(Roles = "Instructor,Admin,Academic,Audit,QA")]
+    public async Task<ActionResult<IEnumerable<LowAttendanceStudentResponse>>> GetLowAttendanceStudents([FromQuery] int? classId, CancellationToken cancellationToken)
+    {
+        return Ok(await _attendanceService.GetLowAttendanceStudentsAsync(classId, cancellationToken));
     }
 
     /// <summary>
@@ -98,7 +111,7 @@ public class AttendanceController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    [Authorize(Roles = "Instructor,Admin,Academic,Audit")]
+    [Authorize(Roles = "Instructor,Admin,Academic,Audit,QA")]
     public async Task<ActionResult<AttendanceRecordResponse>> GetRecordById(int id, CancellationToken cancellationToken)
     {
         return Ok(await _attendanceService.GetAttendanceRecordByIdAsync(id, cancellationToken));

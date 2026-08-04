@@ -34,6 +34,19 @@ public class DashboardController : ControllerBase
         var kpis = await DashboardKpiCalculator.ComputeAsync(_unitOfWork, cancellationToken);
         return Ok(new { TotalClasses = classes.Count(), TotalEtrs = kpis.TotalEtrs, kpis.CompletedCount, kpis.CompletionRatePercent, kpis.PendingApprovalCount, kpis.RejectedCount, kpis.ReturnedForCorrectionCount, kpis.MissingEvidenceCount });
     }
+
+    /// <summary>
+    /// [Module/Flow]: Báo cáo &amp; Phân tích
+    /// [Core Responsibility]: Lấy danh sách ID hồ sơ ETR theo từng nhóm hành động cần xử lý (đôn đốc),
+    /// thay vì chỉ trả số đếm như `stats`.
+    /// [Target Audience]: Admin, Management
+    /// </summary>
+    [HttpGet("action-items")]
+    public async Task<IActionResult> GetActionItems(CancellationToken cancellationToken)
+    {
+        var actionItems = await DashboardKpiCalculator.ComputeActionItemsAsync(_unitOfWork, cancellationToken);
+        return Ok(actionItems);
+    }
 }
 
 

@@ -255,6 +255,104 @@ public class EtrService : IEtrService
         return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt, etr.IssuedDate, etr.ExpiryDate, etr.PreviousRecordId);
     }
 
+    public async Task<EtrCompletionProgressResponse> GetCompletionProgressAsync(int etrCourseRecordId, CancellationToken cancellationToken = default)
+    {
+        var etr = await _unitOfWork.ETRCourseRecordRepository.GetWithSubjectResultsAsync(etrCourseRecordId, cancellationToken)
+            ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
+
+        var enrollment = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(etr.EnrollmentId, cancellationToken)
+            ?? throw new BusinessRuleViolationException("Enrollment not found.");
+        var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(enrollment.ClassId, cancellationToken)
+            ?? throw new BusinessRuleViolationException("Class not found.");
+
+        var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken))
+            .Where(cs => cs.CourseId == trainingClass.CourseId && cs.IsMandatory).ToList();
+        var subjects = (await _unitOfWork.SubjectRepository.GetAllAsync(cancellationToken)).ToDictionary(s => s.SubjectId, s => s);
+
+        var checks = new List<CompletionCheckItem>();
+
+        // Mirrors SubmitEtrAsync's pre-validation checks exactly, but records pass/fail instead
+        // of throwing on the first failure — read-only, does not change ETR state.
+
+        // 1. Mandatory subjects Passed/Exempted (one check per subject)
+        foreach (var cs in courseSubjects)
+        {
+            var sr = etr.SubjectResults?.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
+            var subjectName = subjects.GetValueOrDefault(cs.SubjectId)?.SubjectName ?? $"Subject #{cs.SubjectId}";
+            var isMet = sr != null && (sr.Status == "Passed" || sr.Status == "Exempted");
+            checks.Add(new CompletionCheckItem($"Subject Passed/Exempted: {subjectName}", true, isMet, sr?.Status ?? "(no result yet)"));
+        }
+
+        // 2. Attendance rate >= minimum threshold (one check per subject result)
+        foreach (var sr in etr.SubjectResults ?? Enumerable.Empty<SubjectResult>())
+        {
+            var subjectName = subjects.GetValueOrDefault(sr.SubjectId)?.SubjectName ?? $"Subject #{sr.SubjectId}";
+            var isMet = (sr.AttendanceRate ?? 0) >= BusinessRuleEngine.MinimumAttendanceThreshold;
+            checks.Add(new CompletionCheckItem($"Attendance >= {BusinessRuleEngine.MinimumAttendanceThreshold}%: {subjectName}", true, isMet, $"{sr.AttendanceRate ?? 0}%"));
+        }
+
+        // 3. All evidence Verified (single aggregate check)
+        var allEvidences = await _unitOfWork.EvidenceFileRepository.GetAllAsync(cancellationToken);
+        var etrSubjectIds = etr.SubjectResults?.Select(sr => sr.SubjectResultId).ToList() ?? new List<int>();
+        var pendingEvidenceCount = allEvidences
+            .Count(e => etrSubjectIds.Contains(e.SubjectResultId) && e.VerificationStatus != "Verified" && !e.IsDeleted);
+        checks.Add(new CompletionCheckItem("All evidence Verified", true, pendingEvidenceCount == 0, $"{pendingEvidenceCount} pending"));
+
+        // 4. Subject signoffs (one check per subject result)
+        var allSignoffs = await _unitOfWork.SubjectSignoffRepository.GetAllAsync(cancellationToken);
+        foreach (var sr in etr.SubjectResults ?? Enumerable.Empty<SubjectResult>())
+        {
+            var subjectName = subjects.GetValueOrDefault(sr.SubjectId)?.SubjectName ?? $"Subject #{sr.SubjectId}";
+            var isMet = allSignoffs.Any(s => s.SubjectResultId == sr.SubjectResultId);
+            checks.Add(new CompletionCheckItem($"Instructor Signoff: {subjectName}", true, isMet, isMet ? "Signed off" : "Not signed off"));
+        }
+
+        // 5. Mandatory CompletionRequirements configured for the course
+        var completionRequirements = (await _unitOfWork.CompletionRequirementRepository.GetAllAsync(cancellationToken))
+            .Where(cr => cr.CourseId == trainingClass.CourseId && cr.IsMandatory).ToList();
+
+        foreach (var requirement in completionRequirements)
+        {
+            bool isMet;
+            switch (requirement.RequirementType)
+            {
+                case "MinAttendance":
+                    var minAttendance = requirement.ThresholdValue ?? BusinessRuleEngine.MinimumAttendanceThreshold;
+                    isMet = etr.SubjectResults == null || !etr.SubjectResults.Any(sr => (sr.AttendanceRate ?? 0) < minAttendance);
+                    break;
+
+                case "AllAssessmentsPassed":
+                    isMet = courseSubjects.All(cs =>
+                    {
+                        var sr = etr.SubjectResults?.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
+                        return sr != null && (sr.Status == "Passed" || sr.Status == "Exempted");
+                    });
+                    break;
+
+                case "AllChecklistsSignedOff":
+                    var subjectResultIds = etr.SubjectResults?.Select(sr => sr.SubjectResultId).ToList() ?? new List<int>();
+                    var mandatoryChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(cancellationToken))
+                        .Where(pc => pc.CourseId == trainingClass.CourseId && pc.IsRequired).ToList();
+                    var checklistResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(cancellationToken))
+                        .Where(r => subjectResultIds.Contains(r.SubjectResultId)).ToList();
+                    isMet = mandatoryChecklists.All(c => checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.ResultStatus == "Passed"));
+                    break;
+
+                default:
+                    // Free-text/advisory requirement — not machine-evaluated, always shown as met.
+                    isMet = true;
+                    break;
+            }
+
+            checks.Add(new CompletionCheckItem($"Completion Requirement: {requirement.RequirementName}", true, isMet, null));
+        }
+
+        var metCount = checks.Count(c => c.IsMet);
+        var percent = checks.Count == 0 ? 100m : Math.Round((decimal)metCount / checks.Count * 100, 2);
+
+        return new EtrCompletionProgressResponse(etr.ETRCourseRecordId, checks.Count, metCount, percent, checks);
+    }
+
     public async Task<EtrRecordResponse> VerifyEtrAsync(int etrCourseRecordId, int accountId, CancellationToken cancellationToken = default)
     {
         var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(etrCourseRecordId, cancellationToken)

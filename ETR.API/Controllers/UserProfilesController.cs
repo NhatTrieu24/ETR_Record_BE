@@ -123,5 +123,19 @@ public class UserProfilesController : ControllerBase
         var profile = await _userProfileService.UpdateProfileAsync(accountId, request, currentAccountId, cancellationToken);
         return Ok(profile);
     }
+
+    /// <summary>
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Cập nhật trạng thái tổng quát (Active/Withdrawn/Graduated) của học viên.
+    /// [Target Audience]: Admin, Academic
+    /// </summary>
+    [HttpPut("{accountId:int}/status")]
+    [Authorize(Roles = "Admin,Academic")]
+    public async Task<ActionResult<UserProfileResponse>> UpdateUserProfileStatus(int accountId, [FromBody] UpdateUserProfileStatusRequest request, CancellationToken cancellationToken)
+    {
+        var currentAccountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        var profile = await _userProfileService.UpdateProfileStatusAsync(accountId, request.Status, currentAccountId, cancellationToken);
+        return Ok(profile);
+    }
 }
 

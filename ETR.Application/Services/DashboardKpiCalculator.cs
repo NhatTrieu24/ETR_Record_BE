@@ -11,9 +11,53 @@ public record DashboardKpis(
     int ReturnedForCorrectionCount,
     int MissingEvidenceCount);
 
-/// <summary>Shared KPI computation used by both DashboardController and ReportsController.</summary>
+// M9: counts alone don't let a Training Manager actually "đôn đốc" (chase up) anything — they still
+// need to click into each list separately to find which ETRs are pending/rejected/missing evidence.
+// This carries the same 4 buckets as DashboardKpis, but as ETR ID lists instead of counts.
+public record DashboardActionItems(
+    IReadOnlyList<int> PendingApprovalEtrIds,
+    IReadOnlyList<int> RejectedEtrIds,
+    IReadOnlyList<int> ReturnedForCorrectionEtrIds,
+    IReadOnlyList<int> MissingEvidenceEtrIds);
+
+/// <summary>Shared KPI computation used by DashboardController.</summary>
 public static class DashboardKpiCalculator
 {
+    public static async Task<DashboardActionItems> ComputeActionItemsAsync(IUnitOfWork unitOfWork, CancellationToken cancellationToken)
+    {
+        var etrs = (await unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken)).ToList();
+        var approvalRequests = (await unitOfWork.ApprovalRequestRepository.GetAllAsync(cancellationToken)).ToList();
+        var evidenceFiles = await unitOfWork.EvidenceFileRepository.GetAllAsync(cancellationToken);
+        var subjectResults = await unitOfWork.SubjectResultRepository.GetAllAsync(cancellationToken);
+
+        var pendingApprovalEtrIds = etrs
+            .Where(e => e.Status == "Submitted" || e.Status == "Verified")
+            .Select(e => e.ETRCourseRecordId)
+            .ToList();
+
+        var rejectedEtrIds = approvalRequests
+            .Where(a => a.CurrentStatus == "Rejected")
+            .Select(a => a.ETRCourseRecordId)
+            .Distinct()
+            .ToList();
+
+        var returnedForCorrectionEtrIds = etrs
+            .Where(e => e.Status == "ReturnedForCorrection")
+            .Select(e => e.ETRCourseRecordId)
+            .ToList();
+
+        var etrIdsMissingEvidence = subjectResults
+            .Where(sr => !evidenceFiles.Any(e => e.SubjectResultId == sr.SubjectResultId && e.VerificationStatus == "Verified"))
+            .Select(sr => sr.EtrId)
+            .ToHashSet();
+        var missingEvidenceEtrIds = etrs
+            .Where(e => e.Status != "Completed" && etrIdsMissingEvidence.Contains(e.ETRCourseRecordId))
+            .Select(e => e.ETRCourseRecordId)
+            .ToList();
+
+        return new DashboardActionItems(pendingApprovalEtrIds, rejectedEtrIds, returnedForCorrectionEtrIds, missingEvidenceEtrIds);
+    }
+
     public static async Task<DashboardKpis> ComputeAsync(IUnitOfWork unitOfWork, CancellationToken cancellationToken)
     {
         var etrs = (await unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken)).ToList();

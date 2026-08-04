@@ -158,6 +158,10 @@ public class ExportsController : ControllerBase
         var job = await _unitOfWork.ExportJobRepository.GetByIdAsync(id, cancellationToken);
         if (job == null) return NotFound($"Không tìm thấy yêu cầu xuất dữ liệu với ID {id}.");
         if (job.Status != "Completed") return BadRequest("File xuất chưa hoàn thành hoặc đã bị lỗi.");
+        if (job.DownloadExpiredAt.HasValue && DateTime.UtcNow > job.DownloadExpiredAt.Value)
+        {
+            return StatusCode(StatusCodes.Status410Gone, $"Liên kết tải tệp xuất dữ liệu #{id} đã hết hạn ({job.DownloadExpiredAt:u}).");
+        }
 
         if (!string.IsNullOrEmpty(job.FilePath))
         {
