@@ -11,7 +11,7 @@ public record UserProfileResponse(
     string? Organization);
 
 public record CreateUserProfileRequest(
-    string UserCode,
+    string? UserCode,
     string FullName,
     string Email,
     string? Phone,

@@ -78,10 +78,38 @@ public class UserProfileService : IUserProfileService
 
     public async Task<UserProfileResponse> CreateProfileAsync(CreateUserProfileRequest request, int accountId, int createdByAccountId, CancellationToken cancellationToken = default)
     {
+        string? userCode = request.UserCode;
+        if (string.IsNullOrWhiteSpace(userCode))
+        {
+            var account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken);
+            if (account != null)
+            {
+                string prefix = account.RoleId switch
+                {
+                    1 => "ADM",
+                    2 => "INS",
+                    3 => "QA",
+                    4 => "ACA",
+                    5 => "MGR",
+                    6 => "STU",
+                    7 => "AUD",
+                    _ => "USR"
+                };
+
+                var existingProfiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
+                int count = existingProfiles.Count(p => p.UserCode != null && p.UserCode.StartsWith(prefix));
+                userCode = $"{prefix}-{(count + 1):D3}";
+            }
+            else
+            {
+                userCode = $"USR-{DateTime.UtcNow.Ticks.ToString().Substring(10)}"; // Fallback
+            }
+        }
+
         var profile = new UserProfile
         {
             AccountId = accountId, // Link to the created account
-            UserCode = request.UserCode,
+            UserCode = userCode,
             FullName = request.FullName,
             Email = request.Email,
             Phone = request.Phone,
