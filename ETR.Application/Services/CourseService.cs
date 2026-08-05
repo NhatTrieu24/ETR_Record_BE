@@ -27,7 +27,14 @@ public class CourseService : ICourseService
 
         if (c.IsDeleted) throw new KeyNotFoundException("Course not found.");
 
-        return new CourseResponse(c.CourseId, c.CourseCode, c.CourseName, c.Description, c.DurationHours, c.Status, c.ValidityMonths, c.CourseType);
+        var subjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken))
+            .Where(cs => cs.CourseId == id && !cs.IsDeleted)
+            .OrderBy(cs => cs.SequenceNo)
+            .Select(cs => new CourseSubjectResponse(
+                cs.CourseId, cs.SubjectId, cs.SequenceNo, cs.RequiredHours, cs.IsMandatory, cs.PassingScore
+            )).ToList();
+
+        return new CourseResponse(c.CourseId, c.CourseCode, c.CourseName, c.Description, c.DurationHours, c.Status, c.ValidityMonths, c.CourseType, subjects);
     }
 
     public async Task<CourseResponse> CreateCourseAsync(CreateCourseRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
@@ -68,6 +75,7 @@ public class CourseService : ICourseService
                     Description = $"Course #{course.CourseId} ({course.CourseCode}) created"
                 }, ct);
 
+                var responseSubjects = new List<CourseSubjectResponse>();
                 foreach (var s in request.Subjects)
                 {
                     var subject = await _unitOfWork.SubjectRepository.GetByIdAsync(s.SubjectId, ct)
@@ -96,12 +104,16 @@ public class CourseService : ICourseService
                         NewValue = $"SubjectId: {s.SubjectId}, Seq: {s.SequenceNo}",
                         Description = $"Assigned Subject #{s.SubjectId} to new Course #{course.CourseId}"
                     }, ct);
+
+                    responseSubjects.Add(new CourseSubjectResponse(
+                        course.CourseId, s.SubjectId, s.SequenceNo, s.RequiredHours, s.IsMandatory, s.PassingScore
+                    ));
                 }
 
                 await _unitOfWork.SaveAsync(ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
 
-                return new CourseResponse(course.CourseId, course.CourseCode, course.CourseName, course.Description, course.DurationHours, course.Status, course.ValidityMonths, course.CourseType);
+                return new CourseResponse(course.CourseId, course.CourseCode, course.CourseName, course.Description, course.DurationHours, course.Status, course.ValidityMonths, course.CourseType, responseSubjects);
             }
             catch
             {
@@ -113,39 +125,136 @@ public class CourseService : ICourseService
 
     public async Task<CourseResponse> UpdateCourseAsync(int id, UpdateCourseRequest request, int updatedByAccountId, CancellationToken cancellationToken = default)
     {
-        var course = await _unitOfWork.CourseRepository.GetByIdAsync(id, cancellationToken)
-            ?? throw new KeyNotFoundException("Course not found.");
-
-        if (course.IsDeleted) throw new KeyNotFoundException("Course not found.");
-
-        var oldStatus = course.Status;
-
-        course.CourseCode = request.CourseCode;
-        course.CourseName = request.CourseName;
-        course.Description = request.Description;
-        course.DurationHours = request.DurationHours;
-        course.Status = request.Status;
-        course.ValidityMonths = request.ValidityMonths;
-        course.CourseType = request.CourseType;
-        course.UpdatedAt = DateTime.UtcNow;
-        course.UpdatedByAccountId = updatedByAccountId;
-
-        _unitOfWork.CourseRepository.Update(course);
-
-        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        if (request.Subjects == null || !request.Subjects.Any())
         {
-            AccountId = updatedByAccountId,
-            ActionType = "UPDATE",
-            EntityName = nameof(Course),
-            RecordId = course.CourseId,
-            OldValue = oldStatus,
-            NewValue = course.Status,
-            Description = $"Course #{course.CourseId} ({course.CourseCode}) updated"
+            throw new ArgumentException("A course must have at least one subject.");
+        }
+
+        return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
+        {
+            await _unitOfWork.BeginTransactionAsync(ct);
+            try
+            {
+                var course = await _unitOfWork.CourseRepository.GetByIdAsync(id, ct)
+                    ?? throw new KeyNotFoundException("Course not found.");
+
+                if (course.IsDeleted) throw new KeyNotFoundException("Course not found.");
+
+                var oldStatus = course.Status;
+
+                course.CourseCode = request.CourseCode;
+                course.CourseName = request.CourseName;
+                course.Description = request.Description;
+                course.DurationHours = request.DurationHours;
+                course.Status = request.Status;
+                course.ValidityMonths = request.ValidityMonths;
+                course.CourseType = request.CourseType;
+                course.UpdatedAt = DateTime.UtcNow;
+                course.UpdatedByAccountId = updatedByAccountId;
+
+                _unitOfWork.CourseRepository.Update(course);
+
+                await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                {
+                    AccountId = updatedByAccountId,
+                    ActionType = "UPDATE",
+                    EntityName = nameof(Course),
+                    RecordId = course.CourseId,
+                    OldValue = oldStatus,
+                    NewValue = course.Status,
+                    Description = $"Course #{course.CourseId} ({course.CourseCode}) updated"
+                }, ct);
+
+                // SYNC SUBJECTS
+                var existingSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct))
+                    .Where(cs => cs.CourseId == id && !cs.IsDeleted).ToList();
+
+                var requestedSubjectIds = request.Subjects.Select(s => s.SubjectId).ToList();
+
+                // 1. Remove subjects not in the request
+                var subjectsToRemove = existingSubjects.Where(cs => !requestedSubjectIds.Contains(cs.SubjectId)).ToList();
+                foreach (var toRemove in subjectsToRemove)
+                {
+                    toRemove.IsDeleted = true;
+                    toRemove.DeletedAt = DateTime.UtcNow;
+                    _unitOfWork.CourseSubjectRepository.Update(toRemove);
+
+                    await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                    {
+                        AccountId = updatedByAccountId,
+                        ActionType = "DELETE",
+                        EntityName = nameof(CourseSubject),
+                        RecordId = course.CourseId,
+                        OldValue = $"SubjectId: {toRemove.SubjectId}",
+                        NewValue = "Deleted",
+                        Description = $"Removed Subject #{toRemove.SubjectId} from Course #{course.CourseId} during full sync"
+                    }, ct);
+                }
+
+                // 2. Add or Update subjects
+                var finalSubjects = new List<CourseSubjectResponse>();
+                foreach (var reqSub in request.Subjects)
+                {
+                    var existing = existingSubjects.FirstOrDefault(cs => cs.SubjectId == reqSub.SubjectId);
+                    if (existing != null)
+                    {
+                        // Update
+                        existing.SequenceNo = reqSub.SequenceNo;
+                        existing.RequiredHours = reqSub.RequiredHours;
+                        existing.IsMandatory = reqSub.IsMandatory;
+                        existing.PassingScore = reqSub.PassingScore;
+                        _unitOfWork.CourseSubjectRepository.Update(existing);
+
+                        finalSubjects.Add(new CourseSubjectResponse(
+                            id, existing.SubjectId, existing.SequenceNo, existing.RequiredHours, existing.IsMandatory, existing.PassingScore
+                        ));
+                    }
+                    else
+                    {
+                        // Add
+                        var subject = await _unitOfWork.SubjectRepository.GetByIdAsync(reqSub.SubjectId, ct)
+                            ?? throw new KeyNotFoundException($"Subject {reqSub.SubjectId} not found.");
+
+                        var newCourseSub = new CourseSubject
+                        {
+                            CourseId = id,
+                            SubjectId = reqSub.SubjectId,
+                            SequenceNo = reqSub.SequenceNo,
+                            RequiredHours = reqSub.RequiredHours,
+                            IsMandatory = reqSub.IsMandatory,
+                            PassingScore = reqSub.PassingScore,
+                            CreatedAt = DateTime.UtcNow,
+                            CreatedByAccountId = updatedByAccountId
+                        };
+                        await _unitOfWork.CourseSubjectRepository.AddAsync(newCourseSub, ct);
+
+                        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                        {
+                            AccountId = updatedByAccountId,
+                            ActionType = "INSERT",
+                            EntityName = nameof(CourseSubject),
+                            RecordId = course.CourseId,
+                            NewValue = $"SubjectId: {reqSub.SubjectId}, Seq: {reqSub.SequenceNo}",
+                            Description = $"Assigned Subject #{reqSub.SubjectId} to Course #{course.CourseId} during full sync"
+                        }, ct);
+
+                        finalSubjects.Add(new CourseSubjectResponse(
+                            id, reqSub.SubjectId, reqSub.SequenceNo, reqSub.RequiredHours, reqSub.IsMandatory, reqSub.PassingScore
+                        ));
+                    }
+                }
+
+                await _unitOfWork.SaveAsync(ct);
+                await _unitOfWork.CommitTransactionAsync(ct);
+
+                return new CourseResponse(course.CourseId, course.CourseCode, course.CourseName, course.Description, course.DurationHours, course.Status, course.ValidityMonths, course.CourseType, finalSubjects.OrderBy(s => s.SequenceNo).ToList());
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync(ct);
+                throw;
+            }
         }, cancellationToken);
-
-        await _unitOfWork.SaveAsync(cancellationToken);
-
-        return new CourseResponse(course.CourseId, course.CourseCode, course.CourseName, course.Description, course.DurationHours, course.Status, course.ValidityMonths, course.CourseType);
     }
 
     public async Task DeleteCourseAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default)
