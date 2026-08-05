@@ -105,6 +105,47 @@ public class CoursesController : ControllerBase
         var result = await _courseService.AddSubjectToCourseAsync(id, request, accountId, cancellationToken);
         return Ok(result);
     }
+
+    /// <summary>
+    /// [Module/Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    /// [Core Responsibility]: Lấy danh sách môn học của một khóa học.
+    /// [Target Audience]: Admin, Academic, Instructor, QA, Audit
+    /// </summary>
+    [HttpGet("{id}/subjects")]
+    [Authorize(Roles = "Admin,Academic,TrainingManager,Instructor,QA,Audit")]
+    public async Task<IActionResult> GetCourseSubjects(int id, CancellationToken cancellationToken)
+    {
+        var subjects = await _courseService.GetSubjectsByCourseAsync(id, cancellationToken);
+        return Ok(subjects);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    /// [Core Responsibility]: Cập nhật thông tin một môn học trong khóa học.
+    /// [Target Audience]: Admin, Academic
+    /// </summary>
+    [HttpPut("{courseId}/subjects/{subjectId}")]
+    [Authorize(Roles = "Admin,Academic")]
+    public async Task<IActionResult> UpdateCourseSubject(int courseId, int subjectId, [FromBody] UpdateCourseSubjectRequest request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        var result = await _courseService.UpdateCourseSubjectAsync(courseId, subjectId, request, accountId, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    /// [Core Responsibility]: Xóa một môn học khỏi khóa học.
+    /// [Target Audience]: Admin, Academic
+    /// </summary>
+    [HttpDelete("{courseId}/subjects/{subjectId}")]
+    [Authorize(Roles = "Admin,Academic")]
+    public async Task<IActionResult> RemoveSubjectFromCourse(int courseId, int subjectId, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        await _courseService.RemoveSubjectFromCourseAsync(courseId, subjectId, accountId, cancellationToken);
+        return NoContent();
+    }
 }
 
 
