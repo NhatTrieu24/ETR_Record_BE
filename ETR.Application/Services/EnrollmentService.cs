@@ -248,25 +248,53 @@ public class EnrollmentService : IEnrollmentService
 
     public async Task<EnrollmentResponse> UpdateEnrollmentAsync(int id, UpdateEnrollmentRequest request, int updatedByAccountId, CancellationToken cancellationToken = default)
     {
-        var item = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(id, cancellationToken);
-        if (item == null) throw new KeyNotFoundException("Enrollment not found.");
+        return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
+        {
+            await _unitOfWork.BeginTransactionAsync(ct);
+            try
+            {
+                var item = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(id, ct);
+                if (item == null) throw new KeyNotFoundException("Enrollment not found.");
 
-        item.AccountId = request.LearnerId;
-        item.ClassId = request.ClassId;
-        item.Status = request.Status;
-        item.EnrolledAt = request.EnrolledAt;
-        item.UpdatedAt = DateTime.UtcNow;
-        item.UpdatedByAccountId = updatedByAccountId;
+                item.AccountId = request.LearnerId;
+                item.ClassId = request.ClassId;
+                item.Status = request.Status;
+                item.EnrolledAt = request.EnrolledAt;
+                item.UpdatedAt = DateTime.UtcNow;
+                item.UpdatedByAccountId = updatedByAccountId;
 
-        _unitOfWork.CourseEnrollmentRepository.Update(item);
-        await _unitOfWork.SaveAsync(cancellationToken);
+                _unitOfWork.CourseEnrollmentRepository.Update(item);
 
-        return new EnrollmentResponse(
-            item.EnrollmentId,
-            item.AccountId,
-            item.ClassId,
-            item.Status,
-            item.EnrolledAt);
+                // Đồng bộ ClassStudent (nếu học viên bị chuyển lớp hoặc cập nhật LearnerId/Status)
+                var classStudent = (await _unitOfWork.ClassStudentRepository.GetAllAsync(ct))
+                    .FirstOrDefault(cs => cs.CourseEnrollmentId == id && !cs.IsDeleted);
+
+                if (classStudent != null)
+                {
+                    classStudent.ClassId = request.ClassId;
+                    classStudent.AccountId = request.LearnerId;
+                    classStudent.Status = request.Status;
+                    classStudent.UpdatedAt = DateTime.UtcNow;
+                    classStudent.UpdatedByAccountId = updatedByAccountId;
+                    _unitOfWork.ClassStudentRepository.Update(classStudent);
+                }
+
+                await _unitOfWork.SaveAsync(ct);
+                await _unitOfWork.CommitTransactionAsync(ct);
+
+                return new EnrollmentResponse(
+                    item.EnrollmentId,
+                    item.AccountId,
+                    item.ClassId,
+                    item.Status,
+                    item.EnrolledAt);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync(ct);
+                throw;
+            }
+        }, cancellationToken);
     }
 
     public async Task DeleteEnrollmentAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default)
