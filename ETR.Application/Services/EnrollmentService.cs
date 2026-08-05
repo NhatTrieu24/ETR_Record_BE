@@ -93,6 +93,12 @@ public class EnrollmentService : IEnrollmentService
 
             try
             {
+                var userProfile = await _unitOfWork.UserProfileRepository.GetByIdAsync(accountId, ct);
+                if (userProfile == null)
+                {
+                    throw new BusinessRuleViolationException($"Cannot enroll. Learner (Account ID: {accountId}) does not have a complete user profile.");
+                }
+
                 var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(classId, ct);
                 if (trainingClass == null) throw new BusinessRuleViolationException("Class not found.");
 
