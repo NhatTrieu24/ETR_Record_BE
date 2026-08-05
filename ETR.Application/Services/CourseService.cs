@@ -127,4 +127,59 @@ public class CourseService : ICourseService
 
         await _unitOfWork.SaveAsync(cancellationToken);
     }
+
+    public async Task<CourseSubjectResponse> AddSubjectToCourseAsync(int courseId, AddCourseSubjectRequest request, int addedByAccountId, CancellationToken cancellationToken = default)
+    {
+        var course = await _unitOfWork.CourseRepository.GetByIdAsync(courseId, cancellationToken)
+            ?? throw new KeyNotFoundException("Course not found.");
+
+        if (course.IsDeleted) throw new KeyNotFoundException("Course not found.");
+
+        var subject = await _unitOfWork.SubjectRepository.GetByIdAsync(request.SubjectId, cancellationToken)
+            ?? throw new KeyNotFoundException("Subject not found.");
+
+        var existingMapping = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken))
+            .FirstOrDefault(cs => cs.CourseId == courseId && cs.SubjectId == request.SubjectId);
+
+        if (existingMapping != null)
+        {
+            throw new InvalidOperationException($"Subject {request.SubjectId} is already assigned to Course {courseId}.");
+        }
+
+        var courseSubject = new CourseSubject
+        {
+            CourseId = courseId,
+            SubjectId = request.SubjectId,
+            SequenceNo = request.SequenceNo,
+            RequiredHours = request.RequiredHours,
+            IsMandatory = request.IsMandatory,
+            PassingScore = request.PassingScore,
+            CreatedAt = DateTime.UtcNow,
+            CreatedByAccountId = addedByAccountId
+        };
+
+        await _unitOfWork.CourseSubjectRepository.AddAsync(courseSubject, cancellationToken);
+        await _unitOfWork.SaveAsync(cancellationToken);
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = addedByAccountId,
+            ActionType = "INSERT",
+            EntityName = nameof(CourseSubject),
+            RecordId = courseId, // Using CourseId as RecordId since it's a mapping
+            NewValue = $"SubjectId: {request.SubjectId}, Seq: {request.SequenceNo}",
+            Description = $"Assigned Subject #{request.SubjectId} to Course #{courseId}"
+        }, cancellationToken);
+
+        await _unitOfWork.SaveAsync(cancellationToken);
+
+        return new CourseSubjectResponse(
+            courseSubject.CourseId,
+            courseSubject.SubjectId,
+            courseSubject.SequenceNo,
+            courseSubject.RequiredHours,
+            courseSubject.IsMandatory,
+            courseSubject.PassingScore
+        );
+    }
 }

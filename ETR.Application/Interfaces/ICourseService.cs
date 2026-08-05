@@ -9,4 +9,5 @@ public interface ICourseService
     Task<CourseResponse> CreateCourseAsync(CreateCourseRequest request, int createdByAccountId, CancellationToken cancellationToken = default);
     Task<CourseResponse> UpdateCourseAsync(int id, UpdateCourseRequest request, int updatedByAccountId, CancellationToken cancellationToken = default);
     Task DeleteCourseAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default);
+    Task<CourseSubjectResponse> AddSubjectToCourseAsync(int courseId, AddCourseSubjectRequest request, int addedByAccountId, CancellationToken cancellationToken = default);
 }

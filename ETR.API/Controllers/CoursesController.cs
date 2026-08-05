@@ -91,6 +91,20 @@ public class CoursesController : ControllerBase
         await _courseService.DeleteCourseAsync(id, accountId, cancellationToken);
         return NoContent();
     }
+
+    /// <summary>
+    /// [Module/Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    /// [Core Responsibility]: Gán một môn học vào một khóa học.
+    /// [Target Audience]: Admin, Academic
+    /// </summary>
+    [HttpPost("{id}/subjects")]
+    [Authorize(Roles = "Admin,Academic")]
+    public async Task<IActionResult> AddSubjectToCourse(int id, [FromBody] AddCourseSubjectRequest request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        var result = await _courseService.AddSubjectToCourseAsync(id, request, accountId, cancellationToken);
+        return Ok(result);
+    }
 }
 
 
