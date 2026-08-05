@@ -88,13 +88,57 @@ public class EtrService : IEtrService
             }
         }
 
-        var subjectResults = e.SubjectResults?.Select(sr => new SubjectResultResponse(
-            sr.SubjectResultId,
-            sr.SubjectId,
-            sr.Status,
-            sr.CreatedAt,
-            sr.AttendanceRate,
-            sr.Score)) ?? Array.Empty<SubjectResultResponse>();
+        var subjectResultIds = e.SubjectResults?.Select(sr => sr.SubjectResultId).ToList() ?? new List<int>();
+
+        var allAssessmentResults = await _unitOfWork.AssessmentResultRepository.GetAllAsync(cancellationToken);
+        var assessmentResults = allAssessmentResults.Where(ar => subjectResultIds.Contains(ar.SubjectResultId)).ToList();
+
+        var allPracticalResults = await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(cancellationToken);
+        var practicalResults = allPracticalResults.Where(pr => subjectResultIds.Contains(pr.SubjectResultId)).ToList();
+
+        var allSignoffs = await _unitOfWork.SubjectSignoffRepository.GetAllAsync(cancellationToken);
+        var signoffs = allSignoffs.Where(s => subjectResultIds.Contains(s.SubjectResultId)).ToList();
+
+        var allApprovalRequests = await _unitOfWork.ApprovalRequestRepository.GetAllAsync(cancellationToken);
+        var approvalRequest = allApprovalRequests.FirstOrDefault(ar => ar.ETRCourseRecordId == etrCourseRecordId);
+
+        var approvalHistories = new List<ApprovalHistory>();
+        if (approvalRequest != null)
+        {
+            var allApprovalHistories = await _unitOfWork.ApprovalHistoryRepository.GetAllAsync(cancellationToken);
+            approvalHistories = allApprovalHistories.Where(ah => ah.ApprovalRequestId == approvalRequest.ApprovalRequestId).ToList();
+        }
+
+        var allEvidences = await _unitOfWork.EvidenceFileRepository.GetAllAsync(cancellationToken);
+        var evidences = allEvidences.Where(ev => subjectResultIds.Contains(ev.SubjectResultId) && !ev.IsDeleted).ToList();
+
+        var subjectResultResponses = e.SubjectResults?.Select(sr => {
+            var signoff = signoffs.FirstOrDefault(s => s.SubjectResultId == sr.SubjectResultId);
+            return new EtrSubjectDetailResponse(
+                sr.SubjectResultId,
+                sr.SubjectId,
+                sr.Status,
+                sr.CreatedAt,
+                sr.AttendanceRate,
+                sr.Score,
+                signoff != null,
+                signoff?.SignoffAt,
+                assessmentResults.Where(ar => ar.SubjectResultId == sr.SubjectResultId).Select(ar => new EtrAssessmentResultResponse(
+                    ar.AssessmentResultId, ar.AssessmentId, ar.Score, ar.ResultStatus, ar.AttemptNo, ar.IsPublished
+                )).ToList(),
+                practicalResults.Where(pr => pr.SubjectResultId == sr.SubjectResultId).Select(pr => new EtrPracticalChecklistResultResponse(
+                    pr.PracticalChecklistResultId, pr.PracticalChecklistId, pr.ResultStatus, pr.IsPublished
+                )).ToList()
+            );
+        }).ToList() ?? new List<EtrSubjectDetailResponse>();
+
+        var approvalHistoryResponses = approvalHistories.Select(ah => new EtrApprovalHistoryResponse(
+            ah.ApprovalHistoryId, ah.ApprovalRequestId, ah.ActionType, ah.Comments, ah.ActionByAccountId, ah.ActionAt
+        )).ToList();
+
+        var evidenceResponses = evidences.Select(ev => new EtrEvidenceFileResponse(
+            ev.EvidenceFileId, ev.FileName, ev.FilePath, ev.MimeType ?? "unknown", ev.UploadedByAccountId, ev.UploadedAt
+        )).ToList();
 
         return new EtrDetailsResponse(
             e.ETRCourseRecordId,
@@ -104,7 +148,9 @@ public class EtrService : IEtrService
             e.SubmittedAt,
             e.VerifiedAt,
             e.CompletedAt,
-            subjectResults);
+            subjectResultResponses,
+            approvalHistoryResponses,
+            evidenceResponses);
     }
 
     public async Task DeleteEtrAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default)
