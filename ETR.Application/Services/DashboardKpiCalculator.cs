@@ -1,3 +1,4 @@
+using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 
 namespace ETR.Application.Services;
@@ -56,6 +57,24 @@ public static class DashboardKpiCalculator
             .ToList();
 
         return new DashboardActionItems(pendingApprovalEtrIds, rejectedEtrIds, returnedForCorrectionEtrIds, missingEvidenceEtrIds);
+    }
+
+    // Overview/action-items answer "how much work is left"; this answers "where is it stuck in the
+    // pipeline" — a Draft/InProgress-heavy funnel points to an intake problem, a Submitted-heavy one
+    // points to a QA bottleneck, etc.
+    public static async Task<DashboardStatusFunnel> ComputeStatusFunnelAsync(IUnitOfWork unitOfWork, CancellationToken cancellationToken)
+    {
+        var etrs = (await unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken)).ToList();
+        int Count(string status) => etrs.Count(e => e.Status == status);
+
+        return new DashboardStatusFunnel(
+            Count("Draft"),
+            Count("InProgress"),
+            Count("Submitted"),
+            Count("Verified"),
+            Count("Completed"),
+            Count("ReturnedForCorrection"),
+            Count("Cancelled"));
     }
 
     public static async Task<DashboardKpis> ComputeAsync(IUnitOfWork unitOfWork, CancellationToken cancellationToken)
