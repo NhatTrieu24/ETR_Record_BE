@@ -108,6 +108,12 @@ public class EnrollmentService : IEnrollmentService
                 var allClasses = await _unitOfWork.ClassRepository.GetAllAsync(ct);
 
                 var studentEnrollments = allEnrollments.Where(e => e.AccountId == accountId).ToList();
+                
+                if (studentEnrollments.Any(e => e.ClassId == classId && e.Status != "Deleted"))
+                {
+                    throw new BusinessRuleViolationException("Learner is already enrolled in this exact class.");
+                }
+
                 var studentEtrsForCourse = allEtrs
                     .Where(etr => studentEnrollments.Any(e => e.EnrollmentId == etr.EnrollmentId && 
                                   allClasses.Any(c => c.ClassId == e.ClassId && c.CourseId == trainingClass.CourseId)))
@@ -161,6 +167,11 @@ public class EnrollmentService : IEnrollmentService
                 var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct))
                     .Where(cs => cs.CourseId == trainingClass.CourseId).ToList();
 
+                var allAssessments = (await _unitOfWork.AssessmentRepository.GetAllAsync(ct))
+                    .Where(a => a.CourseId == trainingClass.CourseId).ToList();
+                var allChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(ct))
+                    .Where(p => p.CourseId == trainingClass.CourseId).ToList();
+
                 foreach (var cs in courseSubjects)
                 {
                     var subjectResult = new SubjectResult
@@ -173,6 +184,39 @@ public class EnrollmentService : IEnrollmentService
                         CreatedByAccountId = createdByAccountId
                     };
                     await _unitOfWork.SubjectResultRepository.AddAsync(subjectResult, ct);
+                    await _unitOfWork.SaveAsync(ct);
+
+                    var subjectAssessments = allAssessments.Where(a => a.SubjectId == cs.SubjectId).ToList();
+                    foreach (var assessment in subjectAssessments)
+                    {
+                        var assessmentResult = new AssessmentResult
+                        {
+                            AssessmentId = assessment.AssessmentId,
+                            AccountId = accountId,
+                            SubjectResultId = subjectResult.SubjectResultId,
+                            Score = 0,
+                            ResultStatus = "Pending",
+                            GradedByAccountId = createdByAccountId,
+                            RecordedAt = DateTime.UtcNow,
+                            IsPublished = false,
+                            AttemptNo = 1
+                        };
+                        await _unitOfWork.AssessmentResultRepository.AddAsync(assessmentResult, ct);
+                    }
+
+                    var subjectChecklists = allChecklists.Where(p => p.SubjectId == cs.SubjectId).ToList();
+                    foreach (var checklist in subjectChecklists)
+                    {
+                        var checklistResult = new PracticalChecklistResult
+                        {
+                            SubjectResultId = subjectResult.SubjectResultId,
+                            PracticalChecklistId = checklist.PracticalChecklistId,
+                            Score = 0,
+                            ResultStatus = "Pending",
+                            IsPublished = false
+                        };
+                        await _unitOfWork.PracticalChecklistResultRepository.AddAsync(checklistResult, ct);
+                    }
                 }
 
                 await _unitOfWork.SaveAsync(ct);
