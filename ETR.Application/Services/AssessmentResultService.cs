@@ -65,9 +65,9 @@ public class AssessmentResultService : IAssessmentResultService
 
                 // Verify request.AccountId is a real learner enrolled in a class for this assessment's course —
                 // prevents recording a score against an arbitrary/forged AccountId.
-                var learnerClassIds = (await _unitOfWork.ClassStudentRepository.GetAllAsync(ct))
-                    .Where(cs => cs.AccountId == request.AccountId)
-                    .Select(cs => cs.ClassId)
+                var learnerClassIds = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct))
+                    .Where(e => e.AccountId == request.AccountId && !e.IsDeleted)
+                    .Select(e => e.ClassId)
                     .ToList();
                 var isEnrolledInAssessmentCourse = (await _unitOfWork.ClassRepository.GetAllAsync(ct))
                     .Any(c => learnerClassIds.Contains(c.ClassId) && c.CourseId == assessment.CourseId);
