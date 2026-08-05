@@ -9,4 +9,7 @@ public record CreateCourseRequest(
     int DurationHours,
     [Required, MaxLength(20)] string Status,
     int? ValidityMonths = null,
-    [MaxLength(50)] string? CourseType = null);
+    [MaxLength(50)] string? CourseType = null,
+    [Required, MinLength(1, ErrorMessage = "A course must have at least one subject configured upon creation.")] 
+    List<AddCourseSubjectRequest> Subjects = null!
+);

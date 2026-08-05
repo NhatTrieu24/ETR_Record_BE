@@ -32,34 +32,83 @@ public class CourseService : ICourseService
 
     public async Task<CourseResponse> CreateCourseAsync(CreateCourseRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
     {
-        var course = new Course
+        if (request.Subjects == null || !request.Subjects.Any())
         {
-            CourseCode = request.CourseCode,
-            CourseName = request.CourseName,
-            Description = request.Description,
-            DurationHours = request.DurationHours,
-            Status = request.Status,
-            ValidityMonths = request.ValidityMonths,
-            CourseType = request.CourseType,
-            CreatedAt = DateTime.UtcNow,
-            CreatedByAccountId = createdByAccountId
-        };
+            throw new ArgumentException("A course must have at least one subject configured upon creation.");
+        }
 
-        await _unitOfWork.CourseRepository.AddAsync(course, cancellationToken);
-        await _unitOfWork.SaveAsync(cancellationToken);
-
-        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
         {
-            AccountId = createdByAccountId,
-            ActionType = "INSERT",
-            EntityName = nameof(Course),
-            RecordId = course.CourseId,
-            NewValue = course.CourseCode,
-            Description = $"Course #{course.CourseId} ({course.CourseCode}) created"
+            await _unitOfWork.BeginTransactionAsync(ct);
+            try
+            {
+                var course = new Course
+                {
+                    CourseCode = request.CourseCode,
+                    CourseName = request.CourseName,
+                    Description = request.Description,
+                    DurationHours = request.DurationHours,
+                    Status = request.Status,
+                    ValidityMonths = request.ValidityMonths,
+                    CourseType = request.CourseType,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedByAccountId = createdByAccountId
+                };
+
+                await _unitOfWork.CourseRepository.AddAsync(course, ct);
+                await _unitOfWork.SaveAsync(ct);
+
+                await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                {
+                    AccountId = createdByAccountId,
+                    ActionType = "INSERT",
+                    EntityName = nameof(Course),
+                    RecordId = course.CourseId,
+                    NewValue = course.CourseCode,
+                    Description = $"Course #{course.CourseId} ({course.CourseCode}) created"
+                }, ct);
+
+                foreach (var s in request.Subjects)
+                {
+                    var subject = await _unitOfWork.SubjectRepository.GetByIdAsync(s.SubjectId, ct)
+                        ?? throw new KeyNotFoundException($"Subject {s.SubjectId} not found.");
+
+                    var courseSubject = new CourseSubject
+                    {
+                        CourseId = course.CourseId,
+                        SubjectId = s.SubjectId,
+                        SequenceNo = s.SequenceNo,
+                        RequiredHours = s.RequiredHours,
+                        IsMandatory = s.IsMandatory,
+                        PassingScore = s.PassingScore,
+                        CreatedAt = DateTime.UtcNow,
+                        CreatedByAccountId = createdByAccountId
+                    };
+
+                    await _unitOfWork.CourseSubjectRepository.AddAsync(courseSubject, ct);
+
+                    await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                    {
+                        AccountId = createdByAccountId,
+                        ActionType = "INSERT",
+                        EntityName = nameof(CourseSubject),
+                        RecordId = course.CourseId,
+                        NewValue = $"SubjectId: {s.SubjectId}, Seq: {s.SequenceNo}",
+                        Description = $"Assigned Subject #{s.SubjectId} to new Course #{course.CourseId}"
+                    }, ct);
+                }
+
+                await _unitOfWork.SaveAsync(ct);
+                await _unitOfWork.CommitTransactionAsync(ct);
+
+                return new CourseResponse(course.CourseId, course.CourseCode, course.CourseName, course.Description, course.DurationHours, course.Status, course.ValidityMonths, course.CourseType);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync(ct);
+                throw;
+            }
         }, cancellationToken);
-        await _unitOfWork.SaveAsync(cancellationToken);
-
-        return new CourseResponse(course.CourseId, course.CourseCode, course.CourseName, course.Description, course.DurationHours, course.Status, course.ValidityMonths, course.CourseType);
     }
 
     public async Task<CourseResponse> UpdateCourseAsync(int id, UpdateCourseRequest request, int updatedByAccountId, CancellationToken cancellationToken = default)
