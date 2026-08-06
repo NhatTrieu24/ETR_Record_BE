@@ -16,4 +16,6 @@ public class SessionResponse
     public bool IsAssessmentRequired { get; set; }
     public bool IsChecklistRequired { get; set; }
     public int? AssessmentId { get; set; }
+    public string? AssessmentName { get; set; }
+    public string? AssessmentType { get; set; }
 }
