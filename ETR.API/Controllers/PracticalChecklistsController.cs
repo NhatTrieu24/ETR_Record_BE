@@ -7,7 +7,7 @@ namespace ETR.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin,Instructor,Academic,QA")]
+[Authorize]
 public class PracticalChecklistsController : ControllerBase
 {
     private readonly IPracticalChecklistService _service;
@@ -41,6 +41,7 @@ public class PracticalChecklistsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<IActionResult> Create([FromBody] CreatePracticalChecklistRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -49,6 +50,7 @@ public class PracticalChecklistsController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdatePracticalChecklistRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -57,6 +59,7 @@ public class PracticalChecklistsController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();

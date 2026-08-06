@@ -7,7 +7,7 @@ namespace ETR.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin,Academic,TrainingManager")]
+[Authorize]
 public class CompletionRequirementsController : ControllerBase
 {
     private readonly ICompletionRequirementService _service;
@@ -41,6 +41,7 @@ public class CompletionRequirementsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin,Academic,TrainingManager")]
     public async Task<IActionResult> Create([FromBody] CreateCompletionRequirementRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -49,6 +50,7 @@ public class CompletionRequirementsController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin,Academic,TrainingManager")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateCompletionRequirementRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -57,6 +59,7 @@ public class CompletionRequirementsController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin,Academic,TrainingManager")]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
