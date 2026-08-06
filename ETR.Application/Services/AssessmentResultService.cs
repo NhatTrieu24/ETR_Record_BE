@@ -78,66 +78,93 @@ public class AssessmentResultService : IAssessmentResultService
 
                 var allResults = await _unitOfWork.AssessmentResultRepository.GetAllAsync(ct);
 
-                // Latest attempt so far — exact match by (AssessmentId, AccountId, SessionId).
-                // Khớp nghiêm ngặt theo session: nhập điểm ở một buổi mới (dù cùng assessment)
-                // là một lần thi mới (AttemptNo = 1), KHÔNG bị coi là thi lại của điểm buổi khác.
-                var latestResult = allResults
-                    .Where(r => r.AssessmentId == request.AssessmentId && r.AccountId == request.AccountId
-                        && r.SessionId == request.SessionId)
-                    .OrderByDescending(r => r.AttemptNo)
-                    .FirstOrDefault();
+                // Tìm dòng nháp (Pending) được tạo sẵn khi Enroll
+                var pendingPlaceholder = allResults.FirstOrDefault(r => 
+                    r.AssessmentId == request.AssessmentId && 
+                    r.AccountId == request.AccountId && 
+                    r.ResultStatus == "Pending" && 
+                    r.SessionId == null && 
+                    r.AttemptNo == 1);
 
-                int attemptNo = 1;
+                AssessmentResult? result;
 
-                if (latestResult != null)
+                if (pendingPlaceholder != null)
                 {
-                    attemptNo = latestResult.AttemptNo + 1;
+                    // Đây là lần nhập điểm ĐẦU TIÊN của học viên (chưa có session nào).
+                    // Ta lấy luôn dòng nháp để cập nhật, ĐẢM BẢO nó không bị sinh rác.
+                    pendingPlaceholder.SessionId = request.SessionId;
+                    pendingPlaceholder.Score = request.Score;
+                    pendingPlaceholder.ResultStatus = request.Score >= assessment.PassingScore ? "Passed" : "Failed";
+                    pendingPlaceholder.Remark = request.Remark;
+                    pendingPlaceholder.GradedByAccountId = recordedByAccountId;
+                    pendingPlaceholder.RecordedAt = DateTime.UtcNow;
+                    pendingPlaceholder.UpdatedAt = DateTime.UtcNow;
+                    pendingPlaceholder.UpdatedByAccountId = recordedByAccountId;
 
-                    if (attemptNo > BusinessRuleEngine.MaxAssessmentAttempts)
+                    _unitOfWork.AssessmentResultRepository.Update(pendingPlaceholder);
+                    result = pendingPlaceholder;
+                }
+                else
+                {
+                    // Đây là lần thi lại HOẶC là nhập điểm ở một buổi mới.
+                    // Khớp nghiêm ngặt theo session: nhập điểm ở một buổi mới (dù cùng assessment)
+                    // là một lần thi mới (AttemptNo = 1), KHÔNG bị coi là thi lại của điểm buổi khác.
+                    var latestResult = allResults
+                        .Where(r => r.AssessmentId == request.AssessmentId && r.AccountId == request.AccountId
+                            && r.SessionId == request.SessionId)
+                        .OrderByDescending(r => r.AttemptNo)
+                        .FirstOrDefault();
+
+                    int attemptNo = 1;
+
+                    if (latestResult != null)
                     {
-                        throw new BusinessRuleViolationException($"Cannot retake. Maximum of {BusinessRuleEngine.MaxAssessmentAttempts} attempts already reached for this assessment.");
+                        attemptNo = latestResult.AttemptNo + 1;
+
+                        if (attemptNo > BusinessRuleEngine.MaxAssessmentAttempts)
+                        {
+                            throw new BusinessRuleViolationException($"Cannot retake. Maximum of {BusinessRuleEngine.MaxAssessmentAttempts} attempts already reached for this assessment.");
+                        }
+
+                        if (!request.AuthorizedByAccountId.HasValue || request.AuthorizedByAccountId.Value == recordedByAccountId)
+                        {
+                            throw new BusinessRuleViolationException("A retake must be authorized by an account different from the one recording the score.");
+                        }
+
+                        var retakeHistory = new RetakeHistory
+                        {
+                            SubjectResultId = request.SubjectResultId,
+                            RetakeDate = DateTime.UtcNow,
+                            Reason = "Retake Assessment",
+                            PreviousScore = latestResult.Score,
+                            NewScore = request.Score,
+                            AuthorizedByAccountId = request.AuthorizedByAccountId.Value,
+                            AttemptNo = attemptNo,
+                            CreatedAt = DateTime.UtcNow,
+                            CreatedByAccountId = recordedByAccountId
+                        };
+                        await _unitOfWork.RetakeHistoryRepository.AddAsync(retakeHistory, ct);
                     }
 
-                    if (!request.AuthorizedByAccountId.HasValue || request.AuthorizedByAccountId.Value == recordedByAccountId)
+                    result = new AssessmentResult
                     {
-                        throw new BusinessRuleViolationException("A retake must be authorized by an account different from the one recording the score.");
-                    }
-
-                    var retakeHistory = new RetakeHistory
-                    {
+                        AssessmentId = request.AssessmentId,
+                        AccountId = request.AccountId,
                         SubjectResultId = request.SubjectResultId,
-                        RetakeDate = DateTime.UtcNow,
-                        Reason = "Retake Assessment",
-                        PreviousScore = latestResult.Score,
-                        NewScore = request.Score,
-                        AuthorizedByAccountId = request.AuthorizedByAccountId.Value,
+                        SessionId = request.SessionId,
+                        Score = request.Score,
+                        ResultStatus = request.Score >= assessment.PassingScore ? "Passed" : "Failed",
+                        Remark = request.Remark,
+                        GradedByAccountId = recordedByAccountId,
+                        RecordedAt = DateTime.UtcNow,
                         AttemptNo = attemptNo,
                         CreatedAt = DateTime.UtcNow,
-                        CreatedByAccountId = recordedByAccountId
+                        CreatedByAccountId = recordedByAccountId,
+                        IsPublished = false,
+                        PublishedAt = null
                     };
-                    await _unitOfWork.RetakeHistoryRepository.AddAsync(retakeHistory, ct);
+                    await _unitOfWork.AssessmentResultRepository.AddAsync(result, ct);
                 }
-
-                // Mỗi lần chấm (kể cả retake) tạo 1 dòng AssessmentResult mới — giữ nguyên lịch sử
-                // điểm các lần thi trước thay vì ghi đè (unique index nay gồm cả AttemptNo).
-                var result = new AssessmentResult
-                {
-                    AssessmentId = request.AssessmentId,
-                    AccountId = request.AccountId,
-                    SubjectResultId = request.SubjectResultId,
-                    SessionId = request.SessionId,
-                    Score = request.Score,
-                    ResultStatus = request.Score >= assessment.PassingScore ? "Passed" : "Failed",
-                    Remark = request.Remark,
-                    GradedByAccountId = recordedByAccountId,
-                    RecordedAt = DateTime.UtcNow,
-                    AttemptNo = attemptNo,
-                    CreatedAt = DateTime.UtcNow,
-                    CreatedByAccountId = recordedByAccountId,
-                    IsPublished = false,
-                    PublishedAt = null
-                };
-                await _unitOfWork.AssessmentResultRepository.AddAsync(result, ct);
 
                 await _unitOfWork.SaveAsync(ct);
 
@@ -167,10 +194,18 @@ public class AssessmentResultService : IAssessmentResultService
         
         var allAssessments = await _unitOfWork.AssessmentRepository.GetAllAsync(ct);
 
+        // Nhan's fix creates multiple rows for new sessions, and Retakes create multiple rows.
+        // We MUST group by AssessmentId and take only the latest recorded score for each assessment
+        // to prevent artificially summing a test multiple times and skewing the average.
+        var latestResults = allAssessmentResults
+            .GroupBy(r => r.AssessmentId)
+            .Select(g => g.OrderByDescending(r => r.RecordedAt).ThenByDescending(r => r.AttemptNo).First())
+            .ToList();
+
         decimal totalWeightedScore = 0;
         decimal totalWeight = 0;
 
-        foreach (var result in allAssessmentResults)
+        foreach (var result in latestResults)
         {
             var assessment = allAssessments.FirstOrDefault(a => a.AssessmentId == result.AssessmentId);
             if (assessment != null)
