@@ -18,4 +18,6 @@ public class SessionResponse
     public int? AssessmentId { get; set; }
     public string? AssessmentName { get; set; }
     public string? AssessmentType { get; set; }
+    public int? PracticalChecklistId { get; set; }
+    public string? PracticalChecklistName { get; set; }
 }

@@ -17,4 +17,5 @@ public class UpdateSessionRequest
     public bool IsAssessmentRequired { get; set; }
     public bool IsChecklistRequired { get; set; }
     public int? AssessmentId { get; set; }
+    public int? PracticalChecklistId { get; set; }
 }

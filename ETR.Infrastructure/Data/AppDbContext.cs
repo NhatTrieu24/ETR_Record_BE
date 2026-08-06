@@ -180,6 +180,7 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<Session>().HasOne<Subject>().WithMany().HasForeignKey(s => s.SubjectId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<Session>().HasOne<Account>().WithMany().HasForeignKey(s => s.ConfirmedByAccountId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<Session>().HasOne<Assessment>().WithMany().HasForeignKey(s => s.AssessmentId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<Session>().HasOne<PracticalChecklist>().WithMany().HasForeignKey(s => s.PracticalChecklistId).OnDelete(cascadeDeleteConfig);
 
         // Attendance Setup
         modelBuilder.Entity<AttendanceRecord>().HasOne<Session>().WithMany().HasForeignKey(ar => ar.SessionId).OnDelete(cascadeDeleteConfig);
