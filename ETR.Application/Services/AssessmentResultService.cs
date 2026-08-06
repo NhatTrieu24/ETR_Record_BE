@@ -119,6 +119,28 @@ public class AssessmentResultService : IAssessmentResultService
 
                     if (latestResult != null)
                     {
+                        // [FIX] Nếu điểm của session này CHƯA được publish, giảng viên có quyền sửa đi sửa lại
+                        // (VD: Frontend gọi Save nhiều lần, hoặc sửa lỗi gõ nhầm). Ta sẽ UPSERT dòng hiện tại 
+                        // thay vì ném lỗi bắt buộc phải có giấy phép thi lại (Retake Authorization).
+                        if (!latestResult.IsPublished)
+                        {
+                            latestResult.Score = request.Score;
+                            latestResult.ResultStatus = request.Score >= assessment.PassingScore ? "Passed" : "Failed";
+                            latestResult.Remark = request.Remark;
+                            latestResult.UpdatedAt = DateTime.UtcNow;
+                            latestResult.UpdatedByAccountId = recordedByAccountId;
+
+                            _unitOfWork.AssessmentResultRepository.Update(latestResult);
+                            await _unitOfWork.SaveAsync(ct);
+
+                            await CalculateSubjectResultScoreAsync(request.SubjectResultId, ct);
+                            await _unitOfWork.SaveAsync(ct);
+                            await _unitOfWork.CommitTransactionAsync(ct);
+
+                            return new AssessmentResultResponse(latestResult.AssessmentResultId, latestResult.AssessmentId, latestResult.AccountId, latestResult.SubjectResultId, latestResult.SessionId, latestResult.Score, latestResult.ResultStatus, latestResult.GradedByAccountId, latestResult.RecordedAt, latestResult.PublishedAt, latestResult.IsPublished, latestResult.TakenAt, latestResult.Remark);
+                        }
+
+                        // Nếu đã Publish, đây chính thức là một lần THI LẠI (Retake)
                         attemptNo = latestResult.AttemptNo + 1;
 
                         if (attemptNo > BusinessRuleEngine.MaxAssessmentAttempts)
