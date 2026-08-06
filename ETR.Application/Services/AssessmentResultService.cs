@@ -78,11 +78,12 @@ public class AssessmentResultService : IAssessmentResultService
 
                 var allResults = await _unitOfWork.AssessmentResultRepository.GetAllAsync(ct);
 
-                // Latest attempt so far — exact match by (AssessmentId, AccountId, SessionId), or
-                // legacy record without SessionId (transitional fallback), highest AttemptNo wins.
+                // Latest attempt so far — exact match by (AssessmentId, AccountId, SessionId).
+                // Khớp nghiêm ngặt theo session: nhập điểm ở một buổi mới (dù cùng assessment)
+                // là một lần thi mới (AttemptNo = 1), KHÔNG bị coi là thi lại của điểm buổi khác.
                 var latestResult = allResults
                     .Where(r => r.AssessmentId == request.AssessmentId && r.AccountId == request.AccountId
-                        && (r.SessionId == request.SessionId || (r.SessionId == null && request.SessionId.HasValue)))
+                        && r.SessionId == request.SessionId)
                     .OrderByDescending(r => r.AttemptNo)
                     .FirstOrDefault();
 
