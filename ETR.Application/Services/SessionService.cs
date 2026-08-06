@@ -186,10 +186,21 @@ public class SessionService : ISessionService
             IsAssessmentRequired = session.IsAssessmentRequired,
             IsChecklistRequired = session.IsChecklistRequired,
             AssessmentId = session.AssessmentId,
-            AssessmentName = assessment?.ComponentName,
-            AssessmentType = assessment?.AssessmentType,
+            Assessment = assessment != null ? new ETR.Application.DTOs.Assessment.Responses.AssessmentResponse(
+                assessment.AssessmentId, assessment.CourseId, assessment.SubjectId, assessment.ComponentName,
+                assessment.AssessmentType, assessment.Weight, assessment.PassingScore, assessment.IsRequired,
+                assessment.DisplayOrder) : null,
             PracticalChecklistId = session.PracticalChecklistId,
-            PracticalChecklistName = practicalChecklist?.ItemName
+            PracticalChecklist = practicalChecklist != null ? new ETR.Application.DTOs.PracticalChecklist.PracticalChecklistResponse
+            {
+                PracticalChecklistId = practicalChecklist.PracticalChecklistId,
+                CourseId = practicalChecklist.CourseId,
+                SubjectId = practicalChecklist.SubjectId,
+                ItemName = practicalChecklist.ItemName,
+                Description = practicalChecklist.Description,
+                IsRequired = practicalChecklist.IsRequired,
+                DisplayOrder = practicalChecklist.DisplayOrder
+            } : null
         };
     }
 }

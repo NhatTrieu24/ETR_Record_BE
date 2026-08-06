@@ -16,8 +16,7 @@ public class SessionResponse
     public bool IsAssessmentRequired { get; set; }
     public bool IsChecklistRequired { get; set; }
     public int? AssessmentId { get; set; }
-    public string? AssessmentName { get; set; }
-    public string? AssessmentType { get; set; }
+    public ETR.Application.DTOs.Assessment.Responses.AssessmentResponse? Assessment { get; set; }
     public int? PracticalChecklistId { get; set; }
-    public string? PracticalChecklistName { get; set; }
+    public ETR.Application.DTOs.PracticalChecklist.PracticalChecklistResponse? PracticalChecklist { get; set; }
 }
