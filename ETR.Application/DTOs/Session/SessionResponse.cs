@@ -15,4 +15,5 @@ public class SessionResponse
     public DateTime? ConfirmedAt { get; set; }
     public bool IsAssessmentRequired { get; set; }
     public bool IsChecklistRequired { get; set; }
+    public int? AssessmentId { get; set; }
 }

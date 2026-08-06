@@ -22,4 +22,5 @@ public class CreateSessionRequest
 
     public bool IsAssessmentRequired { get; set; } = false;
     public bool IsChecklistRequired { get; set; } = false;
+    public int? AssessmentId { get; set; }
 }

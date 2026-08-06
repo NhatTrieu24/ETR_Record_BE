@@ -46,6 +46,15 @@ public class SessionService : ISessionService
         if (subjectExists == null)
             throw new ValidationException($"Subject with ID {request.SubjectId} does not exist.");
 
+        if (request.AssessmentId.HasValue)
+        {
+            var assessment = await _unitOfWork.AssessmentRepository.GetByIdAsync(request.AssessmentId.Value, cancellationToken);
+            if (assessment == null)
+                throw new ValidationException($"Assessment with ID {request.AssessmentId.Value} does not exist.");
+            if (assessment.CourseId != classExists.CourseId || assessment.SubjectId != request.SubjectId)
+                throw new ValidationException("Assessment does not match the class's course or the specified subject.");
+        }
+
         var session = new Session
         {
             ClassId = request.ClassId,
@@ -56,6 +65,7 @@ public class SessionService : ISessionService
             IsConfirmed = false, // Default value
             IsAssessmentRequired = request.IsAssessmentRequired,
             IsChecklistRequired = request.IsChecklistRequired,
+            AssessmentId = request.AssessmentId,
             CreatedAt = DateTime.UtcNow,
             CreatedByAccountId = createdByAccountId
         };
@@ -72,11 +82,22 @@ public class SessionService : ISessionService
         if (session == null)
             throw new KeyNotFoundException($"Session with ID {id} not found.");
 
+        if (request.AssessmentId.HasValue)
+        {
+            var classExists = await _unitOfWork.ClassRepository.GetByIdAsync(session.ClassId, cancellationToken);
+            var assessment = await _unitOfWork.AssessmentRepository.GetByIdAsync(request.AssessmentId.Value, cancellationToken);
+            if (assessment == null)
+                throw new ValidationException($"Assessment with ID {request.AssessmentId.Value} does not exist.");
+            if (assessment.CourseId != classExists?.CourseId || assessment.SubjectId != session.SubjectId)
+                throw new ValidationException("Assessment does not match the class's course or the specified subject.");
+        }
+
         session.SessionTitle = request.SessionTitle;
         session.SessionDate = request.SessionDate;
         session.Location = request.Location;
         session.IsAssessmentRequired = request.IsAssessmentRequired;
         session.IsChecklistRequired = request.IsChecklistRequired;
+        session.AssessmentId = request.AssessmentId;
         session.UpdatedAt = DateTime.UtcNow;
         session.UpdatedByAccountId = updatedByAccountId;
 
@@ -113,7 +134,8 @@ public class SessionService : ISessionService
             ConfirmedByAccountId = session.ConfirmedByAccountId,
             ConfirmedAt = session.ConfirmedAt,
             IsAssessmentRequired = session.IsAssessmentRequired,
-            IsChecklistRequired = session.IsChecklistRequired
+            IsChecklistRequired = session.IsChecklistRequired,
+            AssessmentId = session.AssessmentId
         };
     }
 }

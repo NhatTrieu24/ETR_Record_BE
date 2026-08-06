@@ -13,4 +13,5 @@ public class Session : BaseEntity
     public DateTime? ConfirmedAt { get; set; }
     public bool IsAssessmentRequired { get; set; } = false;
     public bool IsChecklistRequired { get; set; } = false;
+    public int? AssessmentId { get; set; }
 }
