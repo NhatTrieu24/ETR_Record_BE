@@ -571,6 +571,35 @@ public class EtrService : IEtrService
         _unitOfWork.ETRCourseRecordRepository.Update(etr);
         await _unitOfWork.SaveAsync(cancellationToken);
 
+        // Grounded is only cleared once a learner's ETR for the affected course is actually
+        // Completed — not merely upon re-enrolling (see EnrollmentService.CreateEnrollmentAsync).
+        // This check runs AFTER the save above so CertificateValidityCalculator reads this ETR's
+        // just-committed Completed status/ExpiryDate, not its pre-completion state.
+        var learnerProfile = await _unitOfWork.UserProfileRepository.GetByIdAsync(enrollment.AccountId, cancellationToken);
+        if (learnerProfile != null && learnerProfile.Status == LearnerStatus.Grounded)
+        {
+            var stillHasExpired = await CertificateValidityCalculator.HasAnyExpiredCompletedEtrAsync(_unitOfWork, enrollment.AccountId, cancellationToken);
+            if (!stillHasExpired)
+            {
+                await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                {
+                    AccountId = accountId,
+                    ActionType = "UPDATE",
+                    EntityName = nameof(UserProfile),
+                    RecordId = learnerProfile.AccountId,
+                    OldValue = LearnerStatus.Grounded,
+                    NewValue = LearnerStatus.Active,
+                    Description = $"UserProfile for Account #{learnerProfile.AccountId} auto-cleared from Grounded: ETR #{etrCourseRecordId} just Completed and no other course has an expired completed ETR."
+                }, cancellationToken);
+
+                learnerProfile.Status = LearnerStatus.Active;
+                learnerProfile.UpdatedAt = DateTime.UtcNow;
+                learnerProfile.UpdatedByAccountId = accountId;
+                _unitOfWork.UserProfileRepository.Update(learnerProfile);
+                await _unitOfWork.SaveAsync(cancellationToken);
+            }
+        }
+
         return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt, etr.IssuedDate, etr.ExpiryDate, etr.PreviousRecordId);
     }
 
@@ -786,5 +815,86 @@ public class EtrService : IEtrService
         }
 
         return result;
+    }
+
+    public async Task<IEnumerable<ExpiringStudentResponse>> GetDueForTrainingAsync(int? courseId, int daysThreshold, CancellationToken cancellationToken = default)
+    {
+        // "Due for training" is GetExpiringStudentsAsync run across every course instead of one —
+        // reuses its existing per-course role filtering (Instructor sees only their own classes) and
+        // Expired/ExpiringSoon logic as-is rather than re-implementing it.
+        var courseIds = courseId.HasValue
+            ? new List<int> { courseId.Value }
+            : (await _unitOfWork.CourseRepository.GetAllAsync(cancellationToken)).Select(c => c.CourseId).ToList();
+
+        var result = new List<ExpiringStudentResponse>();
+        foreach (var id in courseIds)
+        {
+            result.AddRange(await GetExpiringStudentsAsync(id, daysThreshold, cancellationToken));
+        }
+
+        return result;
+    }
+
+    public async Task<GroundedStatusRefreshResponse> RefreshGroundedStatusAsync(int actorAccountId, CancellationToken cancellationToken = default)
+    {
+        // Only Active/Grounded profiles are re-evaluated — Withdrawn/Graduated learners are no
+        // longer in the training pipeline, so their status is left alone regardless of expiry.
+        var profiles = (await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken))
+            .Where(p => p.Status == LearnerStatus.Active || p.Status == LearnerStatus.Grounded)
+            .ToList();
+
+        int scanned = 0, groundedCount = 0, clearedCount = 0;
+
+        foreach (var profile in profiles)
+        {
+            scanned++;
+            var hasExpired = await CertificateValidityCalculator.HasAnyExpiredCompletedEtrAsync(_unitOfWork, profile.AccountId, cancellationToken);
+
+            if (hasExpired && profile.Status != LearnerStatus.Grounded)
+            {
+                await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                {
+                    AccountId = actorAccountId,
+                    ActionType = "UPDATE",
+                    EntityName = nameof(UserProfile),
+                    RecordId = profile.AccountId,
+                    OldValue = profile.Status,
+                    NewValue = LearnerStatus.Grounded,
+                    Description = $"UserProfile for Account #{profile.AccountId} auto-grounded: a completed ETR has an expired certificate and no newer enrollment/ETR covers that course."
+                }, cancellationToken);
+
+                profile.Status = LearnerStatus.Grounded;
+                profile.UpdatedAt = DateTime.UtcNow;
+                profile.UpdatedByAccountId = actorAccountId;
+                _unitOfWork.UserProfileRepository.Update(profile);
+                groundedCount++;
+            }
+            else if (!hasExpired && profile.Status == LearnerStatus.Grounded)
+            {
+                await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                {
+                    AccountId = actorAccountId,
+                    ActionType = "UPDATE",
+                    EntityName = nameof(UserProfile),
+                    RecordId = profile.AccountId,
+                    OldValue = profile.Status,
+                    NewValue = LearnerStatus.Active,
+                    Description = $"UserProfile for Account #{profile.AccountId} auto-cleared from Grounded: no course has an expired completed ETR anymore."
+                }, cancellationToken);
+
+                profile.Status = LearnerStatus.Active;
+                profile.UpdatedAt = DateTime.UtcNow;
+                profile.UpdatedByAccountId = actorAccountId;
+                _unitOfWork.UserProfileRepository.Update(profile);
+                clearedCount++;
+            }
+        }
+
+        if (groundedCount > 0 || clearedCount > 0)
+        {
+            await _unitOfWork.SaveAsync(cancellationToken);
+        }
+
+        return new GroundedStatusRefreshResponse(scanned, groundedCount, clearedCount);
     }
 }
