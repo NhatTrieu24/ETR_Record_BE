@@ -10,6 +10,8 @@ public interface IEtrService
     Task<IEnumerable<EtrRecordResponse>> GetStudentEtrHistoryAsync(int studentId, CancellationToken cancellationToken = default);
     Task<IEnumerable<StudentEtrStatusResponse>> GetStudentEtrCurrentStatusAsync(int studentId, CancellationToken cancellationToken = default);
     Task<IEnumerable<ExpiringStudentResponse>> GetExpiringStudentsAsync(int courseId, int daysThreshold, CancellationToken cancellationToken = default);
+    Task<IEnumerable<ExpiringStudentResponse>> GetDueForTrainingAsync(int? courseId, int daysThreshold, CancellationToken cancellationToken = default);
+    Task<GroundedStatusRefreshResponse> RefreshGroundedStatusAsync(int actorAccountId, CancellationToken cancellationToken = default);
     Task<EtrCompletionProgressResponse> GetCompletionProgressAsync(int etrCourseRecordId, CancellationToken cancellationToken = default);
     Task DeleteEtrAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default);
     

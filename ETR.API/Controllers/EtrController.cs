@@ -265,4 +265,45 @@ public class EtrController : ControllerBase
         var expiringStudents = await _etrService.GetExpiringStudentsAsync(courseId, daysThreshold, cancellationToken);
         return Ok(expiringStudents);
     }
+
+    /// <summary>
+    /// [Module/Flow]: Xử lý ETR — Certificate Validity
+    /// [Core Responsibility]: Lấy danh sách học viên "cần ghi danh lại" (Due for training) trên
+    /// TOÀN BỘ khóa học (hoặc 1 khóa cụ thể nếu truyền courseId), dựa trên nền GetExpiringStudentsAsync.
+    /// [Target Audience]: Admin, Instructor, QA, TrainingManager, Academic
+    /// </summary>
+    /// <param name="courseId">Optional — nếu bỏ trống, quét tất cả Course.</param>
+    /// <param name="daysThreshold">Ngưỡng cảnh báo (Grace Period), mặc định 30 ngày; dùng 60/90 cho cảnh báo sớm hơn.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <response code="200">Returns the list of students due for (re)training.</response>
+    /// <response code="401">If the user is not authenticated.</response>
+    [HttpGet("due-for-training")]
+    [Authorize(Roles = "Admin,Instructor,QA,TrainingManager,Academic")]
+    public async Task<ActionResult<IEnumerable<ExpiringStudentResponse>>> GetDueForTraining([FromQuery] int? courseId, [FromQuery] int daysThreshold = 30, CancellationToken cancellationToken = default)
+    {
+        var dueForTraining = await _etrService.GetDueForTrainingAsync(courseId, daysThreshold, cancellationToken);
+        return Ok(dueForTraining);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Xử lý ETR — Certificate Validity
+    /// [Core Responsibility]: Quét toàn bộ UserProfile (Active/Grounded) và tự động Grounded/clear-Grounded
+    /// dựa trên chứng chỉ (ETRCourseRecord.ExpiryDate) đã hết hạn hay chưa. Không có background job trong
+    /// scope hiện tại — endpoint này là cơ chế trigger thủ công, gọi định kỳ (cron ngoài hệ thống) hoặc tay.
+    /// [Target Audience]: Admin
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <response code="200">Returns how many profiles were scanned/grounded/cleared.</response>
+    /// <response code="401">If the user is not authenticated.</response>
+    /// <response code="403">If the user is not an Admin.</response>
+    [HttpPost("refresh-grounded-status")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<GroundedStatusRefreshResponse>> RefreshGroundedStatus(CancellationToken cancellationToken)
+    {
+        var actorAccountId = _currentUserService.AccountId
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
+        var response = await _etrService.RefreshGroundedStatusAsync(actorAccountId, cancellationToken);
+        return Ok(response);
+    }
 }

@@ -170,6 +170,10 @@ public class EnrollmentService : IEnrollmentService
                 await _unitOfWork.ClassStudentRepository.AddAsync(classStudent, ct);
                 await _unitOfWork.SaveAsync(ct);
 
+                // NOTE: re-enrolling does NOT clear Grounded by itself — merely being back in a
+                // class is not "fit for duty" for aviation certification purposes. Grounded is only
+                // cleared once this new ETR is actually Completed — see EtrService.CompleteEtrAsync.
+
                 var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct))
                     .Where(cs => cs.CourseId == trainingClass.CourseId).ToList();
 
