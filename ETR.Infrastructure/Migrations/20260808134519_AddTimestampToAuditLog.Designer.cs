@@ -4,6 +4,7 @@ using ETR.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ETR.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260808134519_AddTimestampToAuditLog")]
+    partial class AddTimestampToAuditLog
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -79,67 +82,6 @@ namespace ETR.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Accounts");
-                });
-
-            modelBuilder.Entity("ETR.Domain.Entities.AmendmentRequest", b =>
-                {
-                    b.Property<int>("AmendmentRequestId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AmendmentRequestId"));
-
-                    b.Property<DateTime?>("ApprovedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("ApprovedByAccountId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CreatedByAccountId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("DecisionComment")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("NewValue")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("OldValue")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Reason")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("RequestedByAccountId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("SubjectResultId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("UpdatedByAccountId")
-                        .HasColumnType("int");
-
-                    b.HasKey("AmendmentRequestId");
-
-                    b.ToTable("AmendmentRequests");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.ApprovalHistory", b =>
@@ -345,9 +287,6 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<bool>("IsPublished")
                         .HasColumnType("bit");
 
-                    b.Property<decimal?>("PassingScoreSnapshot")
-                        .HasColumnType("decimal(5,2)");
-
                     b.Property<DateTime?>("PublishedAt")
                         .HasColumnType("datetime2");
 
@@ -378,9 +317,6 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<int?>("UpdatedByAccountId")
                         .HasColumnType("int");
-
-                    b.Property<decimal?>("WeightSnapshot")
-                        .HasColumnType("decimal(5,2)");
 
                     b.HasKey("AssessmentResultId");
 
@@ -644,12 +580,6 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<int>("DisplayOrder")
                         .HasColumnType("int");
 
-                    b.Property<DateTime>("EffectiveFrom")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("EffectiveTo")
-                        .HasColumnType("datetime2");
-
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
@@ -670,9 +600,6 @@ namespace ETR.Infrastructure.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<int?>("UpdatedByAccountId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("VersionNo")
                         .HasColumnType("int");
 
                     b.HasKey("RequirementId");
@@ -715,9 +642,6 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<int>("DurationHours")
                         .HasColumnType("int");
 
-                    b.Property<DateTime>("EffectiveFrom")
-                        .HasColumnType("datetime2");
-
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
@@ -732,9 +656,6 @@ namespace ETR.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<int?>("ValidityMonths")
-                        .HasColumnType("int");
-
-                    b.Property<int>("VersionNo")
                         .HasColumnType("int");
 
                     b.HasKey("CourseId");
@@ -903,9 +824,6 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<int>("CourseVersionNo")
-                        .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -1550,9 +1468,6 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
-
-                    b.Property<decimal?>("PassingScoreSnapshot")
-                        .HasColumnType("decimal(5,2)");
 
                     b.Property<decimal?>("Score")
                         .HasColumnType("decimal(5,2)");

@@ -11,4 +11,5 @@ public record AuditLogResponse(
     string? NewValue,
     string? Description,
     string? IPAddress,
-    string? UserAgent);
+    string? UserAgent,
+    DateTime CreatedAt);
