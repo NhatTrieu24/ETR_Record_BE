@@ -94,8 +94,14 @@ public class SubjectSignoffController : ControllerBase
     /// Instructor xin "mở khóa" một SubjectResult đã Sign-off để sửa lại (Amendment Request) —
     /// thay cho việc phải gọi điện nhờ Training Manager trả cả hồ sơ ETR về. Yêu cầu này cần
     /// Training Manager duyệt qua AmendmentsController trước khi SubjectResult thực sự mở lại.
+    /// [Team decision 2026-08-08, docs/todo/addition.md]: chỉ Instructor (và chỉ đúng người đã ký
+    /// — kiểm tra định danh nằm trong AmendmentService) hoặc Admin (Force Unlock, có audit riêng)
+    /// mới được gọi API này. Academic KHÔNG được quyền — class-level [Authorize] vẫn cho Academic
+    /// qua các action khác của controller này, nên method-level [Authorize] dưới đây thu hẹp lại
+    /// (2 attribute kết hợp theo AND, không phải OR — xem ghi chú tương tự ở EtrController).
     /// </summary>
     [HttpPost("{subjectResultId:int}/unlock-request")]
+    [Authorize(Roles = "Instructor,Admin")]
     public async Task<IActionResult> RequestUnlock(
         int subjectResultId,
         [FromBody] CreateAmendmentRequestRequest request,
@@ -104,7 +110,7 @@ public class SubjectSignoffController : ControllerBase
         var accountId = _currentUserService.AccountId
             ?? throw new UnauthorizedAccessException("User is not authenticated.");
 
-        var response = await _amendmentService.CreateAmendmentRequestAsync(subjectResultId, request, accountId, cancellationToken);
+        var response = await _amendmentService.CreateAmendmentRequestAsync(subjectResultId, request, accountId, _currentUserService.RoleName, cancellationToken);
         return Ok(response);
     }
 }

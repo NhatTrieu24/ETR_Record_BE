@@ -1,3 +1,4 @@
+using ETR.Application.Compliance;
 using ETR.Application.DTOs.Amendment.Requests;
 using ETR.Application.Interfaces;
 using ETR.Application.Services;
@@ -62,46 +63,95 @@ public class AmendmentServiceTests
         var subjectResult = new SubjectResult { SubjectResultId = 1, EtrId = 10, Status = "Passed" };
         var (service, _, _, _, _, _) = BuildService(etr: new ETRCourseRecord { ETRCourseRecordId = 10, Status = "InProgress", IsLocked = false }, subjectResult);
 
-        await Assert.ThrowsAsync<ETR.Application.Compliance.BusinessRuleViolationException>(
-            () => service.CreateAmendmentRequestAsync(1, new CreateAmendmentRequestRequest { Reason = "wrong score" }, requestedByAccountId: 5, CancellationToken.None));
+        await Assert.ThrowsAsync<BusinessRuleViolationException>(
+            () => service.CreateAmendmentRequestAsync(1, new CreateAmendmentRequestRequest { Reason = "wrong score" }, requestedByAccountId: 5, requestedByRoleName: "Instructor", CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task CreateAmendmentRequestAsync_InstructorIsNotTheOriginalSigner_ThrowsForbidden()
+    {
+        // Team decision 2026-08-08 (docs/todo/addition.md): only the Instructor who actually signed
+        // off may request their own unlock — someone else's Instructor account must be rejected.
+        var subjectResult = new SubjectResult { SubjectResultId = 1, EtrId = 10, Status = "Passed" };
+        var signoffs = new List<SubjectSignoff> { new() { SubjectSignoffId = 1, SubjectResultId = 1, SignoffByAccountId = 42 } };
+        var (service, _, auditLogRepo, amendments, _, _) = BuildService(etr: new ETRCourseRecord { ETRCourseRecordId = 10, Status = "InProgress", IsLocked = false }, subjectResult, signoffs);
+
+        await Assert.ThrowsAsync<ForbiddenAccessException>(
+            () => service.CreateAmendmentRequestAsync(1, new CreateAmendmentRequestRequest { Reason = "wrong score" }, requestedByAccountId: 5, requestedByRoleName: "Instructor", CancellationToken.None));
+
+        Assert.Empty(amendments);
+        auditLogRepo.Verify(r => r.AddAsync(It.IsAny<AuditLog>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateAmendmentRequestAsync_AdminNotTheOriginalSigner_ForceUnlockSucceedsWithHighSeverityAuditLog()
+    {
+        // Admin Force Unlock is the one deliberate exception (Instructor left/unavailable) — must
+        // succeed, but under a distinct ActionType so it's never confused with a normal self-request.
+        var subjectResult = new SubjectResult { SubjectResultId = 1, EtrId = 10, Status = "Passed" };
+        var signoffs = new List<SubjectSignoff> { new() { SubjectSignoffId = 1, SubjectResultId = 1, SignoffByAccountId = 42 } };
+        var (service, _, auditLogRepo, amendments, _, _) = BuildService(etr: new ETRCourseRecord { ETRCourseRecordId = 10, Status = "InProgress", IsLocked = false }, subjectResult, signoffs);
+
+        var response = await service.CreateAmendmentRequestAsync(1, new CreateAmendmentRequestRequest { Reason = "Instructor gốc đã nghỉ việc" }, requestedByAccountId: 1, requestedByRoleName: "Admin", CancellationToken.None);
+
+        Assert.Equal("Pending", response.Status);
+        Assert.Single(amendments);
+        auditLogRepo.Verify(r => r.AddAsync(It.Is<AuditLog>(a => a.ActionType == "ADMIN_FORCE_UNLOCK"), It.IsAny<CancellationToken>()), Times.Once);
+        auditLogRepo.Verify(r => r.AddAsync(It.Is<AuditLog>(a => a.ActionType == "AMENDMENT_REQUEST"), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateAmendmentRequestAsync_AdminIsTheOriginalSigner_UsesNormalAuditLogNotForceUnlock()
+    {
+        // Admin sometimes IS the signer (SubjectSignoffController allows Admin to sign off too) — in
+        // that case it's an ordinary self-request, not a Force Unlock, and must not be logged as one.
+        var subjectResult = new SubjectResult { SubjectResultId = 1, EtrId = 10, Status = "Passed" };
+        var signoffs = new List<SubjectSignoff> { new() { SubjectSignoffId = 1, SubjectResultId = 1, SignoffByAccountId = 1 } };
+        var (service, _, auditLogRepo, amendments, _, _) = BuildService(etr: new ETRCourseRecord { ETRCourseRecordId = 10, Status = "InProgress", IsLocked = false }, subjectResult, signoffs);
+
+        await service.CreateAmendmentRequestAsync(1, new CreateAmendmentRequestRequest { Reason = "wrong score" }, requestedByAccountId: 1, requestedByRoleName: "Admin", CancellationToken.None);
+
+        Assert.Single(amendments);
+        auditLogRepo.Verify(r => r.AddAsync(It.Is<AuditLog>(a => a.ActionType == "AMENDMENT_REQUEST"), It.IsAny<CancellationToken>()), Times.Once);
+        auditLogRepo.Verify(r => r.AddAsync(It.Is<AuditLog>(a => a.ActionType == "ADMIN_FORCE_UNLOCK"), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     public async Task CreateAmendmentRequestAsync_ParentEtrAlreadyCompleted_ThrowsBusinessRuleViolation()
     {
         var subjectResult = new SubjectResult { SubjectResultId = 1, EtrId = 10, Status = "Passed" };
-        var signoffs = new List<SubjectSignoff> { new() { SubjectSignoffId = 1, SubjectResultId = 1 } };
+        var signoffs = new List<SubjectSignoff> { new() { SubjectSignoffId = 1, SubjectResultId = 1, SignoffByAccountId = 5 } };
         var (service, _, _, _, _, _) = BuildService(etr: new ETRCourseRecord { ETRCourseRecordId = 10, Status = "Completed", IsLocked = true }, subjectResult, signoffs);
 
-        await Assert.ThrowsAsync<ETR.Application.Compliance.BusinessRuleViolationException>(
-            () => service.CreateAmendmentRequestAsync(1, new CreateAmendmentRequestRequest { Reason = "wrong score" }, requestedByAccountId: 5, CancellationToken.None));
+        await Assert.ThrowsAsync<BusinessRuleViolationException>(
+            () => service.CreateAmendmentRequestAsync(1, new CreateAmendmentRequestRequest { Reason = "wrong score" }, requestedByAccountId: 5, requestedByRoleName: "Instructor", CancellationToken.None));
     }
 
     [Fact]
     public async Task CreateAmendmentRequestAsync_AlreadyHasPendingRequest_ThrowsBusinessRuleViolation()
     {
         var subjectResult = new SubjectResult { SubjectResultId = 1, EtrId = 10, Status = "Passed" };
-        var signoffs = new List<SubjectSignoff> { new() { SubjectSignoffId = 1, SubjectResultId = 1 } };
+        var signoffs = new List<SubjectSignoff> { new() { SubjectSignoffId = 1, SubjectResultId = 1, SignoffByAccountId = 5 } };
         var existingAmendments = new List<AmendmentRequest> { new() { AmendmentRequestId = 1, SubjectResultId = 1, Status = "Pending" } };
         var (service, _, _, _, _, _) = BuildService(etr: new ETRCourseRecord { ETRCourseRecordId = 10, Status = "InProgress", IsLocked = false }, subjectResult, signoffs, existingAmendments);
 
-        await Assert.ThrowsAsync<ETR.Application.Compliance.BusinessRuleViolationException>(
-            () => service.CreateAmendmentRequestAsync(1, new CreateAmendmentRequestRequest { Reason = "wrong score" }, requestedByAccountId: 5, CancellationToken.None));
+        await Assert.ThrowsAsync<BusinessRuleViolationException>(
+            () => service.CreateAmendmentRequestAsync(1, new CreateAmendmentRequestRequest { Reason = "wrong score" }, requestedByAccountId: 5, requestedByRoleName: "Instructor", CancellationToken.None));
     }
 
     [Fact]
     public async Task CreateAmendmentRequestAsync_ValidRequest_CreatesPendingAmendmentAndWritesAuditLog()
     {
         var subjectResult = new SubjectResult { SubjectResultId = 1, EtrId = 10, Status = "Passed" };
-        var signoffs = new List<SubjectSignoff> { new() { SubjectSignoffId = 1, SubjectResultId = 1 } };
+        var signoffs = new List<SubjectSignoff> { new() { SubjectSignoffId = 1, SubjectResultId = 1, SignoffByAccountId = 5 } };
         var (service, _, auditLogRepo, amendments, _, _) = BuildService(etr: new ETRCourseRecord { ETRCourseRecordId = 10, Status = "InProgress", IsLocked = false }, subjectResult, signoffs);
 
-        var response = await service.CreateAmendmentRequestAsync(1, new CreateAmendmentRequestRequest { Reason = "wrong score" }, requestedByAccountId: 5, CancellationToken.None);
+        var response = await service.CreateAmendmentRequestAsync(1, new CreateAmendmentRequestRequest { Reason = "wrong score" }, requestedByAccountId: 5, requestedByRoleName: "Instructor", CancellationToken.None);
 
         Assert.Equal("Pending", response.Status);
         Assert.Equal("Passed", response.OldValue);
         Assert.Single(amendments);
-        auditLogRepo.Verify(r => r.AddAsync(It.IsAny<AuditLog>(), It.IsAny<CancellationToken>()), Times.Once);
+        auditLogRepo.Verify(r => r.AddAsync(It.Is<AuditLog>(a => a.ActionType == "AMENDMENT_REQUEST"), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -128,7 +178,7 @@ public class AmendmentServiceTests
         var existingAmendments = new List<AmendmentRequest> { new() { AmendmentRequestId = 1, SubjectResultId = 1, Status = "Pending", OldValue = "Passed" } };
         var (service, _, _, _, _, _) = BuildService(etr: new ETRCourseRecord { ETRCourseRecordId = 10, Status = "Completed", IsLocked = true }, subjectResult, signoffs, existingAmendments);
 
-        await Assert.ThrowsAsync<ETR.Application.Compliance.BusinessRuleViolationException>(
+        await Assert.ThrowsAsync<BusinessRuleViolationException>(
             () => service.ApproveAmendmentRequestAsync(1, new DecideAmendmentRequestRequest(), approvedByAccountId: 9, CancellationToken.None));
     }
 
@@ -139,7 +189,7 @@ public class AmendmentServiceTests
         var existingAmendments = new List<AmendmentRequest> { new() { AmendmentRequestId = 1, SubjectResultId = 1, Status = "Rejected", OldValue = "Passed" } };
         var (service, _, _, _, _, _) = BuildService(etr: new ETRCourseRecord { ETRCourseRecordId = 10, Status = "InProgress", IsLocked = false }, subjectResult, existingAmendments: existingAmendments);
 
-        await Assert.ThrowsAsync<ETR.Application.Compliance.BusinessRuleViolationException>(
+        await Assert.ThrowsAsync<BusinessRuleViolationException>(
             () => service.ApproveAmendmentRequestAsync(1, new DecideAmendmentRequestRequest(), approvedByAccountId: 9, CancellationToken.None));
     }
 
