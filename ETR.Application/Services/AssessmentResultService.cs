@@ -50,7 +50,7 @@ public class AssessmentResultService : IAssessmentResultService
             r.AssessmentResultId, r.AssessmentId, r.AccountId, r.SubjectResultId, r.SessionId, r.Score, r.ResultStatus, r.GradedByAccountId, r.RecordedAt, r.PublishedAt, r.IsPublished, r.TakenAt, r.Remark));
     }
 
-    public async Task<AssessmentResultResponse> RecordAssessmentScoreAsync(CreateAssessmentResultRequest request, int recordedByAccountId, CancellationToken cancellationToken = default)
+    public async Task<AssessmentResultResponse> RecordAssessmentScoreAsync(CreateAssessmentResultRequest request, int recordedByAccountId, string? recordedByRoleName, CancellationToken cancellationToken = default)
     {
         return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
         {
@@ -69,12 +69,16 @@ public class AssessmentResultService : IAssessmentResultService
                     .Where(e => e.AccountId == request.AccountId && !e.IsDeleted)
                     .Select(e => e.ClassId)
                     .ToList();
-                var isEnrolledInAssessmentCourse = (await _unitOfWork.ClassRepository.GetAllAsync(ct))
-                    .Any(c => learnerClassIds.Contains(c.ClassId) && c.CourseId == assessment.CourseId);
-                if (!isEnrolledInAssessmentCourse)
+                var targetClass = (await _unitOfWork.ClassRepository.GetAllAsync(ct))
+                    .FirstOrDefault(c => learnerClassIds.Contains(c.ClassId) && c.CourseId == assessment.CourseId);
+                if (targetClass == null)
                 {
                     throw new BusinessRuleViolationException($"Account (ID: {request.AccountId}) is not enrolled in a class for this assessment's course.");
                 }
+
+                // "Sân nhà ai nấy đá" — Instructor can only grade a class they are actually
+                // assigned to (see ClassOwnershipValidator).
+                ClassOwnershipValidator.EnsureInstructorOwnsClass(recordedByRoleName, recordedByAccountId, targetClass.InstructorAccountId);
 
                 var allResults = await _unitOfWork.AssessmentResultRepository.GetAllAsync(ct);
 
@@ -347,6 +351,17 @@ public class AssessmentResultService : IAssessmentResultService
             {
                 var subjectResult = await _unitOfWork.SubjectResultRepository.GetByIdAsync(request.SubjectResultId, ct);
                 if (subjectResult == null) throw new BusinessRuleViolationException("SubjectResult not found.");
+
+                // "Sân nhà ai nấy đá" — Instructor can only sign off a Subject belonging to a class
+                // they are actually assigned to (see ClassOwnershipValidator).
+                var etrForSignoff = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(subjectResult.EtrId, ct);
+                var enrollmentForSignoff = etrForSignoff != null
+                    ? await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(etrForSignoff.EnrollmentId, ct)
+                    : null;
+                var classForSignoff = enrollmentForSignoff != null
+                    ? await _unitOfWork.ClassRepository.GetByIdAsync(enrollmentForSignoff.ClassId, ct)
+                    : null;
+                ClassOwnershipValidator.EnsureInstructorOwnsClass(signoffByRoleName, signoffByAccountId, classForSignoff?.InstructorAccountId);
 
                 var signoff = new SubjectSignoff
                 {

@@ -1,3 +1,4 @@
+using ETR.Application.Compliance;
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Application.Services;
@@ -83,12 +84,12 @@ public class AssessmentResultServiceTests
             ResultStatus = "Pending", SessionId = null, AttemptNo = 1, PassingScoreSnapshot = 50m
         };
         var enrollment = new CourseEnrollment { EnrollmentId = 1, AccountId = 100, ClassId = 10 };
-        var trainingClass = new Class { ClassId = 10, CourseId = 1 };
+        var trainingClass = new Class { ClassId = 10, CourseId = 1, InstructorAccountId = 9 };
 
         var (service, _) = BuildService(assessment, new List<AssessmentResult> { placeholder }, enrollment, trainingClass);
 
         var request = new CreateAssessmentResultRequest(1, 100, 1, 60m, null, SessionId: 5);
-        var response = await service.RecordAssessmentScoreAsync(request, recordedByAccountId: 9, CancellationToken.None);
+        var response = await service.RecordAssessmentScoreAsync(request, recordedByAccountId: 9, recordedByRoleName: "Instructor", CancellationToken.None);
 
         Assert.Equal("Passed", response.ResultStatus);
     }
@@ -100,12 +101,12 @@ public class AssessmentResultServiceTests
         // enrolled) — there is no "old rule" to preserve, so the current live value is correct.
         var assessment = new Assessment { AssessmentId = 1, CourseId = 1, SubjectId = 1, PassingScore = 90m };
         var enrollment = new CourseEnrollment { EnrollmentId = 1, AccountId = 100, ClassId = 10 };
-        var trainingClass = new Class { ClassId = 10, CourseId = 1 };
+        var trainingClass = new Class { ClassId = 10, CourseId = 1, InstructorAccountId = 9 };
 
         var (service, results) = BuildService(assessment, new List<AssessmentResult>(), enrollment, trainingClass);
 
         var request = new CreateAssessmentResultRequest(1, 100, 1, 60m, null, SessionId: 5);
-        var response = await service.RecordAssessmentScoreAsync(request, recordedByAccountId: 9, CancellationToken.None);
+        var response = await service.RecordAssessmentScoreAsync(request, recordedByAccountId: 9, recordedByRoleName: "Instructor", CancellationToken.None);
 
         Assert.Equal("Failed", response.ResultStatus);
         Assert.Equal(90m, results.Single().PassingScoreSnapshot);
@@ -127,13 +128,68 @@ public class AssessmentResultServiceTests
             ResultStatus = "Pending", SessionId = null, AttemptNo = 1, PassingScoreSnapshot = 50m, WeightSnapshot = 1m
         };
         var enrollment = new CourseEnrollment { EnrollmentId = 1, AccountId = 100, ClassId = 10 };
-        var trainingClass = new Class { ClassId = 10, CourseId = 1 };
+        var trainingClass = new Class { ClassId = 10, CourseId = 1, InstructorAccountId = 9 };
 
         var (service, results) = BuildService(assessment, new List<AssessmentResult> { placeholder }, enrollment, trainingClass);
 
         var request = new CreateAssessmentResultRequest(1, 100, 1, 100m, null, SessionId: 5);
-        await service.RecordAssessmentScoreAsync(request, recordedByAccountId: 9, CancellationToken.None);
+        await service.RecordAssessmentScoreAsync(request, recordedByAccountId: 9, recordedByRoleName: "Instructor", CancellationToken.None);
 
         Assert.Equal(1m, results.Single().WeightSnapshot);
+    }
+
+    [Fact]
+    public async Task RecordAssessmentScoreAsync_InstructorNotAssignedToClass_ThrowsForbidden()
+    {
+        // "Sân nhà ai nấy đá" (team decision 2026-08-08, docs/todo/addition.md).
+        var assessment = new Assessment { AssessmentId = 1, CourseId = 1, SubjectId = 1, PassingScore = 50m };
+        var enrollment = new CourseEnrollment { EnrollmentId = 1, AccountId = 100, ClassId = 10 };
+        var trainingClass = new Class { ClassId = 10, CourseId = 1, InstructorAccountId = 99 };
+
+        var (service, _) = BuildService(assessment, new List<AssessmentResult>(), enrollment, trainingClass);
+
+        var request = new CreateAssessmentResultRequest(1, 100, 1, 60m, null, SessionId: 5);
+
+        await Assert.ThrowsAsync<ForbiddenAccessException>(
+            () => service.RecordAssessmentScoreAsync(request, recordedByAccountId: 42, recordedByRoleName: "Instructor", CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task SignoffSubjectResultAsync_InstructorNotAssignedToClass_ThrowsForbidden()
+    {
+        var subjectResult = new SubjectResult { SubjectResultId = 1, EtrId = 1, CourseId = 1, SubjectId = 1 };
+        var etr = new ETRCourseRecord { ETRCourseRecordId = 1, EnrollmentId = 1 };
+        var enrollment = new CourseEnrollment { EnrollmentId = 1, AccountId = 100, ClassId = 10 };
+        var trainingClass = new Class { ClassId = 10, CourseId = 1, InstructorAccountId = 99 };
+
+        var unitOfWork = new Mock<IUnitOfWork>();
+        unitOfWork.Setup(u => u.ExecuteInStrategyAsync(It.IsAny<Func<CancellationToken, Task<SubjectSignoffResponse>>>(), It.IsAny<CancellationToken>()))
+            .Returns((Func<CancellationToken, Task<SubjectSignoffResponse>> op, CancellationToken ct) => op(ct));
+        unitOfWork.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        unitOfWork.Setup(u => u.RollbackTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        var subjectResultRepo = new Mock<IGenericRepository<SubjectResult>>();
+        subjectResultRepo.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(subjectResult);
+        unitOfWork.SetupGet(u => u.SubjectResultRepository).Returns(subjectResultRepo.Object);
+
+        var etrRepo = new Mock<IETRCourseRecordRepository>();
+        etrRepo.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(etr);
+        unitOfWork.SetupGet(u => u.ETRCourseRecordRepository).Returns(etrRepo.Object);
+
+        var enrollmentRepo = new Mock<IGenericRepository<CourseEnrollment>>();
+        enrollmentRepo.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(enrollment);
+        unitOfWork.SetupGet(u => u.CourseEnrollmentRepository).Returns(enrollmentRepo.Object);
+
+        var classRepo = new Mock<IGenericRepository<Class>>();
+        classRepo.Setup(r => r.GetByIdAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(trainingClass);
+        unitOfWork.SetupGet(u => u.ClassRepository).Returns(classRepo.Object);
+
+        var logger = new Mock<ILogger<AssessmentResultService>>();
+        var service = new AssessmentResultService(unitOfWork.Object, logger.Object);
+
+        var request = new CreateSubjectSignoffRequest(1, "ok");
+
+        await Assert.ThrowsAsync<ForbiddenAccessException>(
+            () => service.SignoffSubjectResultAsync(request, signoffByAccountId: 42, signoffByRoleName: "Instructor", CancellationToken.None));
     }
 }
