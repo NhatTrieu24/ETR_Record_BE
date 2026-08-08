@@ -1,4 +1,5 @@
 using ETR.Application.DTOs;
+using ETR.Application.DTOs.Amendment.Requests;
 using ETR.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,15 +19,18 @@ namespace ETR.API.Controllers;
 public class SubjectSignoffController : ControllerBase
 {
     private readonly IAssessmentResultService _assessmentResultService;
+    private readonly IAmendmentService _amendmentService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IUnitOfWork _unitOfWork;
 
     public SubjectSignoffController(
         IAssessmentResultService assessmentResultService,
+        IAmendmentService amendmentService,
         ICurrentUserService currentUserService,
         IUnitOfWork unitOfWork)
     {
         _assessmentResultService = assessmentResultService;
+        _amendmentService = amendmentService;
         _currentUserService = currentUserService;
         _unitOfWork = unitOfWork;
     }
@@ -84,5 +88,23 @@ public class SubjectSignoffController : ControllerBase
             signoff.Role,
             signoff.SignoffAt,
             signoff.Comment) });
+    }
+
+    /// <summary>
+    /// Instructor xin "mở khóa" một SubjectResult đã Sign-off để sửa lại (Amendment Request) —
+    /// thay cho việc phải gọi điện nhờ Training Manager trả cả hồ sơ ETR về. Yêu cầu này cần
+    /// Training Manager duyệt qua AmendmentsController trước khi SubjectResult thực sự mở lại.
+    /// </summary>
+    [HttpPost("{subjectResultId:int}/unlock-request")]
+    public async Task<IActionResult> RequestUnlock(
+        int subjectResultId,
+        [FromBody] CreateAmendmentRequestRequest request,
+        CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
+        var response = await _amendmentService.CreateAmendmentRequestAsync(subjectResultId, request, accountId, cancellationToken);
+        return Ok(response);
     }
 }

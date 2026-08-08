@@ -38,6 +38,7 @@ public class UnitOfWork : IUnitOfWork
         EvidenceFileRepository = new GenericRepository<EvidenceFile>(_context);
         CompletionRequirementRepository = new GenericRepository<CompletionRequirement>(_context);
         ApprovalRequestRepository = new GenericRepository<ApprovalRequest>(_context);
+        AmendmentRequestRepository = new GenericRepository<AmendmentRequest>(_context);
         ApprovalHistoryRepository = new GenericRepository<ApprovalHistory>(_context);
         AuditLogRepository = new AuditLogRepository(_context);
         ExportJobRepository = new GenericRepository<ExportJob>(_context);
@@ -67,6 +68,7 @@ public class UnitOfWork : IUnitOfWork
     public IGenericRepository<EvidenceFile> EvidenceFileRepository { get; }
     public IGenericRepository<CompletionRequirement> CompletionRequirementRepository { get; }
     public IGenericRepository<ApprovalRequest> ApprovalRequestRepository { get; }
+    public IGenericRepository<AmendmentRequest> AmendmentRequestRepository { get; }
     public IGenericRepository<ApprovalHistory> ApprovalHistoryRepository { get; }
     public IAuditLogRepository AuditLogRepository { get; }
     public IGenericRepository<ExportJob> ExportJobRepository { get; }

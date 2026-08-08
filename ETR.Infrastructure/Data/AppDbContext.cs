@@ -42,6 +42,7 @@ public partial class AppDbContext : DbContext
     public DbSet<CompletionRequirement> CompletionRequirements => Set<CompletionRequirement>();
     public DbSet<ApprovalRequest> ApprovalRequests => Set<ApprovalRequest>();
     public DbSet<ApprovalHistory> ApprovalHistories => Set<ApprovalHistory>();
+    public DbSet<AmendmentRequest> AmendmentRequests => Set<AmendmentRequest>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<ExportJob> ExportJobs => Set<ExportJob>();
 
