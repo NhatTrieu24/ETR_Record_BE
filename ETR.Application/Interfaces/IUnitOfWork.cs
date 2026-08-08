@@ -28,6 +28,7 @@ public interface IUnitOfWork
     IGenericRepository<EvidenceFile> EvidenceFileRepository { get; }
     IGenericRepository<CompletionRequirement> CompletionRequirementRepository { get; }
     IGenericRepository<ApprovalRequest> ApprovalRequestRepository { get; }
+    IGenericRepository<AmendmentRequest> AmendmentRequestRepository { get; }
     IGenericRepository<ApprovalHistory> ApprovalHistoryRepository { get; }
     IAuditLogRepository AuditLogRepository { get; }
     IGenericRepository<ExportJob> ExportJobRepository { get; }
