@@ -90,11 +90,20 @@ public class AssessmentResultService : IAssessmentResultService
 
                 if (pendingPlaceholder != null)
                 {
+                    // Grade against the snapshot taken at Enroll time (see EnrollmentService), NOT
+                    // whatever Assessment.PassingScore currently is — a threshold change made after
+                    // this learner enrolled must not change how their own attempt is graded. Records
+                    // created before this field existed (snapshot null) fall back to the live value.
+                    var passingScore = pendingPlaceholder.PassingScoreSnapshot ?? assessment.PassingScore;
+                    var weight = pendingPlaceholder.WeightSnapshot ?? assessment.Weight;
+
                     // Đây là lần nhập điểm ĐẦU TIÊN của học viên (chưa có session nào).
                     // Ta lấy luôn dòng nháp để cập nhật, ĐẢM BẢO nó không bị sinh rác.
                     pendingPlaceholder.SessionId = request.SessionId;
                     pendingPlaceholder.Score = request.Score;
-                    pendingPlaceholder.ResultStatus = request.Score >= assessment.PassingScore ? "Passed" : "Failed";
+                    pendingPlaceholder.ResultStatus = request.Score >= passingScore ? "Passed" : "Failed";
+                    pendingPlaceholder.PassingScoreSnapshot ??= passingScore;
+                    pendingPlaceholder.WeightSnapshot ??= weight;
                     pendingPlaceholder.Remark = request.Remark;
                     pendingPlaceholder.GradedByAccountId = recordedByAccountId;
                     pendingPlaceholder.RecordedAt = DateTime.UtcNow;
@@ -117,15 +126,23 @@ public class AssessmentResultService : IAssessmentResultService
 
                     int attemptNo = 1;
 
+                    // Every attempt in this chain (retakes, edits) grades against the SAME snapshot
+                    // the earliest recorded attempt used; only a genuinely first-ever record for this
+                    // assessment+account+session (no prior row at all) falls back to the live value.
+                    var passingScore = latestResult?.PassingScoreSnapshot ?? assessment.PassingScore;
+                    var weight = latestResult?.WeightSnapshot ?? assessment.Weight;
+
                     if (latestResult != null)
                     {
                         // [FIX] Nếu điểm của session này CHƯA được publish, giảng viên có quyền sửa đi sửa lại
-                        // (VD: Frontend gọi Save nhiều lần, hoặc sửa lỗi gõ nhầm). Ta sẽ UPSERT dòng hiện tại 
+                        // (VD: Frontend gọi Save nhiều lần, hoặc sửa lỗi gõ nhầm). Ta sẽ UPSERT dòng hiện tại
                         // thay vì ném lỗi bắt buộc phải có giấy phép thi lại (Retake Authorization).
                         if (!latestResult.IsPublished)
                         {
                             latestResult.Score = request.Score;
-                            latestResult.ResultStatus = request.Score >= assessment.PassingScore ? "Passed" : "Failed";
+                            latestResult.ResultStatus = request.Score >= passingScore ? "Passed" : "Failed";
+                            latestResult.PassingScoreSnapshot ??= passingScore;
+                            latestResult.WeightSnapshot ??= weight;
                             latestResult.Remark = request.Remark;
                             latestResult.UpdatedAt = DateTime.UtcNow;
                             latestResult.UpdatedByAccountId = recordedByAccountId;
@@ -175,7 +192,9 @@ public class AssessmentResultService : IAssessmentResultService
                         SubjectResultId = request.SubjectResultId,
                         SessionId = request.SessionId,
                         Score = request.Score,
-                        ResultStatus = request.Score >= assessment.PassingScore ? "Passed" : "Failed",
+                        ResultStatus = request.Score >= passingScore ? "Passed" : "Failed",
+                        PassingScoreSnapshot = passingScore,
+                        WeightSnapshot = weight,
                         Remark = request.Remark,
                         GradedByAccountId = recordedByAccountId,
                         RecordedAt = DateTime.UtcNow,
@@ -229,11 +248,16 @@ public class AssessmentResultService : IAssessmentResultService
 
         foreach (var result in latestResults)
         {
+            // Same rationale as PassingScoreSnapshot: use the Weight that was in force when this
+            // attempt was recorded, not whatever Assessment.Weight currently is — otherwise editing
+            // a Weight later would silently recompute every previously-graded learner's average the
+            // next time any one of their assessments is touched.
             var assessment = allAssessments.FirstOrDefault(a => a.AssessmentId == result.AssessmentId);
-            if (assessment != null)
+            var weight = result.WeightSnapshot ?? assessment?.Weight;
+            if (weight.HasValue)
             {
-                totalWeightedScore += result.Score * assessment.Weight;
-                totalWeight += assessment.Weight;
+                totalWeightedScore += result.Score * weight.Value;
+                totalWeight += weight.Value;
             }
         }
 
@@ -256,11 +280,13 @@ public class AssessmentResultService : IAssessmentResultService
 
         result.Score = request.Score;
         result.Remark = request.Remark;
-        
+
         var assessment = await _unitOfWork.AssessmentRepository.GetByIdAsync(result.AssessmentId, cancellationToken);
-        if (assessment != null)
+        var passingScore = result.PassingScoreSnapshot ?? assessment?.PassingScore;
+        if (passingScore.HasValue)
         {
-            result.ResultStatus = request.Score >= assessment.PassingScore ? "Passed" : "Failed";
+            result.ResultStatus = request.Score >= passingScore.Value ? "Passed" : "Failed";
+            result.PassingScoreSnapshot ??= passingScore;
         }
 
         result.UpdatedAt = DateTime.UtcNow;
@@ -357,9 +383,14 @@ public class AssessmentResultService : IAssessmentResultService
         var subjectResult = await _unitOfWork.SubjectResultRepository.GetByIdAsync(subjectResultId, ct);
         if (subjectResult == null) return;
 
+        // Grade against the snapshot taken at Enroll time — NOT whatever CourseSubject.PassingScore
+        // currently is. This matters most on RE-evaluation (e.g. Instructor re-signs off after an
+        // Amendment reopened this Subject): without the snapshot, a threshold change made in between
+        // would silently flip the verdict for data the learner submitted under the old rule.
         var courseSubject = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct))
             .FirstOrDefault(cs => cs.CourseId == subjectResult.CourseId && cs.SubjectId == subjectResult.SubjectId);
-        var passingScore = courseSubject?.PassingScore ?? 50m;
+        var passingScore = subjectResult.PassingScoreSnapshot ?? courseSubject?.PassingScore ?? 50m;
+        subjectResult.PassingScoreSnapshot ??= passingScore;
 
         var isPassable = true;
 

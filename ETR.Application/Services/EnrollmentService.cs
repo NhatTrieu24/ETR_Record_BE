@@ -193,6 +193,7 @@ public class EnrollmentService : IEnrollmentService
                         CourseId = cs.CourseId,
                         SubjectId = cs.SubjectId,
                         Status = "Pending",
+                        PassingScoreSnapshot = cs.PassingScore,
                         CreatedAt = DateTime.UtcNow,
                         CreatedByAccountId = createdByAccountId
                     };
@@ -212,7 +213,9 @@ public class EnrollmentService : IEnrollmentService
                             GradedByAccountId = createdByAccountId,
                             RecordedAt = DateTime.UtcNow,
                             IsPublished = false,
-                            AttemptNo = 1
+                            AttemptNo = 1,
+                            PassingScoreSnapshot = assessment.PassingScore,
+                            WeightSnapshot = assessment.Weight
                         };
                         await _unitOfWork.AssessmentResultRepository.AddAsync(assessmentResult, ct);
                     }

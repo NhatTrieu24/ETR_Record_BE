@@ -138,6 +138,9 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<Assessment>().Property(a => a.Weight).HasColumnType("decimal(5,2)");
         modelBuilder.Entity<Assessment>().Property(a => a.PassingScore).HasColumnType("decimal(5,2)");
         modelBuilder.Entity<AssessmentResult>().Property(a => a.Score).HasColumnType("decimal(5,2)");
+        modelBuilder.Entity<AssessmentResult>().Property(a => a.PassingScoreSnapshot).HasColumnType("decimal(5,2)");
+        modelBuilder.Entity<AssessmentResult>().Property(a => a.WeightSnapshot).HasColumnType("decimal(5,2)");
+        modelBuilder.Entity<SubjectResult>().Property(sr => sr.PassingScoreSnapshot).HasColumnType("decimal(5,2)");
         modelBuilder.Entity<RetakeHistory>().Property(rh => rh.PreviousScore).HasColumnType("decimal(5,2)");
         modelBuilder.Entity<RetakeHistory>().Property(rh => rh.NewScore).HasColumnType("decimal(5,2)");
         modelBuilder.Entity<PracticalChecklistResult>().Property(p => p.Score).HasColumnType("decimal(5,2)");
