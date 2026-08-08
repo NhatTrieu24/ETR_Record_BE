@@ -88,7 +88,8 @@ public class AuditController : ControllerBase
             l.NewValue,
             l.Description,
             l.IPAddress,
-            l.UserAgent);
+            l.UserAgent,
+            l.CreatedAt);
     }
 }
 
