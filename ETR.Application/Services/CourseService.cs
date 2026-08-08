@@ -17,7 +17,7 @@ public class CourseService : ICourseService
     {
         var courses = await _unitOfWork.CourseRepository.GetAllAsync(cancellationToken);
         return courses.Where(c => !c.IsDeleted).Select(c => new CourseResponse(
-            c.CourseId, c.CourseCode, c.CourseName, c.Description, c.DurationHours, c.Status, c.ValidityMonths, c.CourseType));
+            c.CourseId, c.CourseCode, c.CourseName, c.Description, c.DurationHours, c.Status, c.ValidityMonths, c.CourseType, VersionNo: c.VersionNo));
     }
 
     public async Task<CourseResponse> GetCourseByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -34,7 +34,7 @@ public class CourseService : ICourseService
                 cs.CourseId, cs.SubjectId, cs.SequenceNo, cs.RequiredHours, cs.IsMandatory, cs.PassingScore
             )).ToList();
 
-        return new CourseResponse(c.CourseId, c.CourseCode, c.CourseName, c.Description, c.DurationHours, c.Status, c.ValidityMonths, c.CourseType, subjects);
+        return new CourseResponse(c.CourseId, c.CourseCode, c.CourseName, c.Description, c.DurationHours, c.Status, c.ValidityMonths, c.CourseType, subjects, c.VersionNo);
     }
 
     public async Task<CourseResponse> CreateCourseAsync(CreateCourseRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
@@ -113,7 +113,7 @@ public class CourseService : ICourseService
                 await _unitOfWork.SaveAsync(ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
 
-                return new CourseResponse(course.CourseId, course.CourseCode, course.CourseName, course.Description, course.DurationHours, course.Status, course.ValidityMonths, course.CourseType, responseSubjects);
+                return new CourseResponse(course.CourseId, course.CourseCode, course.CourseName, course.Description, course.DurationHours, course.Status, course.ValidityMonths, course.CourseType, responseSubjects, course.VersionNo);
             }
             catch
             {
@@ -142,6 +142,14 @@ public class CourseService : ICourseService
 
                 var oldStatus = course.Status;
 
+                // ValidityMonths is the only Course field an evaluation rule actually reads today
+                // (it drives ETRCourseRecord.ExpiryDate at Completion — see EtrService.CompleteEtrAsync).
+                // Changing it must NOT retroactively affect learners who already enrolled under the
+                // old value, so it bumps VersionNo instead of silently mutating in place; other
+                // fields (name/description/status/duration/type) are purely descriptive and stay a
+                // plain overwrite.
+                var validityMonthsChanged = course.ValidityMonths != request.ValidityMonths;
+
                 course.CourseCode = request.CourseCode;
                 course.CourseName = request.CourseName;
                 course.Description = request.Description;
@@ -151,6 +159,12 @@ public class CourseService : ICourseService
                 course.CourseType = request.CourseType;
                 course.UpdatedAt = DateTime.UtcNow;
                 course.UpdatedByAccountId = updatedByAccountId;
+
+                if (validityMonthsChanged)
+                {
+                    course.VersionNo += 1;
+                    course.EffectiveFrom = DateTime.UtcNow;
+                }
 
                 _unitOfWork.CourseRepository.Update(course);
 
@@ -162,7 +176,9 @@ public class CourseService : ICourseService
                     RecordId = course.CourseId,
                     OldValue = oldStatus,
                     NewValue = course.Status,
-                    Description = $"Course #{course.CourseId} ({course.CourseCode}) updated"
+                    Description = validityMonthsChanged
+                        ? $"Course #{course.CourseId} ({course.CourseCode}) updated; ValidityMonths changed — VersionNo bumped to {course.VersionNo} so already-enrolled learners keep evaluating against the prior version"
+                        : $"Course #{course.CourseId} ({course.CourseCode}) updated"
                 }, ct);
 
                 // SYNC SUBJECTS
@@ -247,7 +263,7 @@ public class CourseService : ICourseService
                 await _unitOfWork.SaveAsync(ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
 
-                return new CourseResponse(course.CourseId, course.CourseCode, course.CourseName, course.Description, course.DurationHours, course.Status, course.ValidityMonths, course.CourseType, finalSubjects.OrderBy(s => s.SequenceNo).ToList());
+                return new CourseResponse(course.CourseId, course.CourseCode, course.CourseName, course.Description, course.DurationHours, course.Status, course.ValidityMonths, course.CourseType, finalSubjects.OrderBy(s => s.SequenceNo).ToList(), course.VersionNo);
             }
             catch
             {

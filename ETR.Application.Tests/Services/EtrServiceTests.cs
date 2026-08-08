@@ -313,4 +313,75 @@ public class EtrServiceTests
         Assert.Equal("Completed", newEtr.Status);
         Assert.Equal(LearnerStatus.Grounded, learnerProfile.Status);
     }
+
+    [Fact]
+    public async Task GetCompletionProgressAsync_UsesCompletionRequirementMatchingEtrCourseVersionNo_NotTheLatestOne()
+    {
+        var unitOfWork = new Mock<IUnitOfWork>();
+        var currentUser = new Mock<ICurrentUserService>();
+
+        // Learner enrolled while MinAttendance was still 80% (VersionNo=1). The rule was later
+        // tightened to 95% (VersionNo=2) — this ETR must keep evaluating against the 80% rule that
+        // was in force when it was created, not the new 95% one.
+        var etr = new ETRCourseRecord
+        {
+            ETRCourseRecordId = 1,
+            EnrollmentId = 1,
+            CourseVersionNo = 1,
+            SubjectResults = new List<SubjectResult> { new() { SubjectResultId = 1, SubjectId = 1, Status = "Passed", AttendanceRate = 85m } }
+        };
+        var etrRepo = new Mock<IETRCourseRecordRepository>();
+        etrRepo.Setup(r => r.GetWithSubjectResultsAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(etr);
+        unitOfWork.SetupGet(u => u.ETRCourseRecordRepository).Returns(etrRepo.Object);
+
+        var enrollmentRepo = new Mock<IGenericRepository<CourseEnrollment>>();
+        enrollmentRepo.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(new CourseEnrollment { EnrollmentId = 1, ClassId = 10 });
+        unitOfWork.SetupGet(u => u.CourseEnrollmentRepository).Returns(enrollmentRepo.Object);
+
+        var classRepo = new Mock<IGenericRepository<Class>>();
+        classRepo.Setup(r => r.GetByIdAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(new Class { ClassId = 10, CourseId = 1 });
+        unitOfWork.SetupGet(u => u.ClassRepository).Returns(classRepo.Object);
+
+        var courseSubjectRepo = new Mock<IGenericRepository<CourseSubject>>();
+        courseSubjectRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CourseSubject> { new() { CourseId = 1, SubjectId = 1, IsMandatory = true } });
+        unitOfWork.SetupGet(u => u.CourseSubjectRepository).Returns(courseSubjectRepo.Object);
+
+        var subjectRepo = new Mock<IGenericRepository<Subject>>();
+        subjectRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Subject> { new() { SubjectId = 1, SubjectName = "Safety" } });
+        unitOfWork.SetupGet(u => u.SubjectRepository).Returns(subjectRepo.Object);
+
+        var evidenceRepo = new Mock<IGenericRepository<EvidenceFile>>();
+        evidenceRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<EvidenceFile>());
+        unitOfWork.SetupGet(u => u.EvidenceFileRepository).Returns(evidenceRepo.Object);
+
+        var signoffRepo = new Mock<IGenericRepository<SubjectSignoff>>();
+        signoffRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<SubjectSignoff> { new() { SubjectResultId = 1 } });
+        unitOfWork.SetupGet(u => u.SubjectSignoffRepository).Returns(signoffRepo.Object);
+
+        var checklistRepo = new Mock<IGenericRepository<PracticalChecklist>>();
+        checklistRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<PracticalChecklist>());
+        unitOfWork.SetupGet(u => u.PracticalChecklistRepository).Returns(checklistRepo.Object);
+
+        var checklistResultRepo = new Mock<IGenericRepository<PracticalChecklistResult>>();
+        checklistResultRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<PracticalChecklistResult>());
+        unitOfWork.SetupGet(u => u.PracticalChecklistResultRepository).Returns(checklistResultRepo.Object);
+
+        var requirementRepo = new Mock<IGenericRepository<ETR.Domain.Entities.CompletionRequirement>>();
+        requirementRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<ETR.Domain.Entities.CompletionRequirement>
+        {
+            new() { RequirementId = 1, CourseId = 1, RequirementName = "Min Attendance", RequirementType = "MinAttendance", ThresholdValue = 80m, IsMandatory = true, VersionNo = 1, EffectiveTo = DateTime.UtcNow.AddDays(-1) },
+            new() { RequirementId = 2, CourseId = 1, RequirementName = "Min Attendance", RequirementType = "MinAttendance", ThresholdValue = 95m, IsMandatory = true, VersionNo = 2, EffectiveTo = null },
+        });
+        unitOfWork.SetupGet(u => u.CompletionRequirementRepository).Returns(requirementRepo.Object);
+
+        var service = new EtrService(unitOfWork.Object, currentUser.Object);
+
+        var result = await service.GetCompletionProgressAsync(1, CancellationToken.None);
+
+        var requirementChecks = result.Checks.Where(c => c.Name.StartsWith("Completion Requirement:")).ToList();
+        Assert.Single(requirementChecks);
+        Assert.True(requirementChecks[0].IsMet); // 85% passes the VersionNo=1 (80%) rule the learner enrolled under, not the newer 95% one.
+    }
 }

@@ -49,6 +49,14 @@ public class CompletionRequirementsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = result.RequirementId }, result);
     }
 
+    /// <summary>
+    /// Cập nhật CompletionRequirement. LƯU Ý: nếu request đổi RequirementType/ThresholdValue/IsMandatory
+    /// (field ảnh hưởng kết quả đánh giá), endpoint này KHÔNG ghi đè hàng cũ — nó đóng hàng cũ lại
+    /// (EffectiveTo) và tạo hàng MỚI với VersionNo tăng lên, để các ETR đã enroll trước đó tiếp tục
+    /// đối chiếu đúng luật cũ. Response trả về khi đó có RequirementId KHÁC với {id} trong URL — FE
+    /// cần dùng RequirementId trong response cho các lần gọi tiếp theo, không giữ id cũ. Nếu chỉ đổi
+    /// field mô tả (RequirementName/Description/DisplayOrder), hành vi vẫn là ghi đè tại chỗ như cũ.
+    /// </summary>
     [HttpPut("{id}")]
     [Authorize(Roles = "Admin,Academic,TrainingManager")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateCompletionRequirementRequest request, CancellationToken cancellationToken)

@@ -231,8 +231,12 @@ public class EtrService : IEtrService
         }
 
         // 5. Check mandatory CompletionRequirements configured for the course
+        // Filtered by CourseVersionNo (snapshotted at Enroll time), NOT "whatever requirements exist
+        // right now" — so a mid-course rule change never retroactively re-evaluates this learner
+        // against a threshold that didn't exist when they enrolled. See Course/CompletionRequirement
+        // VersionNo docs.
         var completionRequirements = (await _unitOfWork.CompletionRequirementRepository.GetAllAsync(cancellationToken))
-            .Where(cr => cr.CourseId == trainingClass.CourseId && cr.IsMandatory).ToList();
+            .Where(cr => cr.CourseId == trainingClass.CourseId && cr.IsMandatory && cr.VersionNo == etr.CourseVersionNo).ToList();
 
         foreach (var requirement in completionRequirements)
         {
@@ -354,8 +358,12 @@ public class EtrService : IEtrService
         }
 
         // 5. Mandatory CompletionRequirements configured for the course
+        // Filtered by CourseVersionNo (snapshotted at Enroll time), NOT "whatever requirements exist
+        // right now" — so a mid-course rule change never retroactively re-evaluates this learner
+        // against a threshold that didn't exist when they enrolled. See Course/CompletionRequirement
+        // VersionNo docs.
         var completionRequirements = (await _unitOfWork.CompletionRequirementRepository.GetAllAsync(cancellationToken))
-            .Where(cr => cr.CourseId == trainingClass.CourseId && cr.IsMandatory).ToList();
+            .Where(cr => cr.CourseId == trainingClass.CourseId && cr.IsMandatory && cr.VersionNo == etr.CourseVersionNo).ToList();
 
         foreach (var requirement in completionRequirements)
         {
