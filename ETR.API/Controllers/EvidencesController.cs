@@ -104,6 +104,21 @@ public class EvidencesController : ControllerBase
     }
 
     /// <summary>
+    /// Phê duyệt hoặc từ chối NHIỀU tệp bằng chứng cùng lúc với 1 trạng thái/lý do chung — dành
+    /// cho QA xử lý hàng loạt (VD: 1 lớp 30 học viên × 3 file = 90 minh chứng) thay vì phải gọi
+    /// PUT /{id}/verify lặp lại từng file. Item nào lỗi (không tồn tại, tự verify minh chứng của
+    /// chính mình...) sẽ nằm trong "Failed" của response, KHÔNG làm rollback các item còn lại.
+    /// </summary>
+    [HttpPut("bulk-verify")]
+    [Authorize(Roles = "QA,Admin")]
+    public async Task<IActionResult> BulkVerifyEvidence([FromBody] BulkVerifyEvidenceRequest request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        var response = await _evidenceService.BulkVerifyEvidencesAsync(request, accountId, cancellationToken);
+        return Ok(response);
+    }
+
+    /// <summary>
     /// Xóa mềm (soft delete) một tệp bằng chứng.
     /// </summary>
     [HttpDelete("{id}")]
