@@ -16,7 +16,6 @@ public class UnitOfWork : IUnitOfWork
         _context = context;
         AccountRepository = new GenericRepository<Account>(_context);
         UserProfileRepository = new GenericRepository<UserProfile>(_context);
-        ClassStudentRepository = new GenericRepository<ClassStudent>(_context);
         CourseEnrollmentRepository = new GenericRepository<CourseEnrollment>(_context);
         ETRCourseRecordRepository = new ETRCourseRecordRepository(_context);
         ClassRepository = new GenericRepository<Class>(_context);
@@ -46,7 +45,6 @@ public class UnitOfWork : IUnitOfWork
 
     public IGenericRepository<Account> AccountRepository { get; }
     public IGenericRepository<UserProfile> UserProfileRepository { get; }
-    public IGenericRepository<ClassStudent> ClassStudentRepository { get; }
     public IGenericRepository<CourseEnrollment> CourseEnrollmentRepository { get; }
     public IETRCourseRecordRepository ETRCourseRecordRepository { get; }
     public IGenericRepository<Class> ClassRepository { get; }

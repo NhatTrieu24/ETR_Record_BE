@@ -32,19 +32,19 @@ public class AssessmentResultService : IAssessmentResultService
             result.AssessmentResultId, result.AssessmentId, result.AccountId, result.SubjectResultId, result.SessionId, result.Score, result.ResultStatus, result.GradedByAccountId, result.RecordedAt, result.PublishedAt, result.IsPublished, result.TakenAt, result.Remark);
     }
 
-    public async Task<IEnumerable<AssessmentResultResponse>> GetAssessmentResultsByClassStudentAsync(int classStudentId, int accountId, string? roleName, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<AssessmentResultResponse>> GetAssessmentResultsByEnrollmentAsync(int enrollmentId, int accountId, string? roleName, CancellationToken cancellationToken = default)
     {
-        var classStudent = await _unitOfWork.ClassStudentRepository.GetByIdAsync(classStudentId, cancellationToken)
-            ?? throw new KeyNotFoundException("ClassStudent not found.");
+        var enrollment = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(enrollmentId, cancellationToken)
+            ?? throw new KeyNotFoundException("Enrollment not found.");
 
         // Zero-Trust: Students may only view their own assessment results.
-        if (roleName == "Student" && classStudent.AccountId != accountId)
+        if (roleName == "Student" && enrollment.AccountId != accountId)
         {
             throw new ForbiddenAccessException("You are not authorized to view another student's assessment results.");
         }
 
         var results = (await _unitOfWork.AssessmentResultRepository.GetAllAsync(cancellationToken))
-            .Where(r => r.AccountId == classStudent.AccountId);
+            .Where(r => r.AccountId == enrollment.AccountId);
 
         return results.Select(r => new AssessmentResultResponse(
             r.AssessmentResultId, r.AssessmentId, r.AccountId, r.SubjectResultId, r.SessionId, r.Score, r.ResultStatus, r.GradedByAccountId, r.RecordedAt, r.PublishedAt, r.IsPublished, r.TakenAt, r.Remark));

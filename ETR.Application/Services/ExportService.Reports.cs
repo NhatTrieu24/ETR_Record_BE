@@ -60,22 +60,22 @@ public partial class ExportService
         var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(classId, cancellationToken)
             ?? throw new KeyNotFoundException("Class not found.");
 
-        var classStudents = (await _unitOfWork.ClassStudentRepository.GetAllAsync(cancellationToken))
-            .Where(cs => cs.ClassId == classId).ToList();
-        var classStudentIds = classStudents.Select(cs => cs.ClassStudentId).ToHashSet();
+        var enrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken))
+            .Where(e => e.ClassId == classId).ToList();
+        var enrollmentIds = enrollments.Select(e => e.EnrollmentId).ToHashSet();
 
         var sessions = (await _unitOfWork.SessionRepository.GetAllAsync(cancellationToken))
             .Where(s => s.ClassId == classId)
             .ToDictionary(s => s.SessionId, s => s);
 
         var records = (await _unitOfWork.AttendanceRecordRepository.GetAllAsync(cancellationToken))
-            .Where(r => classStudentIds.Contains(r.ClassStudentId))
+            .Where(r => enrollmentIds.Contains(r.EnrollmentId))
             .OrderBy(r => sessions.GetValueOrDefault(r.SessionId)?.SessionDate)
             .ToList();
 
         var profiles = (await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken)).ToList();
 
-        var excelBytes = BuildAttendanceReportExcel(trainingClass, classStudents, profiles, sessions, records);
+        var excelBytes = BuildAttendanceReportExcel(trainingClass, enrollments, profiles, sessions, records);
         var fileName = $"{SanitizeForFileName(trainingClass.ClassCode)}_Attendance_Report_{DateTime.UtcNow:yyyyMMddHHmmss}.xlsx";
         return await WriteExportFileAsync("AttendanceReport", fileName, excelBytes, requestedByAccountId, webRootPath, null, cancellationToken);
     }
@@ -219,7 +219,7 @@ public partial class ExportService
 
     private static byte[] BuildAttendanceReportExcel(
         Class trainingClass,
-        List<ClassStudent> classStudents,
+        List<CourseEnrollment> enrollments,
         List<UserProfile> profiles,
         Dictionary<int, Session> sessions,
         List<AttendanceRecord> records)
@@ -243,8 +243,8 @@ public partial class ExportService
         var row = headerRow + 1;
         foreach (var record in records)
         {
-            var classStudent = classStudents.FirstOrDefault(cs => cs.ClassStudentId == record.ClassStudentId);
-            var profile = classStudent == null ? null : profiles.FirstOrDefault(p => p.AccountId == classStudent.AccountId);
+            var enrollment = enrollments.FirstOrDefault(e => e.EnrollmentId == record.EnrollmentId);
+            var profile = enrollment == null ? null : profiles.FirstOrDefault(p => p.AccountId == enrollment.AccountId);
             var session = sessions.GetValueOrDefault(record.SessionId);
 
             sheet.Cell(row, 1).Value = profile?.UserCode ?? "-";

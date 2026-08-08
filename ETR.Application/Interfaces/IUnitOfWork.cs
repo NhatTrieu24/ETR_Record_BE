@@ -6,7 +6,6 @@ public interface IUnitOfWork
 {
     IGenericRepository<Account> AccountRepository { get; }
     IGenericRepository<UserProfile> UserProfileRepository { get; }
-    IGenericRepository<ClassStudent> ClassStudentRepository { get; }
     IGenericRepository<CourseEnrollment> CourseEnrollmentRepository { get; }
     IETRCourseRecordRepository ETRCourseRecordRepository { get; }
     IGenericRepository<Class> ClassRepository { get; }

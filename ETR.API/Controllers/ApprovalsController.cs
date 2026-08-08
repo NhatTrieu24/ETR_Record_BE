@@ -1,4 +1,5 @@
 using ETR.Application.DTOs;
+using ETR.Application.DTOs.Approval;
 using ETR.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -45,9 +46,16 @@ public class ApprovalsController : ControllerBase
         return Ok(response);
     }
 
+    /// <summary>
+    /// [Module/Flow]: Xử lý ETR — Approval Workflow
+    /// [Core Responsibility]: Chuẩn hóa `action` thành enum `ApprovalActionType` (Verify/Approve/
+    /// Reject/Return) thay vì chuỗi tự do — giá trị không hợp lệ bị model binding chặn với 400 trước
+    /// khi chạm tới Service; Swagger/OpenAPI cũng nhờ đó phát sinh đúng kiểu enum cho FE.
+    /// [Target Audience]: QA (Verify/Reject/Return), TrainingManager (Approve), Admin (mọi action)
+    /// </summary>
     [HttpPost("{id}/process")]
     [Authorize(Roles = "Admin,QA,TrainingManager")]
-    public async Task<IActionResult> ProcessApproval(int id, [FromQuery] string action, [FromQuery] string? comment, CancellationToken cancellationToken)
+    public async Task<IActionResult> ProcessApproval(int id, [FromQuery] ApprovalActionType action, [FromQuery] string? comment, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId
             ?? throw new UnauthorizedAccessException("User is not authenticated.");

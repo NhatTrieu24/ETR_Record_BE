@@ -22,8 +22,7 @@ public partial class AppDbContext : DbContext
     
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
-    public DbSet<ClassStudent> ClassStudents => Set<ClassStudent>();
-    
+
     public DbSet<Subject> Subjects => Set<Subject>();
     public DbSet<CourseSubject> CourseSubjects => Set<CourseSubject>();
     public DbSet<Class> Classes => Set<Class>();
@@ -66,7 +65,6 @@ public partial class AppDbContext : DbContext
         
         modelBuilder.Entity<Account>().HasKey(e => e.AccountId);
         modelBuilder.Entity<UserProfile>().HasKey(e => e.AccountId);
-        modelBuilder.Entity<ClassStudent>().HasKey(e => e.ClassStudentId);
 
         modelBuilder.Entity<Subject>().HasKey(e => e.SubjectId);
         modelBuilder.Entity<CourseSubject>().HasKey(e => new { e.CourseId, e.SubjectId });
@@ -115,7 +113,7 @@ public partial class AppDbContext : DbContext
             .IsUnique();
 
         modelBuilder.Entity<AttendanceRecord>()
-            .HasIndex(ar => new { ar.SessionId, ar.ClassStudentId })
+            .HasIndex(ar => new { ar.SessionId, ar.EnrollmentId })
             .IsUnique();
 
         // AttemptNo trong khoá unique — cho phép mỗi lần retake tạo 1 dòng mới (giữ lịch sử điểm),
@@ -167,12 +165,9 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<Class>().HasOne<Course>().WithMany().HasForeignKey(tc => tc.CourseId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<Class>().HasOne<Account>().WithMany().HasForeignKey(tc => tc.InstructorAccountId).OnDelete(cascadeDeleteConfig);
         
-        // Enrollment & ClassStudent
+        // Enrollment
         modelBuilder.Entity<CourseEnrollment>().HasOne<Account>().WithMany().HasForeignKey(e => e.AccountId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<CourseEnrollment>().HasOne<Class>().WithMany().HasForeignKey(e => e.ClassId).OnDelete(cascadeDeleteConfig);
-        
-        modelBuilder.Entity<ClassStudent>().HasOne<CourseEnrollment>().WithMany().HasForeignKey(cs => cs.CourseEnrollmentId).OnDelete(cascadeDeleteConfig);
-        modelBuilder.Entity<ClassStudent>().HasOne<Account>().WithMany().HasForeignKey(cs => cs.AccountId).OnDelete(cascadeDeleteConfig);
 
         // ETR Restructure
         modelBuilder.Entity<ETRCourseRecord>().HasOne<CourseEnrollment>().WithOne().HasForeignKey<ETRCourseRecord>(e => e.EnrollmentId).OnDelete(cascadeDeleteConfig);
@@ -188,7 +183,7 @@ public partial class AppDbContext : DbContext
 
         // Attendance Setup
         modelBuilder.Entity<AttendanceRecord>().HasOne<Session>().WithMany().HasForeignKey(ar => ar.SessionId).OnDelete(cascadeDeleteConfig);
-        modelBuilder.Entity<AttendanceRecord>().HasOne<ClassStudent>().WithMany().HasForeignKey(ar => ar.ClassStudentId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<AttendanceRecord>().HasOne<CourseEnrollment>().WithMany().HasForeignKey(ar => ar.EnrollmentId).OnDelete(cascadeDeleteConfig);
 
         // Assessment Setup
         modelBuilder.Entity<Assessment>().HasOne<CourseSubject>().WithMany().HasForeignKey(a => new { a.CourseId, a.SubjectId }).OnDelete(cascadeDeleteConfig);
