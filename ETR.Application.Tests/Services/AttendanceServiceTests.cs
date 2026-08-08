@@ -9,7 +9,7 @@ namespace ETR.Application.Tests.Services;
 
 public class AttendanceServiceTests
 {
-    private static AttendanceService BuildService(Session session, Class trainingClass, ClassStudent? classStudent)
+    private static AttendanceService BuildService(Session session, Class trainingClass, CourseEnrollment? enrollment)
     {
         var unitOfWork = new Mock<IUnitOfWork>();
 
@@ -28,9 +28,9 @@ public class AttendanceServiceTests
         classRepo.Setup(r => r.GetByIdAsync(trainingClass.ClassId, It.IsAny<CancellationToken>())).ReturnsAsync(trainingClass);
         unitOfWork.SetupGet(u => u.ClassRepository).Returns(classRepo.Object);
 
-        var classStudentRepo = new Mock<IGenericRepository<ClassStudent>>();
-        classStudentRepo.Setup(r => r.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(classStudent);
-        unitOfWork.SetupGet(u => u.ClassStudentRepository).Returns(classStudentRepo.Object);
+        var enrollmentRepo = new Mock<IGenericRepository<CourseEnrollment>>();
+        enrollmentRepo.Setup(r => r.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(enrollment);
+        unitOfWork.SetupGet(u => u.CourseEnrollmentRepository).Returns(enrollmentRepo.Object);
 
         var etrRepo = new Mock<IETRCourseRecordRepository>();
         etrRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<ETRCourseRecord>());
@@ -51,11 +51,10 @@ public class AttendanceServiceTests
     [Fact]
     public async Task RecordAttendanceAsync_InstructorNotAssignedToClass_ThrowsForbidden()
     {
-        // "Sân nhà ai nấy đá" (team decision 2026-08-08, docs/todo/addition.md).
         var session = new Session { SessionId = 1, ClassId = 10, IsConfirmed = false };
         var trainingClass = new Class { ClassId = 10, InstructorAccountId = 99 };
-        var classStudent = new ClassStudent { ClassStudentId = 1, ClassId = 10, CourseEnrollmentId = 5 };
-        var service = BuildService(session, trainingClass, classStudent);
+        var enrollment = new CourseEnrollment { EnrollmentId = 1, ClassId = 10, AccountId = 5 };
+        var service = BuildService(session, trainingClass, enrollment);
 
         var request = new CreateAttendanceRecordRequest(1, 1, "Present", null);
 
@@ -68,8 +67,8 @@ public class AttendanceServiceTests
     {
         var session = new Session { SessionId = 1, ClassId = 10, IsConfirmed = false };
         var trainingClass = new Class { ClassId = 10, InstructorAccountId = 42 };
-        var classStudent = new ClassStudent { ClassStudentId = 1, ClassId = 10, CourseEnrollmentId = 5 };
-        var service = BuildService(session, trainingClass, classStudent);
+        var enrollment = new CourseEnrollment { EnrollmentId = 1, ClassId = 10, AccountId = 5 };
+        var service = BuildService(session, trainingClass, enrollment);
 
         var request = new CreateAttendanceRecordRequest(1, 1, "Present", null);
 

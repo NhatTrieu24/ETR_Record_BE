@@ -167,14 +167,12 @@ public partial class AppDbContext
             if (etrResult != null) return etrResult.EnrollmentId;
         }
 
+        // AttendanceRecord points straight at CourseEnrollment.EnrollmentId now (the ClassStudent
+        // indirection table was removed — mục #10, docs/todo/9.todo_to_complete_system.md), so no DB
+        // round-trip is needed here anymore to resolve it.
         if (entry.Entity is AttendanceRecord ar)
         {
-            var classStudentId = GetOriginalOrCurrent(entry, ar.ClassStudentId, nameof(AttendanceRecord.ClassStudentId));
-            var csEntry = ChangeTracker.Entries<ClassStudent>().FirstOrDefault(e => e.Entity.ClassStudentId == classStudentId);
-            if (csEntry != null) return csEntry.Entity.CourseEnrollmentId;
-
-            var classStudent = await ClassStudents.AsNoTracking().FirstOrDefaultAsync(cs => cs.ClassStudentId == classStudentId, cancellationToken);
-            if (classStudent != null) return classStudent.CourseEnrollmentId;
+            return GetOriginalOrCurrent(entry, ar.EnrollmentId, nameof(AttendanceRecord.EnrollmentId));
         }
 
         int subjectResultId = 0;

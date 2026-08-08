@@ -259,7 +259,7 @@ public static class DataSeeder
     }
 
     // ===================== Module: Enrollment =====================
-    // CourseEnrollment, ClassStudent
+    // CourseEnrollment
 
     private static async Task SeedEnrollmentAsync(AppDbContext context)
     {
@@ -277,19 +277,6 @@ public static class DataSeeder
                 StartDate = new DateTime(2026, 1, 5),
                 ExpectedCompletionDate = new DateTime(2026, 4, 30),
                 ActualCompletionDate = new DateTime(2026, 4, 30)
-            });
-            await context.SaveChangesAsync();
-        }
-
-        if (!await context.ClassStudents.AnyAsync())
-        {
-            var enrollment = await context.CourseEnrollments.FirstAsync(e => e.AccountId == student.AccountId && e.ClassId == cls.ClassId);
-            context.ClassStudents.Add(new ClassStudent
-            {
-                CourseEnrollmentId = enrollment.EnrollmentId,
-                ClassId = cls.ClassId,
-                AccountId = student.AccountId,
-                Status = "Completed"
             });
             await context.SaveChangesAsync();
         }
@@ -344,20 +331,19 @@ public static class DataSeeder
     }
 
     /// <summary>Shared lookups reused by the result-recording modules below.</summary>
-    private static async Task<(Account Student, ETRCourseRecord Etr, ClassStudent ClassStudent, Dictionary<string, SubjectResult> SubjectResultsByCode)> GetDemoContextAsync(AppDbContext context)
+    private static async Task<(Account Student, ETRCourseRecord Etr, CourseEnrollment Enrollment, Dictionary<string, SubjectResult> SubjectResultsByCode)> GetDemoContextAsync(AppDbContext context)
     {
         var student = await context.Accounts.FirstAsync(a => a.Username == StudentUsername);
         var cls = await context.Classes.FirstAsync(c => c.ClassCode == ClassCode);
         var enrollment = await context.CourseEnrollments.FirstAsync(e => e.AccountId == student.AccountId && e.ClassId == cls.ClassId);
         var etr = await context.ETRCourseRecords.FirstAsync(e => e.EnrollmentId == enrollment.EnrollmentId);
-        var classStudent = await context.ClassStudents.FirstAsync(cs => cs.AccountId == student.AccountId && cs.ClassId == cls.ClassId);
 
         var subjectCodesById = await context.Subjects.ToDictionaryAsync(s => s.SubjectId, s => s.SubjectCode);
         var subjectResultsByCode = await context.SubjectResults
             .Where(sr => sr.EtrId == etr.ETRCourseRecordId)
             .ToDictionaryAsync(sr => subjectCodesById[sr.SubjectId], sr => sr);
 
-        return (student, etr, classStudent, subjectResultsByCode);
+        return (student, etr, enrollment, subjectResultsByCode);
     }
 
     // ===================== Module: Attendance =====================
@@ -370,14 +356,14 @@ public static class DataSeeder
             return;
         }
 
-        var (_, _, classStudent, _) = await GetDemoContextAsync(context);
+        var (_, _, enrollment, _) = await GetDemoContextAsync(context);
         var instructorId = (await context.Accounts.FirstAsync(a => a.Username == InstructorUsername)).AccountId;
         var sessions = await context.Sessions.Where(s => s.IsConfirmed).ToListAsync();
 
         var records = sessions.Select(s => new AttendanceRecord
         {
             SessionId = s.SessionId,
-            ClassStudentId = classStudent.ClassStudentId,
+            EnrollmentId = enrollment.EnrollmentId,
             Status = "Present",
             RecordedByAccountId = instructorId,
             RecordedAt = s.SessionDate

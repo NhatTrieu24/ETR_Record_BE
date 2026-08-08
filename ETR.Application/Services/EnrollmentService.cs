@@ -162,17 +162,6 @@ public class EnrollmentService : IEnrollmentService
                 await _unitOfWork.ETRCourseRecordRepository.AddAsync(etrRecord, ct);
                 await _unitOfWork.SaveAsync(ct);
 
-                var classStudent = new ClassStudent
-                {
-                    CourseEnrollmentId = enrollment.EnrollmentId,
-                    ClassId = classId,
-                    AccountId = accountId,
-                    Status = "Active"
-                };
-                
-                await _unitOfWork.ClassStudentRepository.AddAsync(classStudent, ct);
-                await _unitOfWork.SaveAsync(ct);
-
                 // NOTE: re-enrolling does NOT clear Grounded by itself — merely being back in a
                 // class is not "fit for duty" for aviation certification purposes. Grounded is only
                 // cleared once this new ETR is actually Completed — see EtrService.CompleteEtrAsync.
@@ -275,20 +264,6 @@ public class EnrollmentService : IEnrollmentService
 
                 _unitOfWork.CourseEnrollmentRepository.Update(item);
 
-                // Đồng bộ ClassStudent (nếu học viên bị chuyển lớp hoặc cập nhật LearnerId/Status)
-                var classStudent = (await _unitOfWork.ClassStudentRepository.GetAllAsync(ct))
-                    .FirstOrDefault(cs => cs.CourseEnrollmentId == id && !cs.IsDeleted);
-
-                if (classStudent != null)
-                {
-                    classStudent.ClassId = request.ClassId;
-                    classStudent.AccountId = request.LearnerId;
-                    classStudent.Status = request.Status;
-                    classStudent.UpdatedAt = DateTime.UtcNow;
-                    classStudent.UpdatedByAccountId = updatedByAccountId;
-                    _unitOfWork.ClassStudentRepository.Update(classStudent);
-                }
-
                 await _unitOfWork.SaveAsync(ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
 
@@ -339,9 +314,11 @@ public class EnrollmentService : IEnrollmentService
 
         _unitOfWork.CourseEnrollmentRepository.Update(item);
 
-        // Cascade: an Enrollment cannot be withdrawn while leaving its ETR/ClassStudent behind in
-        // an "active" state — the guard above only allows this while the ETR is still Draft/InProgress,
-        // so cancelling it here is safe (no completed/locked data is being touched).
+        // Cascade: an Enrollment cannot be withdrawn while leaving its ETR behind in an "active"
+        // state — the guard above only allows this while the ETR is still Draft/InProgress, so
+        // cancelling it here is safe (no completed/locked data is being touched). AttendanceRecord
+        // now points straight at CourseEnrollment.EnrollmentId (no separate ClassStudent row to keep
+        // in sync anymore — mục #10, docs/todo/9.todo_to_complete_system.md).
         if (etrRecord != null)
         {
             etrRecord.Status = "Cancelled";
@@ -350,18 +327,6 @@ public class EnrollmentService : IEnrollmentService
             etrRecord.UpdatedAt = DateTime.UtcNow;
             etrRecord.UpdatedByAccountId = deletedByAccountId;
             _unitOfWork.ETRCourseRecordRepository.Update(etrRecord);
-        }
-
-        var classStudent = (await _unitOfWork.ClassStudentRepository.GetAllAsync(cancellationToken))
-            .FirstOrDefault(cs => cs.CourseEnrollmentId == id);
-        if (classStudent != null)
-        {
-            classStudent.Status = "Withdrawn";
-            classStudent.IsDeleted = true;
-            classStudent.DeletedAt = DateTime.UtcNow;
-            classStudent.UpdatedAt = DateTime.UtcNow;
-            classStudent.UpdatedByAccountId = deletedByAccountId;
-            _unitOfWork.ClassStudentRepository.Update(classStudent);
         }
 
         await _unitOfWork.SaveAsync(cancellationToken);

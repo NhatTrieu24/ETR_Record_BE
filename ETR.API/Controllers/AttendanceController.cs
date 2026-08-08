@@ -93,20 +93,20 @@ public class AttendanceController : ControllerBase
     /// [Core Responsibility]: Lấy lịch sử điểm danh của một học viên cụ thể trong lớp.
     /// [Target Audience]: Instructor, Admin, Student
     /// </summary>
-    /// <param name="classStudentId">The ClassStudent ID.</param>
+    /// <param name="enrollmentId">The CourseEnrollment ID.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A list of attendance records.</returns>
     /// <response code="200">Returns the list of attendance records.</response>
     /// <response code="401">If the user is not authenticated.</response>
-    /// <response code="404">If the ClassStudent is not found.</response>
-    [HttpGet("student/{classStudentId}")]
+    /// <response code="404">If the Enrollment is not found.</response>
+    [HttpGet("enrollment/{enrollmentId}")]
     [Authorize] // Allow students to also fetch their own results, validation inside service
-    public async Task<IActionResult> GetAttendanceRecords(int classStudentId, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetAttendanceRecords(int enrollmentId, CancellationToken cancellationToken)
     {
-        var accountId = _currentUserService.AccountId 
+        var accountId = _currentUserService.AccountId
             ?? throw new UnauthorizedAccessException("User is not authenticated.");
 
-        var response = await _attendanceService.GetAttendanceByClassStudentAsync(classStudentId, accountId, _currentUserService.RoleName, cancellationToken);
+        var response = await _attendanceService.GetAttendanceByEnrollmentAsync(enrollmentId, accountId, _currentUserService.RoleName, cancellationToken);
         return Ok(response);
     }
 

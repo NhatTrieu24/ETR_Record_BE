@@ -1,4 +1,5 @@
 using ETR.Application.Compliance;
+using ETR.Application.DTOs.Approval;
 using ETR.Application.Interfaces;
 using ETR.Application.Services;
 using Moq;
@@ -17,13 +18,13 @@ public class ApprovalServiceTests
     }
 
     [Theory]
-    [InlineData("Verify", "Instructor")]
-    [InlineData("Verify", "TrainingManager")]
-    [InlineData("Approve", "Instructor")]
-    [InlineData("Approve", "QA")]
-    [InlineData("Reject", "Instructor")]
-    [InlineData("Return", "Instructor")]
-    public async Task ProcessApprovalActionAsync_WhenRoleNotAllowedForAction_ExpectsForbiddenAccessException(string action, string roleName)
+    [InlineData(ApprovalActionType.Verify, "Instructor")]
+    [InlineData(ApprovalActionType.Verify, "TrainingManager")]
+    [InlineData(ApprovalActionType.Approve, "Instructor")]
+    [InlineData(ApprovalActionType.Approve, "QA")]
+    [InlineData(ApprovalActionType.Reject, "Instructor")]
+    [InlineData(ApprovalActionType.Return, "Instructor")]
+    public async Task ProcessApprovalActionAsync_WhenRoleNotAllowedForAction_ExpectsForbiddenAccessException(ApprovalActionType action, string roleName)
     {
         var service = BuildService();
 
@@ -32,13 +33,13 @@ public class ApprovalServiceTests
     }
 
     [Theory]
-    [InlineData("Verify", "QA")]
-    [InlineData("Verify", "Admin")]
-    [InlineData("Approve", "TrainingManager")]
-    [InlineData("Approve", "Admin")]
-    [InlineData("Reject", "QA")]
-    [InlineData("Return", "QA")]
-    public async Task ProcessApprovalActionAsync_WhenRoleIsAllowedForAction_ExpectsNoRoleRejection(string action, string roleName)
+    [InlineData(ApprovalActionType.Verify, "QA")]
+    [InlineData(ApprovalActionType.Verify, "Admin")]
+    [InlineData(ApprovalActionType.Approve, "TrainingManager")]
+    [InlineData(ApprovalActionType.Approve, "Admin")]
+    [InlineData(ApprovalActionType.Reject, "QA")]
+    [InlineData(ApprovalActionType.Return, "QA")]
+    public async Task ProcessApprovalActionAsync_WhenRoleIsAllowedForAction_ExpectsNoRoleRejection(ApprovalActionType action, string roleName)
     {
         var service = BuildService();
 
@@ -51,12 +52,8 @@ public class ApprovalServiceTests
         Assert.False(ex is ForbiddenAccessException);
     }
 
-    [Fact]
-    public async Task ProcessApprovalActionAsync_WhenActionIsUnknown_ExpectsBusinessRuleViolationException()
-    {
-        var service = BuildService();
-
-        await Assert.ThrowsAsync<BusinessRuleViolationException>(
-            () => service.ProcessApprovalActionAsync(1, "Delete", actionByAccountId: 1, actionByRoleName: "Admin", comment: null, CancellationToken.None));
-    }
+    // "Unknown action" is no longer reachable here — action is a real ApprovalActionType enum now
+    // (mục #6, docs/todo/9.todo_to_complete_system.md), so ASP.NET Core model binding rejects any
+    // value outside {Verify, Approve, Reject, Return} with a 400 before ApprovalService is even
+    // called. There is nothing left for ApprovalService itself to validate on that front.
 }

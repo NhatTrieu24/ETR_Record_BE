@@ -67,10 +67,6 @@ public class EnrollmentServiceTests
             .Returns(Task.CompletedTask);
         unitOfWork.SetupGet(u => u.ETRCourseRecordRepository).Returns(etrRepo.Object);
 
-        var classStudentRepo = new Mock<IGenericRepository<ClassStudent>>();
-        classStudentRepo.Setup(r => r.AddAsync(It.IsAny<ClassStudent>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
-        unitOfWork.SetupGet(u => u.ClassStudentRepository).Returns(classStudentRepo.Object);
-
         var assessmentRepo = new Mock<IGenericRepository<Assessment>>();
         assessmentRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<Assessment>());
         unitOfWork.SetupGet(u => u.AssessmentRepository).Returns(assessmentRepo.Object);

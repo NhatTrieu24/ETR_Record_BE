@@ -1,5 +1,6 @@
 using ETR.Application.Compliance;
 using ETR.Application.DTOs;
+using ETR.Application.DTOs.Approval;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
 using System.ComponentModel.DataAnnotations;
@@ -49,27 +50,27 @@ public class ApprovalService : IApprovalService
     // controller's [Authorize]) because the controller grants a broad role set to cover all 4
     // actions at once; without this, any of those roles could perform any action (e.g. Instructor
     // self-approving their own submission), defeating the QA/TrainingManager segregation of duties.
-    private static readonly Dictionary<string, string[]> AllowedRolesByAction = new()
+    private static readonly Dictionary<ApprovalActionType, string[]> AllowedRolesByAction = new()
     {
-        ["Verify"] = ["QA", "Admin"],
-        ["Approve"] = ["TrainingManager", "Admin"],
-        ["Reject"] = ["QA", "Admin"],
-        ["Return"] = ["QA", "Admin"],
+        [ApprovalActionType.Verify] = ["QA", "Admin"],
+        [ApprovalActionType.Approve] = ["TrainingManager", "Admin"],
+        [ApprovalActionType.Reject] = ["QA", "Admin"],
+        [ApprovalActionType.Return] = ["QA", "Admin"],
     };
 
-    public async Task<ApprovalRequestResponse> ProcessApprovalActionAsync(int approvalRequestId, string action, int actionByAccountId, string? actionByRoleName, string? comment, CancellationToken cancellationToken = default)
+    public async Task<ApprovalRequestResponse> ProcessApprovalActionAsync(int approvalRequestId, ApprovalActionType action, int actionByAccountId, string? actionByRoleName, string? comment, CancellationToken cancellationToken = default)
     {
-        if (!AllowedRolesByAction.TryGetValue(action, out var allowedRoles))
-        {
-            throw new BusinessRuleViolationException("Invalid action.");
-        }
+        // action is a real enum now (see ApprovalActionType) — ASP.NET Core model binding already
+        // rejects any value outside the 4 known members with a 400 before this method is even
+        // called, so no "unknown action" branch is needed here anymore.
+        var allowedRoles = AllowedRolesByAction[action];
 
         if (actionByRoleName == null || !allowedRoles.Contains(actionByRoleName))
         {
             throw new ForbiddenAccessException($"Role '{actionByRoleName}' is not authorized to perform the '{action}' action.");
         }
 
-        if ((action == "Reject" || action == "Return") && string.IsNullOrWhiteSpace(comment))
+        if ((action == ApprovalActionType.Reject || action == ApprovalActionType.Return) && string.IsNullOrWhiteSpace(comment))
         {
             throw new ValidationException("A comment is required when rejecting or returning an ApprovalRequest.");
         }
@@ -85,10 +86,10 @@ public class ApprovalService : IApprovalService
                 var prevStatus = request.CurrentStatus;
                 string newStatus = action switch
                 {
-                    "Approve" => "Approved",
-                    "Reject" => "Rejected",
-                    "Verify" => "Verified",
-                    "Return" => "ReturnedForCorrection",
+                    ApprovalActionType.Approve => "Approved",
+                    ApprovalActionType.Reject => "Rejected",
+                    ApprovalActionType.Verify => "Verified",
+                    ApprovalActionType.Return => "ReturnedForCorrection",
                     _ => throw new BusinessRuleViolationException("Invalid action.")
                 };
 
@@ -106,7 +107,7 @@ public class ApprovalService : IApprovalService
                 {
                     ApprovalRequestId = request.ApprovalRequestId,
                     ActionByAccountId = actionByAccountId,
-                    ActionType = action,
+                    ActionType = action.ToString(),
                     PreviousStatus = prevStatus,
                     NewStatus = newStatus,
                     Comments = comment,
@@ -125,7 +126,7 @@ public class ApprovalService : IApprovalService
                 {
                     ETRRecordId = request.ETRCourseRecordId,
                     AccountId = actionByAccountId,
-                    ActionType = action.ToUpperInvariant(),
+                    ActionType = action.ToString().ToUpperInvariant(),
                     EntityName = nameof(ApprovalRequest),
                     RecordId = request.ApprovalRequestId,
                     OldValue = prevStatus,

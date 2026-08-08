@@ -18,25 +18,25 @@ public class AttendanceService : IAttendanceService
     {
         var records = await _unitOfWork.AttendanceRecordRepository.GetAllAsync(cancellationToken);
         return records.Select(r => new AttendanceRecordResponse(
-            r.AttendanceRecordId, r.SessionId, r.ClassStudentId, r.Status, r.Remarks, r.RecordedByAccountId, r.RecordedAt));
+            r.AttendanceRecordId, r.SessionId, r.EnrollmentId, r.Status, r.Remarks, r.RecordedByAccountId, r.RecordedAt));
     }
 
-    public async Task<IEnumerable<AttendanceRecordResponse>> GetAttendanceByClassStudentAsync(int classStudentId, int accountId, string? roleName, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<AttendanceRecordResponse>> GetAttendanceByEnrollmentAsync(int enrollmentId, int accountId, string? roleName, CancellationToken cancellationToken = default)
     {
-        var classStudent = await _unitOfWork.ClassStudentRepository.GetByIdAsync(classStudentId, cancellationToken)
-            ?? throw new KeyNotFoundException("ClassStudent not found.");
+        var enrollment = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(enrollmentId, cancellationToken)
+            ?? throw new KeyNotFoundException("Enrollment not found.");
 
         // Zero-Trust: Students may only view their own attendance records.
-        if (roleName == "Student" && classStudent.AccountId != accountId)
+        if (roleName == "Student" && enrollment.AccountId != accountId)
         {
             throw new ForbiddenAccessException("You are not authorized to view another student's attendance records.");
         }
 
         var records = (await _unitOfWork.AttendanceRecordRepository.GetAllAsync(cancellationToken))
-            .Where(r => r.ClassStudentId == classStudentId);
+            .Where(r => r.EnrollmentId == enrollmentId);
 
         return records.Select(r => new AttendanceRecordResponse(
-            r.AttendanceRecordId, r.SessionId, r.ClassStudentId, r.Status, r.Remarks, r.RecordedByAccountId, r.RecordedAt));
+            r.AttendanceRecordId, r.SessionId, r.EnrollmentId, r.Status, r.Remarks, r.RecordedByAccountId, r.RecordedAt));
     }
 
     public async Task<AttendanceRecordResponse> RecordAttendanceAsync(CreateAttendanceRecordRequest request, int recordedByAccountId, string? recordedByRoleName, CancellationToken cancellationToken = default)
@@ -55,14 +55,14 @@ public class AttendanceService : IAttendanceService
                 var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(session.ClassId, ct);
                 ClassOwnershipValidator.EnsureInstructorOwnsClass(recordedByRoleName, recordedByAccountId, trainingClass?.InstructorAccountId);
 
-                var classStudent = await _unitOfWork.ClassStudentRepository.GetByIdAsync(request.ClassStudentId, ct);
-                if (classStudent == null || classStudent.ClassId != session.ClassId)
-                    throw new BusinessRuleViolationException("Student is not assigned to this class.");
+                var enrollment = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(request.EnrollmentId, ct);
+                if (enrollment == null || enrollment.ClassId != session.ClassId)
+                    throw new BusinessRuleViolationException("Student is not enrolled in this class.");
 
                 var record = new AttendanceRecord
                 {
                     SessionId = request.SessionId,
-                    ClassStudentId = request.ClassStudentId,
+                    EnrollmentId = request.EnrollmentId,
                     Status = request.Status,
                     Remarks = request.Remarks,
                     RecordedByAccountId = recordedByAccountId,
@@ -76,23 +76,23 @@ public class AttendanceService : IAttendanceService
 
                 // Auto-calculate AttendanceRate in SubjectResult
                 var etrRecord = (await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(ct))
-                    .FirstOrDefault(etr => etr.EnrollmentId == classStudent.CourseEnrollmentId);
+                    .FirstOrDefault(etr => etr.EnrollmentId == enrollment.EnrollmentId);
 
                 if (etrRecord != null)
                 {
                     var sr = (await _unitOfWork.SubjectResultRepository.GetAllAsync(ct))
                         .FirstOrDefault(s => s.EtrId == etrRecord.ETRCourseRecordId && s.SubjectId == session.SubjectId);
-                    
+
                     if (sr != null)
                     {
-                        await RecalculateAttendanceRateAsync(sr, request.ClassStudentId, session.SubjectId, session.ClassId, ct);
+                        await RecalculateAttendanceRateAsync(sr, request.EnrollmentId, session.SubjectId, session.ClassId, ct);
                     }
                 }
 
                 await _unitOfWork.SaveAsync(ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
 
-                return new AttendanceRecordResponse(record.AttendanceRecordId, record.SessionId, record.ClassStudentId, record.Status, record.Remarks, record.RecordedByAccountId, record.RecordedAt);
+                return new AttendanceRecordResponse(record.AttendanceRecordId, record.SessionId, record.EnrollmentId, record.Status, record.Remarks, record.RecordedByAccountId, record.RecordedAt);
             }
             catch
             {
@@ -124,7 +124,7 @@ public class AttendanceService : IAttendanceService
         var r = await _unitOfWork.AttendanceRecordRepository.GetByIdAsync(id, cancellationToken);
         if (r == null) throw new KeyNotFoundException("AttendanceRecord not found.");
         return new AttendanceRecordResponse(
-            r.AttendanceRecordId, r.SessionId, r.ClassStudentId, r.Status, r.Remarks, r.RecordedByAccountId, r.RecordedAt);
+            r.AttendanceRecordId, r.SessionId, r.EnrollmentId, r.Status, r.Remarks, r.RecordedByAccountId, r.RecordedAt);
     }
 
     public async Task<AttendanceRecordResponse> UpdateAttendanceRecordAsync(int id, UpdateAttendanceRecordRequest request, int updatedByAccountId, CancellationToken cancellationToken = default)
@@ -154,7 +154,7 @@ public class AttendanceService : IAttendanceService
                 await _unitOfWork.CommitTransactionAsync(ct);
 
                 return new AttendanceRecordResponse(
-                    record.AttendanceRecordId, record.SessionId, record.ClassStudentId, record.Status, record.Remarks, record.RecordedByAccountId, record.RecordedAt);
+                    record.AttendanceRecordId, record.SessionId, record.EnrollmentId, record.Status, record.Remarks, record.RecordedByAccountId, record.RecordedAt);
             }
             catch
             {
@@ -241,10 +241,10 @@ public class AttendanceService : IAttendanceService
     }
 
     // Ngưỡng đã diễn ra/đã confirm — không tính trên tổng session kế hoạch (mẫu số sai nếu lớp chưa học hết).
-    private async Task RecalculateAttendanceRateAsync(SubjectResult sr, int classStudentId, int subjectId, int classId, CancellationToken ct)
+    private async Task RecalculateAttendanceRateAsync(SubjectResult sr, int enrollmentId, int subjectId, int classId, CancellationToken ct)
     {
         var presentRecords = (await _unitOfWork.AttendanceRecordRepository.GetAllAsync(ct))
-            .Where(r => r.ClassStudentId == classStudentId && r.Status == "Present").ToList();
+            .Where(r => r.EnrollmentId == enrollmentId && r.Status == "Present").ToList();
 
         var confirmedSessions = (await _unitOfWork.SessionRepository.GetAllAsync(ct))
             .Where(s => s.SubjectId == subjectId && s.ClassId == classId && s.IsConfirmed).ToList();
@@ -261,17 +261,17 @@ public class AttendanceService : IAttendanceService
         var session = await _unitOfWork.SessionRepository.GetByIdAsync(record.SessionId, ct);
         if (session == null) return;
 
-        var classStudent = await _unitOfWork.ClassStudentRepository.GetByIdAsync(record.ClassStudentId, ct);
-        if (classStudent == null) return;
+        var enrollment = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(record.EnrollmentId, ct);
+        if (enrollment == null) return;
 
         var etrRecord = (await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(ct))
-            .FirstOrDefault(etr => etr.EnrollmentId == classStudent.CourseEnrollmentId);
+            .FirstOrDefault(etr => etr.EnrollmentId == enrollment.EnrollmentId);
         if (etrRecord == null) return;
 
         var sr = (await _unitOfWork.SubjectResultRepository.GetAllAsync(ct))
             .FirstOrDefault(s => s.EtrId == etrRecord.ETRCourseRecordId && s.SubjectId == session.SubjectId);
         if (sr == null) return;
 
-        await RecalculateAttendanceRateAsync(sr, record.ClassStudentId, session.SubjectId, session.ClassId, ct);
+        await RecalculateAttendanceRateAsync(sr, record.EnrollmentId, session.SubjectId, session.ClassId, ct);
     }
 }

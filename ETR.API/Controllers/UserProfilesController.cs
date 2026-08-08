@@ -73,8 +73,8 @@ public class UserProfilesController : ControllerBase
     /// [Target Audience]: Admin, Academic
     /// </summary>
     // Single-profile-by-ID lookup is lower risk than enumerating all profiles (caller already needs
-    // to know the accountId from some other legitimate join, e.g. ClassStudent) — Instructor included
-    // here to unblock the common "look up this student's real name" enrichment case FE needs.
+    // to know the accountId from some other legitimate join, e.g. CourseEnrollment) — Instructor
+    // included here to unblock the common "look up this student's real name" enrichment case FE needs.
     [HttpGet("{accountId:int}")]
     [Authorize(Roles = "Admin,Academic,QA,Audit,Instructor")]
     public async Task<ActionResult<UserProfileResponse>> GetUserProfileByAccountId(int accountId, CancellationToken cancellationToken)
