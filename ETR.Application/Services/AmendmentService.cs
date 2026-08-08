@@ -37,7 +37,7 @@ public class AmendmentService : IAmendmentService
         return MapToResponse(request);
     }
 
-    public async Task<AmendmentRequestResponse> CreateAmendmentRequestAsync(int subjectResultId, CreateAmendmentRequestRequest request, int requestedByAccountId, CancellationToken cancellationToken = default)
+    public async Task<AmendmentRequestResponse> CreateAmendmentRequestAsync(int subjectResultId, CreateAmendmentRequestRequest request, int requestedByAccountId, string? requestedByRoleName, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.Reason))
             throw new ValidationException("A reason is required to request an amendment.");
@@ -45,10 +45,27 @@ public class AmendmentService : IAmendmentService
         var subjectResult = await _unitOfWork.SubjectResultRepository.GetByIdAsync(subjectResultId, cancellationToken)
             ?? throw new BusinessRuleViolationException("SubjectResult not found.");
 
-        var hasSignoff = (await _unitOfWork.SubjectSignoffRepository.GetAllAsync(cancellationToken))
-            .Any(s => s.SubjectResultId == subjectResultId);
-        if (!hasSignoff)
+        // Only the most recent signoff matters for identity — if it was already re-signed after a
+        // prior amendment, the earlier (soft-deleted) signoffs are excluded by the IsDeleted query
+        // filter automatically.
+        var currentSignoff = (await _unitOfWork.SubjectSignoffRepository.GetAllAsync(cancellationToken))
+            .Where(s => s.SubjectResultId == subjectResultId)
+            .OrderByDescending(s => s.SignoffAt)
+            .FirstOrDefault();
+        if (currentSignoff == null)
             throw new BusinessRuleViolationException("Cannot request an amendment for a SubjectResult that has not been signed off yet — just edit it directly.");
+
+        // "Chỉ chính người đã ký mới được xin mở khóa" (team decision 2026-08-08, docs/todo/addition.md).
+        // Admin is the one deliberate exception — a "Force Unlock" for when the original signer has
+        // left/is otherwise unavailable — but that path must leave an unmistakably louder audit trail
+        // than a normal self-service request (see the AuditLog branch below).
+        var isOriginalSigner = currentSignoff.SignoffByAccountId == requestedByAccountId;
+        var isAdmin = string.Equals(requestedByRoleName, "Admin", StringComparison.OrdinalIgnoreCase);
+        if (!isOriginalSigner && !isAdmin)
+        {
+            throw new ForbiddenAccessException("Bạn không có quyền can thiệp vào chữ ký của người khác — chỉ người đã Sign-off Subject này mới được xin mở khóa.");
+        }
+        var isAdminForceUnlock = isAdmin && !isOriginalSigner;
 
         var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(subjectResult.EtrId, cancellationToken);
         if (etr != null && (etr.IsLocked || string.Equals(etr.Status, "Completed", StringComparison.OrdinalIgnoreCase)))
@@ -75,16 +92,30 @@ public class AmendmentService : IAmendmentService
 
         await _unitOfWork.AmendmentRequestRepository.AddAsync(amendment, cancellationToken);
 
-        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
-        {
-            AccountId = requestedByAccountId,
-            ActionType = "AMENDMENT_REQUEST",
-            EntityName = nameof(SubjectResult),
-            RecordId = subjectResultId,
-            OldValue = subjectResult.Status,
-            NewValue = "Pending amendment",
-            Description = $"Amendment requested for SubjectResult #{subjectResultId}. Reason: {request.Reason}"
-        }, cancellationToken);
+        // Admin Force Unlock gets its OWN ActionType and an unmissable description — this must never
+        // be filed under the same "AMENDMENT_REQUEST" bucket as an ordinary self-service request, or
+        // an Auditor scanning the log for signer-identity mismatches would have no way to find it.
+        await _unitOfWork.AuditLogRepository.AddAsync(isAdminForceUnlock
+            ? new AuditLog
+            {
+                AccountId = requestedByAccountId,
+                ActionType = "ADMIN_FORCE_UNLOCK",
+                EntityName = nameof(SubjectResult),
+                RecordId = subjectResultId,
+                OldValue = subjectResult.Status,
+                NewValue = "Pending amendment",
+                Description = $"[CẢNH BÁO] Admin (AccountId {requestedByAccountId}) can thiệp phá vỡ chữ ký của người khác — Force Unlock SubjectResult #{subjectResultId} vốn được ký bởi AccountId {currentSignoff.SignoffByAccountId}. Reason: {request.Reason}"
+            }
+            : new AuditLog
+            {
+                AccountId = requestedByAccountId,
+                ActionType = "AMENDMENT_REQUEST",
+                EntityName = nameof(SubjectResult),
+                RecordId = subjectResultId,
+                OldValue = subjectResult.Status,
+                NewValue = "Pending amendment",
+                Description = $"Amendment requested for SubjectResult #{subjectResultId}. Reason: {request.Reason}"
+            }, cancellationToken);
 
         await _unitOfWork.SaveAsync(cancellationToken);
 

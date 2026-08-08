@@ -7,7 +7,7 @@ public interface IAmendmentService
 {
     Task<IEnumerable<AmendmentRequestResponse>> GetAllAmendmentRequestsAsync(CancellationToken cancellationToken = default);
     Task<AmendmentRequestResponse> GetAmendmentRequestByIdAsync(int id, CancellationToken cancellationToken = default);
-    Task<AmendmentRequestResponse> CreateAmendmentRequestAsync(int subjectResultId, CreateAmendmentRequestRequest request, int requestedByAccountId, CancellationToken cancellationToken = default);
+    Task<AmendmentRequestResponse> CreateAmendmentRequestAsync(int subjectResultId, CreateAmendmentRequestRequest request, int requestedByAccountId, string? requestedByRoleName, CancellationToken cancellationToken = default);
     Task<AmendmentRequestResponse> ApproveAmendmentRequestAsync(int id, DecideAmendmentRequestRequest request, int approvedByAccountId, CancellationToken cancellationToken = default);
     Task<AmendmentRequestResponse> RejectAmendmentRequestAsync(int id, DecideAmendmentRequestRequest request, int rejectedByAccountId, CancellationToken cancellationToken = default);
 }
