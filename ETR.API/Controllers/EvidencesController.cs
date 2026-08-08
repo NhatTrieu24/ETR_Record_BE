@@ -86,7 +86,7 @@ public class EvidencesController : ControllerBase
             webRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
         }
 
-        var response = await _evidenceService.UploadEvidenceAsync(request, accountId, webRootPath, cancellationToken);
+        var response = await _evidenceService.UploadEvidenceAsync(request, accountId, _currentUserService.RoleName, webRootPath, cancellationToken);
         return CreatedAtAction(nameof(GetById), new { id = response.EvidenceFileId }, response);
     }
 

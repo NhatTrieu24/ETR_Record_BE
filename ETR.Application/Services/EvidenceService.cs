@@ -49,10 +49,25 @@ public class EvidenceService : IEvidenceService
         return MapToResponse(evidence);
     }
 
-    public async Task<EvidenceResponse> UploadEvidenceAsync(UploadEvidenceRequest request, int uploadedByAccountId, string webRootPath, CancellationToken cancellationToken = default)
+    public async Task<EvidenceResponse> UploadEvidenceAsync(UploadEvidenceRequest request, int uploadedByAccountId, string? uploadedByRoleName, string webRootPath, CancellationToken cancellationToken = default)
     {
         if (request.File == null || request.File.Length == 0)
             throw new ValidationException("File is empty or not provided.");
+
+        // "Sân nhà ai nấy đá" — Instructor can only upload Evidence into a class they are actually
+        // assigned to (see ClassOwnershipValidator). Checked BEFORE writing the file to disk so a
+        // rejected request never leaves an orphaned upload behind.
+        var subjectResultForEvidence = await _unitOfWork.SubjectResultRepository.GetByIdAsync(request.SubjectResultId, cancellationToken);
+        var etrForEvidence = subjectResultForEvidence != null
+            ? await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(subjectResultForEvidence.EtrId, cancellationToken)
+            : null;
+        var enrollmentForEvidence = etrForEvidence != null
+            ? await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(etrForEvidence.EnrollmentId, cancellationToken)
+            : null;
+        var classForEvidence = enrollmentForEvidence != null
+            ? await _unitOfWork.ClassRepository.GetByIdAsync(enrollmentForEvidence.ClassId, cancellationToken)
+            : null;
+        ClassOwnershipValidator.EnsureInstructorOwnsClass(uploadedByRoleName, uploadedByAccountId, classForEvidence?.InstructorAccountId);
 
         if (request.File.Length > MaxFileSizeBytes)
             throw new ValidationException($"File exceeds the maximum allowed size of {MaxFileSizeBytes / (1024 * 1024)} MB.");

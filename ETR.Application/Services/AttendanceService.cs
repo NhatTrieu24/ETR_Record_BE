@@ -39,7 +39,7 @@ public class AttendanceService : IAttendanceService
             r.AttendanceRecordId, r.SessionId, r.ClassStudentId, r.Status, r.Remarks, r.RecordedByAccountId, r.RecordedAt));
     }
 
-    public async Task<AttendanceRecordResponse> RecordAttendanceAsync(CreateAttendanceRecordRequest request, int recordedByAccountId, CancellationToken cancellationToken = default)
+    public async Task<AttendanceRecordResponse> RecordAttendanceAsync(CreateAttendanceRecordRequest request, int recordedByAccountId, string? recordedByRoleName, CancellationToken cancellationToken = default)
     {
         return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
         {
@@ -49,6 +49,11 @@ public class AttendanceService : IAttendanceService
                 var session = await _unitOfWork.SessionRepository.GetByIdAsync(request.SessionId, ct);
                 if (session == null || session.IsConfirmed)
                     throw new BusinessRuleViolationException("Session not found or already confirmed.");
+
+                // "Sân nhà ai nấy đá" — Instructor can only record attendance for a class they are
+                // actually assigned to (see ClassOwnershipValidator).
+                var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(session.ClassId, ct);
+                ClassOwnershipValidator.EnsureInstructorOwnsClass(recordedByRoleName, recordedByAccountId, trainingClass?.InstructorAccountId);
 
                 var classStudent = await _unitOfWork.ClassStudentRepository.GetByIdAsync(request.ClassStudentId, ct);
                 if (classStudent == null || classStudent.ClassId != session.ClassId)

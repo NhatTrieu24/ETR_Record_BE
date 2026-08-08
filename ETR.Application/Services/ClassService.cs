@@ -8,16 +8,27 @@ namespace ETR.Application.Services;
 public class ClassService : IClassService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICurrentUserService _currentUserService;
 
-    public ClassService(IUnitOfWork unitOfWork)
+    public ClassService(IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
     {
         _unitOfWork = unitOfWork;
+        _currentUserService = currentUserService;
     }
 
     public async Task<IEnumerable<TrainingClassResponse>> GetAllClassesAsync(CancellationToken cancellationToken = default)
     {
         var classes = await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken);
-        return classes.Where(c => !c.IsDeleted).Select(c => new TrainingClassResponse(
+        var visible = classes.Where(c => !c.IsDeleted);
+
+        // "Sân nhà ai nấy đá" (team decision 2026-08-08, docs/todo/addition.md): Instructor only
+        // sees classes they are actually assigned to, not the whole system's class list.
+        if (string.Equals(_currentUserService.RoleName, "Instructor", StringComparison.OrdinalIgnoreCase) && _currentUserService.AccountId.HasValue)
+        {
+            visible = visible.Where(c => c.InstructorAccountId == _currentUserService.AccountId.Value);
+        }
+
+        return visible.Select(c => new TrainingClassResponse(
             c.ClassId, c.ClassCode, c.ClassName, c.CourseId, c.StartDate, c.EndDate, c.Location, c.Capacity, c.Status, c.InstructorAccountId));
     }
 
