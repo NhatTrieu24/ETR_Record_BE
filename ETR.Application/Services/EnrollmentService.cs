@@ -102,6 +102,8 @@ public class EnrollmentService : IEnrollmentService
                 var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(classId, ct);
                 if (trainingClass == null) throw new BusinessRuleViolationException("Class not found.");
 
+                var course = await _unitOfWork.CourseRepository.GetByIdAsync(trainingClass.CourseId, ct);
+
                 // === BUSINESS RULE 1: Course must have at least one Subject before enrollment ===
                 var hasSubjectsFromCheck = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct)).Any(cs => cs.CourseId == trainingClass.CourseId);
                 if (!hasSubjectsFromCheck)
@@ -153,7 +155,8 @@ public class EnrollmentService : IEnrollmentService
                     CreatedBySystem = true,
                     CreatedAt = DateTime.UtcNow,
                     CreatedByAccountId = createdByAccountId,
-                    PreviousRecordId = previousEtr?.ETRCourseRecordId
+                    PreviousRecordId = previousEtr?.ETRCourseRecordId,
+                    CourseVersionNo = course?.VersionNo ?? 1
                 };
 
                 await _unitOfWork.ETRCourseRecordRepository.AddAsync(etrRecord, ct);

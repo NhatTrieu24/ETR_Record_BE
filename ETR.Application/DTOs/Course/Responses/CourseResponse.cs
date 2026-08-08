@@ -7,7 +7,8 @@ public record CourseResponse(
     string Description, 
     int DurationHours, 
     string Status, 
-    int? ValidityMonths = null, 
+    int? ValidityMonths = null,
     string? CourseType = null,
-    List<CourseSubjectResponse>? Subjects = null
+    List<CourseSubjectResponse>? Subjects = null,
+    int VersionNo = 1
 );

@@ -35,6 +35,11 @@ public class EnrollmentServiceTests
         classRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(classes);
         unitOfWork.SetupGet(u => u.ClassRepository).Returns(classRepo.Object);
 
+        var courseRepo = new Mock<IGenericRepository<Course>>();
+        courseRepo.Setup(r => r.GetByIdAsync(trainingClass.CourseId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Course { CourseId = trainingClass.CourseId, CourseCode = "C1", VersionNo = 1 });
+        unitOfWork.SetupGet(u => u.CourseRepository).Returns(courseRepo.Object);
+
         var courseSubjectRepo = new Mock<IGenericRepository<CourseSubject>>();
         courseSubjectRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<CourseSubject> { new() { CourseId = trainingClass.CourseId, SubjectId = 1 } });
