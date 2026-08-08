@@ -17,10 +17,19 @@ public class PracticalChecklistResultService : IPracticalChecklistResultService
         _logger = logger;
     }
 
-    private async Task<decimal> GetPassingScoreAsync(int courseId, int subjectId, CancellationToken ct)
+    // Prefers SubjectResult.PassingScoreSnapshot (taken at Enroll time) over a live CourseSubject
+    // lookup — same rationale as AssessmentResultService.EvaluateSubjectPassabilityAsync: a
+    // CourseSubject.PassingScore change after enrollment must not retroactively change a learner's
+    // already-recorded practical checklist verdict.
+    private async Task<decimal> GetPassingScoreAsync(SubjectResult subjectResult, CancellationToken ct)
     {
+        if (subjectResult.PassingScoreSnapshot.HasValue)
+        {
+            return subjectResult.PassingScoreSnapshot.Value;
+        }
+
         var courseSubject = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct))
-            .FirstOrDefault(cs => cs.CourseId == courseId && cs.SubjectId == subjectId);
+            .FirstOrDefault(cs => cs.CourseId == subjectResult.CourseId && cs.SubjectId == subjectResult.SubjectId);
         return courseSubject?.PassingScore ?? 50m;
     }
 
@@ -104,7 +113,7 @@ public class PracticalChecklistResultService : IPracticalChecklistResultService
                 $"No PracticalChecklist configured for CourseId={subjectResult.CourseId}, SubjectId={subjectResult.SubjectId}. Configure one via PracticalChecklistsController before recording a result.");
         }
 
-        var passingScore = await GetPassingScoreAsync(subjectResult.CourseId, subjectResult.SubjectId, cancellationToken);
+        var passingScore = await GetPassingScoreAsync(subjectResult, cancellationToken);
 
         var result = new PracticalChecklistResult
         {
@@ -161,7 +170,7 @@ public class PracticalChecklistResultService : IPracticalChecklistResultService
         var subjectResult = await _unitOfWork.SubjectResultRepository.GetByIdAsync(result.SubjectResultId, cancellationToken);
         var passingScore = subjectResult == null
             ? 50m
-            : await GetPassingScoreAsync(subjectResult.CourseId, subjectResult.SubjectId, cancellationToken);
+            : await GetPassingScoreAsync(subjectResult, cancellationToken);
 
         result.Score = request.Score;
         result.ResultStatus = request.Score >= passingScore ? "Passed" : "Failed";
