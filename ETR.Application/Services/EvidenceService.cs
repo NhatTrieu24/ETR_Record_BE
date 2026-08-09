@@ -248,6 +248,18 @@ public class EvidenceService : IEvidenceService
         if (evidence == null)
             throw new KeyNotFoundException($"Evidence with ID {id} not found.");
 
+        if (evidence.VerificationStatus == "Verified")
+            throw new ForbiddenAccessException("Cannot delete evidence that has already been verified.");
+
+        if (evidence.SubjectResultId > 0)
+        {
+            var isSignedOff = _unitOfWork.SubjectSignoffRepository.GetQueryable()
+                .Any(s => s.SubjectResultId == evidence.SubjectResultId);
+            
+            if (isSignedOff)
+                throw new ForbiddenAccessException("Cannot delete evidence for a subject result that has already been signed off.");
+        }
+
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
         {
             AccountId = deletedByAccountId,
