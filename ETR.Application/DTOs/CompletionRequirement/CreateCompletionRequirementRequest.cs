@@ -20,5 +20,6 @@ public class CreateCompletionRequirementRequest
     public string? RequirementType { get; set; }
 
     /// <summary>Threshold used by "MinAttendance" (percentage).</summary>
+    [Range(0, 100, ErrorMessage = "ThresholdValue must be between 0 and 100")]
     public decimal? ThresholdValue { get; set; }
 }

@@ -14,8 +14,10 @@ public class UpdateAssessmentRequest
     public string ComponentName { get; set; } = string.Empty;
 
     [Required]
+    [RegularExpression("^(Theory|Practical)$", ErrorMessage = "AssessmentType must be 'Theory' or 'Practical'")]
     public string AssessmentType { get; set; } = string.Empty;
 
+    [Range(0, 100, ErrorMessage = "Weight must be between 0 and 100")]
     public decimal Weight { get; set; }
     public decimal PassingScore { get; set; }
     public bool IsRequired { get; set; }

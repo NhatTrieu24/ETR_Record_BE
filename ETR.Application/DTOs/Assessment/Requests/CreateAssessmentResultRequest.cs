@@ -6,7 +6,7 @@ public record CreateAssessmentResultRequest(
     int AssessmentId,
     int AccountId,
     int SubjectResultId,
-    decimal Score,
+    [Range(0, 100, ErrorMessage = "Score must be between 0 and 100")] decimal Score,
     [MaxLength(1000)] string? Remark,
     int? SessionId = null,
     int? AuthorizedByAccountId = null);
