@@ -215,7 +215,7 @@ public class EtrController : ControllerBase
     /// [Target Audience]: Admin, Instructor, QA, Audit, Student (nếu là chính họ)
     /// </summary>
     [HttpGet("student/{studentId}/history")]
-    [Authorize(Roles = "Admin,Instructor,QA,Audit,Student,Academic")]
+    [Authorize(Roles = "Admin,Instructor,QA,Audit,Student,Academic,TrainingManager")]
     public async Task<ActionResult<IEnumerable<EtrRecordResponse>>> GetStudentEtrHistory(int studentId, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
@@ -237,7 +237,7 @@ public class EtrController : ControllerBase
     /// [Target Audience]: Admin, Instructor, QA, Audit, Student (nếu là chính họ)
     /// </summary>
     [HttpGet("student/{studentId}/current-status")]
-    [Authorize(Roles = "Admin,Instructor,QA,Audit,Student,Academic")]
+    [Authorize(Roles = "Admin,Instructor,QA,Audit,Student,Academic,TrainingManager")]
     public async Task<ActionResult<IEnumerable<StudentEtrStatusResponse>>> GetStudentEtrCurrentStatus(int studentId, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
