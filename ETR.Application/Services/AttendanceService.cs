@@ -243,11 +243,13 @@ public class AttendanceService : IAttendanceService
     // Ngưỡng đã diễn ra/đã confirm — không tính trên tổng session kế hoạch (mẫu số sai nếu lớp chưa học hết).
     private async Task RecalculateAttendanceRateAsync(SubjectResult sr, int enrollmentId, int subjectId, int classId, CancellationToken ct)
     {
-        var presentRecords = (await _unitOfWork.AttendanceRecordRepository.GetAllAsync(ct))
-            .Where(r => r.EnrollmentId == enrollmentId && r.Status == "Present").ToList();
-
         var confirmedSessions = (await _unitOfWork.SessionRepository.GetAllAsync(ct))
             .Where(s => s.SubjectId == subjectId && s.ClassId == classId && s.IsConfirmed).ToList();
+
+        var confirmedSessionIds = confirmedSessions.Select(s => s.SessionId).ToList();
+
+        var presentRecords = (await _unitOfWork.AttendanceRecordRepository.GetAllAsync(ct))
+            .Where(r => r.EnrollmentId == enrollmentId && r.Status == "Present" && confirmedSessionIds.Contains(r.SessionId)).ToList();
 
         if (confirmedSessions.Count > 0)
         {
