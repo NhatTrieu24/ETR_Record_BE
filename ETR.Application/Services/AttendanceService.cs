@@ -104,19 +104,54 @@ public class AttendanceService : IAttendanceService
 
     public async Task<AttendanceSessionResponse> ConfirmSessionAsync(int sessionId, int confirmedByAccountId, CancellationToken cancellationToken = default)
     {
-        var session = await _unitOfWork.SessionRepository.GetByIdAsync(sessionId, cancellationToken)
-            ?? throw new KeyNotFoundException("Session not found.");
+        return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
+        {
+            await _unitOfWork.BeginTransactionAsync(ct);
+            try
+            {
+                var session = await _unitOfWork.SessionRepository.GetByIdAsync(sessionId, ct)
+                    ?? throw new KeyNotFoundException("Session not found.");
 
-        session.IsConfirmed = true;
-        session.ConfirmedByAccountId = confirmedByAccountId;
-        session.ConfirmedAt = DateTime.UtcNow;
-        session.UpdatedAt = DateTime.UtcNow;
-        session.UpdatedByAccountId = confirmedByAccountId;
+                session.IsConfirmed = true;
+                session.ConfirmedByAccountId = confirmedByAccountId;
+                session.ConfirmedAt = DateTime.UtcNow;
+                session.UpdatedAt = DateTime.UtcNow;
+                session.UpdatedByAccountId = confirmedByAccountId;
 
-        _unitOfWork.SessionRepository.Update(session);
-        await _unitOfWork.SaveAsync(cancellationToken);
+                _unitOfWork.SessionRepository.Update(session);
+                await _unitOfWork.SaveAsync(ct);
 
-        return new AttendanceSessionResponse(session.SessionId, session.ClassId, session.SubjectId, session.SessionTitle, session.SessionDate, session.Location, session.IsConfirmed, session.ConfirmedByAccountId, session.ConfirmedAt);
+                var enrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct))
+                    .Where(e => e.ClassId == session.ClassId).ToList();
+
+                var etrs = (await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(ct))
+                    .Where(e => enrollments.Select(en => en.EnrollmentId).Contains(e.EnrollmentId)).ToList();
+                    
+                var subjectResults = (await _unitOfWork.SubjectResultRepository.GetAllAsync(ct))
+                    .Where(sr => sr.SubjectId == session.SubjectId && etrs.Select(e => e.ETRCourseRecordId).Contains(sr.EtrId)).ToList();
+
+                foreach (var enrollment in enrollments)
+                {
+                    var etr = etrs.FirstOrDefault(e => e.EnrollmentId == enrollment.EnrollmentId);
+                    if (etr == null) continue;
+
+                    var sr = subjectResults.FirstOrDefault(s => s.EtrId == etr.ETRCourseRecordId);
+                    if (sr == null) continue;
+
+                    await RecalculateAttendanceRateAsync(sr, enrollment.EnrollmentId, session.SubjectId, session.ClassId, ct);
+                }
+
+                await _unitOfWork.SaveAsync(ct);
+                await _unitOfWork.CommitTransactionAsync(ct);
+
+                return new AttendanceSessionResponse(session.SessionId, session.ClassId, session.SubjectId, session.SessionTitle, session.SessionDate, session.Location, session.IsConfirmed, session.ConfirmedByAccountId, session.ConfirmedAt);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync(ct);
+                throw;
+            }
+        }, cancellationToken);
     }
 
     public async Task<AttendanceRecordResponse> GetAttendanceRecordByIdAsync(int id, CancellationToken cancellationToken = default)

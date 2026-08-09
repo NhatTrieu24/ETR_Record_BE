@@ -284,6 +284,7 @@ public class AssessmentResultService : IAssessmentResultService
 
         result.Score = request.Score;
         result.Remark = request.Remark;
+        result.GradedByAccountId = updatedByAccountId;
 
         var assessment = await _unitOfWork.AssessmentRepository.GetByIdAsync(result.AssessmentId, cancellationToken);
         var passingScore = result.PassingScoreSnapshot ?? assessment?.PassingScore;
