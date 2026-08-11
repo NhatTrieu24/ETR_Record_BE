@@ -1,0 +1,13 @@
+BẢNG NHẬP ĐIỂM - Kiểm tra lý thuyết giữa kỳ (Theory) - Môn: Aviation Safety Fundamentals,,,,
+AssessmentId: 1,CourseId: 1,PassingScore: 70,Weight: 0.4,Type: Theory
+AccountId,Họ và tên,Mã học viên,SubjectResultId,Điểm (0-100)* [Đạt: ≥70],Ghi chú
+101,Nguyễn Văn An,STU001,11,85,
+102,Trần Thị Bình,STU002,12,92,
+103,Lê Văn Cường,STU003,13,65,Cần ôn tập thêm
+104,Phạm Thị Dung,STU004,14,78,
+105,Hoàng Văn Em,STU005,15,88,
+106,Đỗ Thị Fương,STU006,16,55,Chưa đạt - cần retake
+107,Ngô Văn Giang,STU007,17,71,
+108,Vũ Thị Hoa,STU008,18,95,
+109,Bùi Văn Inh,STU009,19,80,
+110,Đinh Thị Kim,STU010,20,68,Sát ngưỡng - cần theo dõi
