@@ -12,6 +12,9 @@ public class AddCourseSubjectRequest
     
     public int RequiredHours { get; set; } = 0;
     
+    [Required, Range(1, int.MaxValue)]
+    public int RequiredSessions { get; set; }
+    
     public bool IsMandatory { get; set; } = true;
     
     [Range(0, 100)]

@@ -9,5 +9,7 @@ public class Subject : BaseEntity
     public int DefaultHours { get; set; }
     public string? AssessmentMethod { get; set; }
     public string? Description { get; set; }
+    public int MinSessions { get; set; }
+    public int MaxSessions { get; set; }
     public string Status { get; set; } = string.Empty;
 }

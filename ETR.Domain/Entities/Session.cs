@@ -6,7 +6,7 @@ public class Session : BaseEntity
     public int ClassId { get; set; }
     public int SubjectId { get; set; }
     public string SessionTitle { get; set; } = string.Empty;
-    public DateTime SessionDate { get; set; }
+    public DateTime? SessionDate { get; set; }
     public string? Location { get; set; }
     public bool IsConfirmed { get; set; }
     public int? ConfirmedByAccountId { get; set; }

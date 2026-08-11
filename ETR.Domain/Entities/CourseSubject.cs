@@ -9,4 +9,5 @@ public class CourseSubject : BaseEntity
     public decimal PassingScore { get; set; }
     public bool IsMandatory { get; set; }
     public string? SubjectVersion { get; set; }
+    public int RequiredSessions { get; set; }
 }

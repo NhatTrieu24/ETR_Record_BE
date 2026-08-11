@@ -5,6 +5,7 @@ public record CourseSubjectResponse(
     int SubjectId,
     int SequenceNo,
     int RequiredHours,
+    int RequiredSessions,
     bool IsMandatory,
     decimal PassingScore
 );

@@ -6,7 +6,7 @@ public class SessionResponse
     public int ClassId { get; set; }
     public int SubjectId { get; set; }
     public string SessionTitle { get; set; } = string.Empty;
-    public DateTime SessionDate { get; set; }
+    public DateTime? SessionDate { get; set; }
     public string? Location { get; set; }
     
     // Status fields

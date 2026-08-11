@@ -67,7 +67,10 @@ public class EvidenceService : IEvidenceService
         var classForEvidence = enrollmentForEvidence != null
             ? await _unitOfWork.ClassRepository.GetByIdAsync(enrollmentForEvidence.ClassId, cancellationToken)
             : null;
-        ClassOwnershipValidator.EnsureInstructorOwnsClass(uploadedByRoleName, uploadedByAccountId, classForEvidence?.InstructorAccountId);
+            
+        var isAssigned = classForEvidence != null && subjectResultForEvidence != null && _unitOfWork.ClassSubjectRepository.GetQueryable()
+            .Any(cs => cs.ClassId == classForEvidence.ClassId && cs.SubjectId == subjectResultForEvidence.SubjectId && cs.InstructorAccountId == uploadedByAccountId);
+        ClassOwnershipValidator.EnsureInstructorOwnsSubject(uploadedByRoleName, isAssigned);
 
         if (request.File.Length > MaxFileSizeBytes)
             throw new ValidationException($"File exceeds the maximum allowed size of {MaxFileSizeBytes / (1024 * 1024)} MB.");

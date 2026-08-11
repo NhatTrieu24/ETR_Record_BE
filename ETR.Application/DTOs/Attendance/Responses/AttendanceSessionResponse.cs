@@ -5,7 +5,7 @@ public record AttendanceSessionResponse(
     int ClassId,
     int SubjectId,
     string SessionTitle,
-    DateTime SessionDate,
+    DateTime? SessionDate,
     string? Location,
     bool IsConfirmed,
     int? ConfirmedByAccountId,

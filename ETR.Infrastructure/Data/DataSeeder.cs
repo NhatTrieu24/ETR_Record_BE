@@ -243,6 +243,21 @@ public static class DataSeeder
             await context.SaveChangesAsync();
         }
 
+        if (!await context.ClassSubjects.AnyAsync())
+        {
+            var cls = await context.Classes.FirstAsync(c => c.ClassCode == ClassCode);
+            var instructorId = (await context.Accounts.FirstAsync(a => a.Username == InstructorUsername)).AccountId;
+            var subjectIds = await context.Subjects.ToDictionaryAsync(s => s.SubjectCode, s => s.SubjectId);
+
+            context.ClassSubjects.AddRange(
+                new ClassSubject { ClassId = cls.ClassId, SubjectId = subjectIds["SJ-REG"], InstructorAccountId = instructorId, CreatedAt = DateTime.UtcNow },
+                new ClassSubject { ClassId = cls.ClassId, SubjectId = subjectIds["SJ-SYS"], InstructorAccountId = instructorId, CreatedAt = DateTime.UtcNow },
+                new ClassSubject { ClassId = cls.ClassId, SubjectId = subjectIds["SJ-PRA"], InstructorAccountId = instructorId, CreatedAt = DateTime.UtcNow },
+                new ClassSubject { ClassId = cls.ClassId, SubjectId = subjectIds["SJ-SAF"], InstructorAccountId = instructorId, CreatedAt = DateTime.UtcNow }
+            );
+            await context.SaveChangesAsync();
+        }
+
         if (!await context.Sessions.AnyAsync())
         {
             var cls = await context.Classes.FirstAsync(c => c.ClassCode == ClassCode);
@@ -366,7 +381,7 @@ public static class DataSeeder
             EnrollmentId = enrollment.EnrollmentId,
             Status = "Present",
             RecordedByAccountId = instructorId,
-            RecordedAt = s.SessionDate
+            RecordedAt = s.SessionDate ?? DateTime.UtcNow
         }).ToList();
 
         context.AttendanceRecords.AddRange(records);

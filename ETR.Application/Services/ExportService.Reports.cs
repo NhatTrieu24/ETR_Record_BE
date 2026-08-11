@@ -250,7 +250,7 @@ public partial class ExportService
             sheet.Cell(row, 1).Value = profile?.UserCode ?? "-";
             sheet.Cell(row, 2).Value = profile?.FullName ?? "-";
             sheet.Cell(row, 3).Value = session?.SessionTitle ?? record.SessionId.ToString();
-            sheet.Cell(row, 4).Value = session?.SessionDate.ToString("yyyy-MM-dd") ?? "-";
+            sheet.Cell(row, 4).Value = session?.SessionDate?.ToString("yyyy-MM-dd") ?? "-";
             sheet.Cell(row, 5).Value = record.Status;
             sheet.Cell(row, 6).Value = record.Remarks ?? "-";
             row++;

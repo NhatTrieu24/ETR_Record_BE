@@ -78,7 +78,9 @@ public class AssessmentResultService : IAssessmentResultService
 
                 // "Sân nhà ai nấy đá" — Instructor can only grade a class they are actually
                 // assigned to (see ClassOwnershipValidator).
-                ClassOwnershipValidator.EnsureInstructorOwnsClass(recordedByRoleName, recordedByAccountId, targetClass.InstructorAccountId);
+                var isAssigned = _unitOfWork.ClassSubjectRepository.GetQueryable()
+                    .Any(cs => cs.ClassId == targetClass.ClassId && cs.SubjectId == subjectResult.SubjectId && cs.InstructorAccountId == recordedByAccountId);
+                ClassOwnershipValidator.EnsureInstructorOwnsSubject(recordedByRoleName, isAssigned);
 
                 var allResults = await _unitOfWork.AssessmentResultRepository.GetAllAsync(ct);
 
@@ -362,7 +364,10 @@ public class AssessmentResultService : IAssessmentResultService
                 var classForSignoff = enrollmentForSignoff != null
                     ? await _unitOfWork.ClassRepository.GetByIdAsync(enrollmentForSignoff.ClassId, ct)
                     : null;
-                ClassOwnershipValidator.EnsureInstructorOwnsClass(signoffByRoleName, signoffByAccountId, classForSignoff?.InstructorAccountId);
+                
+                var isAssignedSignoff = classForSignoff != null && _unitOfWork.ClassSubjectRepository.GetQueryable()
+                    .Any(cs => cs.ClassId == classForSignoff.ClassId && cs.SubjectId == subjectResult.SubjectId && cs.InstructorAccountId == signoffByAccountId);
+                ClassOwnershipValidator.EnsureInstructorOwnsSubject(signoffByRoleName, isAssignedSignoff);
 
                 var signoff = new SubjectSignoff
                 {

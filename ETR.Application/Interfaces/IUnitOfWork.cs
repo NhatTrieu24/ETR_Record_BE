@@ -9,6 +9,7 @@ public interface IUnitOfWork
     IGenericRepository<CourseEnrollment> CourseEnrollmentRepository { get; }
     IETRCourseRecordRepository ETRCourseRecordRepository { get; }
     IGenericRepository<Class> ClassRepository { get; }
+    IGenericRepository<ClassSubject> ClassSubjectRepository { get; }
     IGenericRepository<Subject> SubjectRepository { get; }
     IGenericRepository<CourseSubject> CourseSubjectRepository { get; }
     IGenericRepository<Role> RoleRepository { get; }

@@ -111,7 +111,10 @@ public class SearchController : ControllerBase
 
         if (instructorId.HasValue)
         {
-            var instructorClassIds = classes.Where(c => c.InstructorAccountId == instructorId.Value).Select(c => c.ClassId).ToHashSet();
+            var instructorClassIds = _unitOfWork.ClassSubjectRepository.GetQueryable()
+                .Where(cs => cs.InstructorAccountId == instructorId.Value)
+                .Select(cs => cs.ClassId)
+                .ToHashSet();
             var instructorEnrollmentIds = enrollments.Where(e => instructorClassIds.Contains(e.ClassId)).Select(e => e.EnrollmentId).ToHashSet();
             etrs = etrs.Where(e => instructorEnrollmentIds.Contains(e.EnrollmentId));
         }

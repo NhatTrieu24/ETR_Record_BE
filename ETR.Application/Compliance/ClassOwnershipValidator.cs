@@ -10,16 +10,16 @@ namespace ETR.Application.Compliance;
 /// </summary>
 public static class ClassOwnershipValidator
 {
-    public static void EnsureInstructorOwnsClass(string? callerRoleName, int? callerAccountId, int? classInstructorAccountId)
+    public static void EnsureInstructorOwnsSubject(string? callerRoleName, bool isInstructorAssignedToSubject)
     {
         if (!string.Equals(callerRoleName, "Instructor", StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
 
-        if (classInstructorAccountId == null || classInstructorAccountId != callerAccountId)
+        if (!isInstructorAssignedToSubject)
         {
-            throw new ForbiddenAccessException("Bạn không được phân công giảng dạy lớp này.");
+            throw new ForbiddenAccessException("Bản không được phân công giảng dạy môn này trong lớp.");
         }
     }
 }

@@ -10,4 +10,15 @@ public record UpdateSubjectRequest(
     int DefaultHours,
     [MaxLength(100)] string? AssessmentMethod,
     [MaxLength(2000)] string? Description,
-    [Required, MaxLength(20)] string Status);
+    [Required, Range(1, int.MaxValue)] int MinSessions,
+    [Required, Range(1, int.MaxValue)] int MaxSessions,
+    [Required, MaxLength(20)] string Status) : IValidatableObject
+{
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (MinSessions > MaxSessions)
+        {
+            yield return new ValidationResult("MinSessions cannot be greater than MaxSessions.", new[] { nameof(MinSessions), nameof(MaxSessions) });
+        }
+    }
+}

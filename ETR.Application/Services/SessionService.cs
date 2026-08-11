@@ -60,57 +60,9 @@ public class SessionService : ISessionService
         return MapToResponse(session, assessment, checklist);
     }
 
-    public async Task<SessionResponse> CreateSessionAsync(CreateSessionRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
+    public Task<SessionResponse> CreateSessionAsync(CreateSessionRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
     {
-        // Simple validation as per user requirements
-        var classExists = await _unitOfWork.ClassRepository.GetByIdAsync(request.ClassId, cancellationToken);
-        if (classExists == null)
-            throw new ValidationException($"Class with ID {request.ClassId} does not exist.");
-
-        var subjectExists = await _unitOfWork.SubjectRepository.GetByIdAsync(request.SubjectId, cancellationToken);
-        if (subjectExists == null)
-            throw new ValidationException($"Subject with ID {request.SubjectId} does not exist.");
-
-        Assessment? assessment = null;
-        if (request.AssessmentId.HasValue)
-        {
-            assessment = await _unitOfWork.AssessmentRepository.GetByIdAsync(request.AssessmentId.Value, cancellationToken);
-            if (assessment == null)
-                throw new ValidationException($"Assessment with ID {request.AssessmentId.Value} does not exist.");
-            if (assessment.CourseId != classExists.CourseId || assessment.SubjectId != request.SubjectId)
-                throw new ValidationException("Assessment does not match the class's course or the specified subject.");
-        }
-
-        PracticalChecklist? checklist = null;
-        if (request.PracticalChecklistId.HasValue)
-        {
-            checklist = await _unitOfWork.PracticalChecklistRepository.GetByIdAsync(request.PracticalChecklistId.Value, cancellationToken);
-            if (checklist == null)
-                throw new ValidationException($"PracticalChecklist with ID {request.PracticalChecklistId.Value} does not exist.");
-            if (checklist.CourseId != classExists.CourseId || checklist.SubjectId != request.SubjectId)
-                throw new ValidationException("PracticalChecklist does not match the class's course or the specified subject.");
-        }
-
-        var session = new Session
-        {
-            ClassId = request.ClassId,
-            SubjectId = request.SubjectId,
-            SessionTitle = request.SessionTitle,
-            SessionDate = request.SessionDate,
-            Location = request.Location,
-            IsConfirmed = false, // Default value
-            IsAssessmentRequired = request.IsAssessmentRequired,
-            IsChecklistRequired = request.IsChecklistRequired,
-            AssessmentId = request.AssessmentId,
-            PracticalChecklistId = request.PracticalChecklistId,
-            CreatedAt = DateTime.UtcNow,
-            CreatedByAccountId = createdByAccountId
-        };
-
-        await _unitOfWork.SessionRepository.AddAsync(session, cancellationToken);
-        await _unitOfWork.SaveAsync(cancellationToken);
-
-        return MapToResponse(session, assessment, checklist);
+        throw new NotSupportedException("Sessions are auto-provisioned based on Course configuration and cannot be manually created.");
     }
 
     public async Task<SessionResponse> UpdateSessionAsync(int id, UpdateSessionRequest request, int updatedByAccountId, CancellationToken cancellationToken = default)
@@ -141,7 +93,7 @@ public class SessionService : ISessionService
                 throw new ValidationException("PracticalChecklist does not match the class's course or the specified subject.");
         }
 
-        session.SessionTitle = request.SessionTitle;
+        // Only these fields can be updated by Instructor/Admin
         session.SessionDate = request.SessionDate;
         session.Location = request.Location;
         session.IsAssessmentRequired = request.IsAssessmentRequired;
@@ -157,17 +109,9 @@ public class SessionService : ISessionService
         return MapToResponse(session, assessment, checklist);
     }
 
-    public async Task DeleteSessionAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default)
+    public Task DeleteSessionAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default)
     {
-        var session = await _unitOfWork.SessionRepository.GetByIdAsync(id, cancellationToken);
-        if (session == null)
-            throw new KeyNotFoundException($"Session with ID {id} not found.");
-
-        // Instead of hard delete, we perform soft delete according to BaseEntity pattern if applicable.
-        // Assuming Delete method handles it or we manually set IsDeleted. 
-        // Using GenericRepository Delete pattern:
-        _unitOfWork.SessionRepository.Delete(session);
-        await _unitOfWork.SaveAsync(cancellationToken);
+        throw new NotSupportedException("Sessions are auto-provisioned and cannot be manually deleted.");
     }
 
     private SessionResponse MapToResponse(Session session, Assessment? assessment = null, PracticalChecklist? practicalChecklist = null)

@@ -18,8 +18,10 @@ public class EnrollmentService : IEnrollmentService
 
     private async Task<HashSet<int>> GetInstructorClassIdsAsync(int instructorAccountId, CancellationToken cancellationToken)
     {
-        var classes = await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken);
-        return classes.Where(c => c.InstructorAccountId == instructorAccountId).Select(c => c.ClassId).ToHashSet();
+        return _unitOfWork.ClassSubjectRepository.GetQueryable()
+            .Where(cs => cs.InstructorAccountId == instructorAccountId)
+            .Select(cs => cs.ClassId)
+            .ToHashSet();
     }
 
     public async Task<IEnumerable<EnrollmentResponse>> GetAllEnrollmentsAsync(CancellationToken cancellationToken = default)

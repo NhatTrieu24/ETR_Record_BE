@@ -53,7 +53,10 @@ public class AttendanceService : IAttendanceService
                 // "Sân nhà ai nấy đá" — Instructor can only record attendance for a class they are
                 // actually assigned to (see ClassOwnershipValidator).
                 var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(session.ClassId, ct);
-                ClassOwnershipValidator.EnsureInstructorOwnsClass(recordedByRoleName, recordedByAccountId, trainingClass?.InstructorAccountId);
+                
+                var isAssigned = trainingClass != null && _unitOfWork.ClassSubjectRepository.GetQueryable()
+                    .Any(cs => cs.ClassId == trainingClass.ClassId && cs.SubjectId == session.SubjectId && cs.InstructorAccountId == recordedByAccountId);
+                ClassOwnershipValidator.EnsureInstructorOwnsSubject(recordedByRoleName, isAssigned);
 
                 var enrollment = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(request.EnrollmentId, ct);
                 if (enrollment == null || enrollment.ClassId != session.ClassId)

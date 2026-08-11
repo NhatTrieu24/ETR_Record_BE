@@ -31,7 +31,7 @@ public class CourseService : ICourseService
             .Where(cs => cs.CourseId == id && !cs.IsDeleted)
             .OrderBy(cs => cs.SequenceNo)
             .Select(cs => new CourseSubjectResponse(
-                cs.CourseId, cs.SubjectId, cs.SequenceNo, cs.RequiredHours, cs.IsMandatory, cs.PassingScore
+                cs.CourseId, cs.SubjectId, cs.SequenceNo, cs.RequiredHours, cs.RequiredSessions, cs.IsMandatory, cs.PassingScore
             )).ToList();
 
         return new CourseResponse(c.CourseId, c.CourseCode, c.CourseName, c.Description, c.DurationHours, c.Status, c.ValidityMonths, c.CourseType, subjects, c.VersionNo);
@@ -106,7 +106,7 @@ public class CourseService : ICourseService
                     }, ct);
 
                     responseSubjects.Add(new CourseSubjectResponse(
-                        course.CourseId, s.SubjectId, s.SequenceNo, s.RequiredHours, s.IsMandatory, s.PassingScore
+                        course.CourseId, s.SubjectId, s.SequenceNo, s.RequiredHours, s.RequiredSessions, s.IsMandatory, s.PassingScore
                     ));
                 }
 
@@ -222,7 +222,7 @@ public class CourseService : ICourseService
                         _unitOfWork.CourseSubjectRepository.Update(existing);
 
                         finalSubjects.Add(new CourseSubjectResponse(
-                            id, existing.SubjectId, existing.SequenceNo, existing.RequiredHours, existing.IsMandatory, existing.PassingScore
+                            id, existing.SubjectId, existing.SequenceNo, existing.RequiredHours, existing.RequiredSessions, existing.IsMandatory, existing.PassingScore
                         ));
                     }
                     else
@@ -255,7 +255,7 @@ public class CourseService : ICourseService
                         }, ct);
 
                         finalSubjects.Add(new CourseSubjectResponse(
-                            id, reqSub.SubjectId, reqSub.SequenceNo, reqSub.RequiredHours, reqSub.IsMandatory, reqSub.PassingScore
+                            id, reqSub.SubjectId, reqSub.SequenceNo, reqSub.RequiredHours, reqSub.RequiredSessions, reqSub.IsMandatory, reqSub.PassingScore
                         ));
                     }
                 }
@@ -352,6 +352,7 @@ public class CourseService : ICourseService
             courseSubject.SubjectId,
             courseSubject.SequenceNo,
             courseSubject.RequiredHours,
+            courseSubject.RequiredSessions,
             courseSubject.IsMandatory,
             courseSubject.PassingScore
         );
@@ -368,6 +369,7 @@ public class CourseService : ICourseService
                 cs.SubjectId,
                 cs.SequenceNo,
                 cs.RequiredHours,
+                cs.RequiredSessions,
                 cs.IsMandatory,
                 cs.PassingScore
             ));
@@ -403,6 +405,7 @@ public class CourseService : ICourseService
             existingMapping.SubjectId,
             existingMapping.SequenceNo,
             existingMapping.RequiredHours,
+            existingMapping.RequiredSessions,
             existingMapping.IsMandatory,
             existingMapping.PassingScore
         );

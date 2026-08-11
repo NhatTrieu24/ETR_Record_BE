@@ -19,17 +19,31 @@ public class ClassService : IClassService
     public async Task<IEnumerable<TrainingClassResponse>> GetAllClassesAsync(CancellationToken cancellationToken = default)
     {
         var classes = await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken);
-        var visible = classes.Where(c => !c.IsDeleted);
+        var visible = classes.Where(c => !c.IsDeleted).ToList();
 
         // "Sân nhà ai nấy đá" (team decision 2026-08-08, docs/todo/addition.md): Instructor only
         // sees classes they are actually assigned to, not the whole system's class list.
         if (string.Equals(_currentUserService.RoleName, "Instructor", StringComparison.OrdinalIgnoreCase) && _currentUserService.AccountId.HasValue)
         {
-            visible = visible.Where(c => c.InstructorAccountId == _currentUserService.AccountId.Value);
+            var myClassIds = _unitOfWork.ClassSubjectRepository.GetQueryable()
+                .Where(cs => cs.InstructorAccountId == _currentUserService.AccountId.Value)
+                .Select(cs => cs.ClassId)
+                .ToHashSet();
+            
+            visible = visible.Where(c => myClassIds.Contains(c.ClassId)).ToList();
         }
+        
+        var allClassSubjects = await _unitOfWork.ClassSubjectRepository.GetAllAsync(cancellationToken);
 
-        return visible.Select(c => new TrainingClassResponse(
-            c.ClassId, c.ClassCode, c.ClassName, c.CourseId, c.StartDate, c.EndDate, c.Location, c.Capacity, c.Status, c.InstructorAccountId));
+        return visible.Select(c => {
+            var assignments = allClassSubjects
+                .Where(cs => cs.ClassId == c.ClassId)
+                .Select(cs => new InstructorAssignmentResponse(cs.ClassSubjectId, cs.SubjectId, cs.InstructorAccountId))
+                .ToList();
+
+            return new TrainingClassResponse(
+                c.ClassId, c.ClassCode, c.ClassName, c.CourseId, c.StartDate, c.EndDate, c.Location, c.Capacity, c.Status, assignments);
+        });
     }
 
     public async Task<TrainingClassResponse> GetClassByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -39,90 +53,210 @@ public class ClassService : IClassService
 
         if (c.IsDeleted) throw new KeyNotFoundException("Class not found.");
 
-        return new TrainingClassResponse(c.ClassId, c.ClassCode, c.ClassName, c.CourseId, c.StartDate, c.EndDate, c.Location, c.Capacity, c.Status, c.InstructorAccountId);
+        var allClassSubjects = await _unitOfWork.ClassSubjectRepository.GetAllAsync(cancellationToken);
+        var assignments = allClassSubjects
+            .Where(cs => cs.ClassId == c.ClassId)
+            .Select(cs => new InstructorAssignmentResponse(cs.ClassSubjectId, cs.SubjectId, cs.InstructorAccountId))
+            .ToList();
+
+        return new TrainingClassResponse(c.ClassId, c.ClassCode, c.ClassName, c.CourseId, c.StartDate, c.EndDate, c.Location, c.Capacity, c.Status, assignments);
     }
 
     public async Task<TrainingClassResponse> CreateClassAsync(CreateClassRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
     {
-        if (request.InstructorAccountId.HasValue)
+        return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
         {
-            await EnsureAccountHasInstructorRoleAsync(request.InstructorAccountId.Value, cancellationToken);
-        }
+            await _unitOfWork.BeginTransactionAsync(ct);
+            try
+            {
+                var course = await _unitOfWork.CourseRepository.GetByIdAsync(request.CourseId, ct)
+                    ?? throw new BusinessRuleViolationException("Course not found.");
 
-        var cls = new Class
-        {
-            ClassCode = request.ClassCode,
-            ClassName = request.ClassName,
-            CourseId = request.CourseId,
-            StartDate = request.StartDate,
-            EndDate = request.EndDate,
-            Location = request.Location,
-            Capacity = request.Capacity,
-            Status = request.Status,
-            InstructorAccountId = request.InstructorAccountId,
-            CreatedAt = DateTime.UtcNow,
-            CreatedByAccountId = createdByAccountId
-        };
+                var cls = new Class
+                {
+                    ClassCode = request.ClassCode,
+                    ClassName = request.ClassName,
+                    CourseId = request.CourseId,
+                    StartDate = request.StartDate,
+                    EndDate = request.EndDate,
+                    Location = request.Location,
+                    Capacity = request.Capacity,
+                    Status = request.Status,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedByAccountId = createdByAccountId
+                };
 
-        await _unitOfWork.ClassRepository.AddAsync(cls, cancellationToken);
-        await _unitOfWork.SaveAsync(cancellationToken);
+                await _unitOfWork.ClassRepository.AddAsync(cls, ct);
+                await _unitOfWork.SaveAsync(ct);
 
-        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
-        {
-            AccountId = createdByAccountId,
-            ActionType = "INSERT",
-            EntityName = nameof(Class),
-            RecordId = cls.ClassId,
-            NewValue = cls.ClassCode,
-            Description = $"Class #{cls.ClassId} ({cls.ClassCode}) created"
+                var assignments = new List<InstructorAssignmentResponse>();
+                var classSubjects = new List<ClassSubject>();
+                var sessions = new List<Session>();
+
+                if (request.InstructorAssignments != null && request.InstructorAssignments.Any())
+                {
+                    var courseSubjects = await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct);
+                    
+                    foreach (var assignment in request.InstructorAssignments)
+                    {
+                        var cs = courseSubjects.FirstOrDefault(x => x.CourseId == request.CourseId && x.SubjectId == assignment.SubjectId)
+                            ?? throw new BusinessRuleViolationException($"Subject {assignment.SubjectId} is not part of Course {request.CourseId}.");
+                        
+                        if (assignment.InstructorAccountId.HasValue)
+                        {
+                            await EnsureAccountHasInstructorRoleAsync(assignment.InstructorAccountId.Value, ct);
+                        }
+
+                        var classSubject = new ClassSubject
+                        {
+                            ClassId = cls.ClassId,
+                            SubjectId = assignment.SubjectId,
+                            InstructorAccountId = assignment.InstructorAccountId
+                        };
+                        
+                        classSubjects.Add(classSubject);
+                    }
+                    
+                    foreach (var classSubject in classSubjects)
+                    {
+                        await _unitOfWork.ClassSubjectRepository.AddAsync(classSubject, ct);
+                    }
+                    await _unitOfWork.SaveAsync(ct);
+                    
+                    // Auto-provision sessions
+                    foreach (var classSubject in classSubjects)
+                    {
+                        var cs = courseSubjects.First(x => x.CourseId == request.CourseId && x.SubjectId == classSubject.SubjectId);
+                        for (int i = 1; i <= cs.RequiredSessions; i++)
+                        {
+                            var session = new Session
+                            {
+                                ClassId = cls.ClassId,
+                                SubjectId = classSubject.SubjectId,
+                                SessionTitle = $"Buổi {i}",
+                                SessionDate = null, // Will be filled by Instructor later
+                                Location = request.Location, // Inherit from class by default
+                                IsConfirmed = false
+                            };
+                            await _unitOfWork.SessionRepository.AddAsync(session, ct);
+                            sessions.Add(session);
+                        }
+                    }
+                    await _unitOfWork.SaveAsync(ct);
+
+                    assignments = classSubjects.Select(x => new InstructorAssignmentResponse(x.ClassSubjectId, x.SubjectId, x.InstructorAccountId)).ToList();
+                }
+
+                await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                {
+                    AccountId = createdByAccountId,
+                    ActionType = "INSERT",
+                    EntityName = nameof(Class),
+                    RecordId = cls.ClassId,
+                    NewValue = cls.ClassCode,
+                    Description = $"Class #{cls.ClassId} ({cls.ClassCode}) created with {classSubjects.Count} subjects and {sessions.Count} sessions"
+                }, ct);
+                
+                await _unitOfWork.SaveAsync(ct);
+                await _unitOfWork.CommitTransactionAsync(ct);
+
+                return new TrainingClassResponse(cls.ClassId, cls.ClassCode, cls.ClassName, cls.CourseId, cls.StartDate, cls.EndDate, cls.Location, cls.Capacity, cls.Status, assignments);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync(ct);
+                throw;
+            }
         }, cancellationToken);
-        await _unitOfWork.SaveAsync(cancellationToken);
-
-        return new TrainingClassResponse(cls.ClassId, cls.ClassCode, cls.ClassName, cls.CourseId, cls.StartDate, cls.EndDate, cls.Location, cls.Capacity, cls.Status, cls.InstructorAccountId);
     }
 
     public async Task<TrainingClassResponse> UpdateClassAsync(int id, UpdateClassRequest request, int updatedByAccountId, CancellationToken cancellationToken = default)
     {
-        var cls = await _unitOfWork.ClassRepository.GetByIdAsync(id, cancellationToken)
-            ?? throw new KeyNotFoundException("Class not found.");
-
-        if (cls.IsDeleted) throw new KeyNotFoundException("Class not found.");
-
-        if (request.InstructorAccountId.HasValue && request.InstructorAccountId != cls.InstructorAccountId)
+        return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
         {
-            await EnsureAccountHasInstructorRoleAsync(request.InstructorAccountId.Value, cancellationToken);
-        }
+            await _unitOfWork.BeginTransactionAsync(ct);
+            try
+            {
+                var cls = await _unitOfWork.ClassRepository.GetByIdAsync(id, ct)
+                    ?? throw new KeyNotFoundException("Class not found.");
 
-        var oldStatus = cls.Status;
+                if (cls.IsDeleted) throw new KeyNotFoundException("Class not found.");
 
-        cls.ClassCode = request.ClassCode;
-        cls.ClassName = request.ClassName;
-        cls.CourseId = request.CourseId;
-        cls.StartDate = request.StartDate;
-        cls.EndDate = request.EndDate;
-        cls.Location = request.Location;
-        cls.Capacity = request.Capacity;
-        cls.Status = request.Status;
-        cls.InstructorAccountId = request.InstructorAccountId;
-        cls.UpdatedAt = DateTime.UtcNow;
-        cls.UpdatedByAccountId = updatedByAccountId;
+                var oldStatus = cls.Status;
 
-        _unitOfWork.ClassRepository.Update(cls);
+                cls.ClassCode = request.ClassCode;
+                cls.ClassName = request.ClassName;
+                cls.CourseId = request.CourseId; // Although this shouldn't normally change
+                cls.StartDate = request.StartDate;
+                cls.EndDate = request.EndDate;
+                cls.Location = request.Location;
+                cls.Capacity = request.Capacity;
+                cls.Status = request.Status;
+                cls.UpdatedAt = DateTime.UtcNow;
+                cls.UpdatedByAccountId = updatedByAccountId;
 
-        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
-        {
-            AccountId = updatedByAccountId,
-            ActionType = "UPDATE",
-            EntityName = nameof(Class),
-            RecordId = cls.ClassId,
-            OldValue = oldStatus,
-            NewValue = cls.Status,
-            Description = $"Class #{cls.ClassId} ({cls.ClassCode}) updated"
+                _unitOfWork.ClassRepository.Update(cls);
+
+                // Update ClassSubjects
+                var existingAssignments = _unitOfWork.ClassSubjectRepository.GetQueryable().Where(x => x.ClassId == cls.ClassId).ToList();
+                foreach (var ea in existingAssignments)
+                {
+                    _unitOfWork.ClassSubjectRepository.Delete(ea);
+                }
+                await _unitOfWork.SaveAsync(ct); // Clear existing
+
+                var assignments = new List<InstructorAssignmentResponse>();
+                
+                if (request.InstructorAssignments != null && request.InstructorAssignments.Any())
+                {
+                    var courseSubjects = await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct);
+
+                    foreach (var assignment in request.InstructorAssignments)
+                    {
+                        var cs = courseSubjects.FirstOrDefault(x => x.CourseId == request.CourseId && x.SubjectId == assignment.SubjectId)
+                            ?? throw new BusinessRuleViolationException($"Subject {assignment.SubjectId} is not part of Course {request.CourseId}.");
+                        
+                        if (assignment.InstructorAccountId.HasValue)
+                        {
+                            await EnsureAccountHasInstructorRoleAsync(assignment.InstructorAccountId.Value, ct);
+                        }
+
+                        var classSubject = new ClassSubject
+                        {
+                            ClassId = cls.ClassId,
+                            SubjectId = assignment.SubjectId,
+                            InstructorAccountId = assignment.InstructorAccountId
+                        };
+                        
+                        await _unitOfWork.ClassSubjectRepository.AddAsync(classSubject, ct);
+                        await _unitOfWork.SaveAsync(ct);
+                        
+                        assignments.Add(new InstructorAssignmentResponse(classSubject.ClassSubjectId, classSubject.SubjectId, classSubject.InstructorAccountId));
+                    }
+                }
+
+                await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                {
+                    AccountId = updatedByAccountId,
+                    ActionType = "UPDATE",
+                    EntityName = nameof(Class),
+                    RecordId = cls.ClassId,
+                    OldValue = oldStatus,
+                    NewValue = cls.Status,
+                    Description = $"Class #{cls.ClassId} ({cls.ClassCode}) updated"
+                }, ct);
+
+                await _unitOfWork.SaveAsync(ct);
+                await _unitOfWork.CommitTransactionAsync(ct);
+
+                return new TrainingClassResponse(cls.ClassId, cls.ClassCode, cls.ClassName, cls.CourseId, cls.StartDate, cls.EndDate, cls.Location, cls.Capacity, cls.Status, assignments);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync(ct);
+                throw;
+            }
         }, cancellationToken);
-
-        await _unitOfWork.SaveAsync(cancellationToken);
-
-        return new TrainingClassResponse(cls.ClassId, cls.ClassCode, cls.ClassName, cls.CourseId, cls.StartDate, cls.EndDate, cls.Location, cls.Capacity, cls.Status, cls.InstructorAccountId);
     }
 
     public async Task DeleteClassAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default)

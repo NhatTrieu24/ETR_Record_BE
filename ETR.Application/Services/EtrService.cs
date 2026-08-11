@@ -19,8 +19,10 @@ public class EtrService : IEtrService
 
     private async Task<HashSet<int>> GetInstructorClassIdsAsync(int instructorAccountId, CancellationToken cancellationToken)
     {
-        var classes = await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken);
-        return classes.Where(c => c.InstructorAccountId == instructorAccountId).Select(c => c.ClassId).ToHashSet();
+        return _unitOfWork.ClassSubjectRepository.GetQueryable()
+            .Where(cs => cs.InstructorAccountId == instructorAccountId)
+            .Select(cs => cs.ClassId)
+            .ToHashSet();
     }
 
     private async Task<HashSet<int>> GetInstructorEnrollmentIdsAsync(int instructorAccountId, CancellationToken cancellationToken)
@@ -780,7 +782,8 @@ public class EtrService : IEtrService
         
         if (_currentUserService.RoleName == "Instructor" && _currentUserService.AccountId.HasValue)
         {
-            classes = classes.Where(c => c.InstructorAccountId == _currentUserService.AccountId.Value).ToList();
+            var myClassIds = await GetInstructorClassIdsAsync(_currentUserService.AccountId.Value, cancellationToken);
+            classes = classes.Where(c => myClassIds.Contains(c.ClassId)).ToList();
         }
         
         var classIds = classes.Select(c => c.ClassId).ToList();

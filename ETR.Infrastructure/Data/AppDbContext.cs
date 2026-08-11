@@ -26,6 +26,7 @@ public partial class AppDbContext : DbContext
     public DbSet<Subject> Subjects => Set<Subject>();
     public DbSet<CourseSubject> CourseSubjects => Set<CourseSubject>();
     public DbSet<Class> Classes => Set<Class>();
+    public DbSet<ClassSubject> ClassSubjects => Set<ClassSubject>();
     public DbSet<Session> Sessions => Set<Session>();
     public DbSet<CourseEnrollment> CourseEnrollments => Set<CourseEnrollment>();
     public DbSet<ETRCourseRecord> ETRCourseRecords => Set<ETRCourseRecord>();
@@ -69,6 +70,7 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<Subject>().HasKey(e => e.SubjectId);
         modelBuilder.Entity<CourseSubject>().HasKey(e => new { e.CourseId, e.SubjectId });
         modelBuilder.Entity<Class>().HasKey(e => e.ClassId);
+        modelBuilder.Entity<ClassSubject>().HasKey(e => e.ClassSubjectId);
         modelBuilder.Entity<Session>().HasKey(e => e.SessionId);
         modelBuilder.Entity<CourseEnrollment>().HasKey(e => e.EnrollmentId);
         modelBuilder.Entity<ETRCourseRecord>().HasKey(e => e.ETRCourseRecordId);
@@ -110,6 +112,10 @@ public partial class AppDbContext : DbContext
 
         modelBuilder.Entity<SubjectResult>()
             .HasIndex(sr => new { sr.EtrId, sr.CourseId, sr.SubjectId })
+            .IsUnique();
+
+        modelBuilder.Entity<ClassSubject>()
+            .HasIndex(cs => new { cs.ClassId, cs.SubjectId })
             .IsUnique();
 
         modelBuilder.Entity<AttendanceRecord>()
@@ -163,7 +169,9 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<CourseSubject>().HasOne<Course>().WithMany().HasForeignKey(cs => cs.CourseId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<CourseSubject>().HasOne<Subject>().WithMany().HasForeignKey(cs => cs.SubjectId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<Class>().HasOne<Course>().WithMany().HasForeignKey(tc => tc.CourseId).OnDelete(cascadeDeleteConfig);
-        modelBuilder.Entity<Class>().HasOne<Account>().WithMany().HasForeignKey(tc => tc.InstructorAccountId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<ClassSubject>().HasOne<Class>().WithMany().HasForeignKey(cs => cs.ClassId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<ClassSubject>().HasOne<Subject>().WithMany().HasForeignKey(cs => cs.SubjectId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<ClassSubject>().HasOne<Account>().WithMany().HasForeignKey(cs => cs.InstructorAccountId).OnDelete(cascadeDeleteConfig);
         
         // Enrollment
         modelBuilder.Entity<CourseEnrollment>().HasOne<Account>().WithMany().HasForeignKey(e => e.AccountId).OnDelete(cascadeDeleteConfig);

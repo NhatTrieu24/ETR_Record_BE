@@ -90,8 +90,14 @@ public class DashboardService : IDashboardService
 
     private async Task<List<InstructorClassSummary>> ComputeInstructorClassesAsync(int instructorAccountId, CancellationToken cancellationToken)
     {
+        var classIds = _unitOfWork.ClassSubjectRepository.GetQueryable()
+            .Where(cs => cs.InstructorAccountId == instructorAccountId)
+            .Select(cs => cs.ClassId)
+            .Distinct()
+            .ToList();
+            
         var classes = (await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken))
-            .Where(c => c.InstructorAccountId == instructorAccountId)
+            .Where(c => classIds.Contains(c.ClassId))
             .ToList();
 
         var enrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken);
