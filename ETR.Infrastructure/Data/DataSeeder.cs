@@ -41,6 +41,7 @@ public static class DataSeeder
         await SeedSignoffAsync(context);
         await SeedEvidenceAsync(context);
         await SeedApprovalWorkflowAsync(context);
+        await SeedMiscellaneousAsync(context);
     }
 
     // ===================== Module: Identity =====================
@@ -144,14 +145,19 @@ public static class DataSeeder
     {
         if (!await context.Courses.AnyAsync())
         {
-            context.Courses.Add(new Course
-            {
-                CourseCode = CourseCode,
-                CourseName = "Aircraft Maintenance Technician - Basic",
-                Description = "Foundational course covering regulations, aircraft systems, practical maintenance skills, and safety for entry-level maintenance technicians.",
-                DurationHours = 120,
-                Status = "Active"
-            });
+            context.Courses.AddRange(
+                new Course
+                {
+                    CourseCode = CourseCode,
+                    CourseName = "Aircraft Maintenance Technician - Basic",
+                    Description = "Foundational course covering regulations, aircraft systems, practical maintenance skills, and safety for entry-level maintenance technicians.",
+                    DurationHours = 120,
+                    Status = "Active"
+                },
+                new Course { CourseCode = "B737-TR", CourseName = "B737 Type Rating", Description = "Type rating course for B737 NG/MAX.", DurationHours = 160, Status = "Active" },
+                new Course { CourseCode = "A320-FAM", CourseName = "A320 Familiarization", Description = "A320 family general familiarization.", DurationHours = 40, Status = "Active" },
+                new Course { CourseCode = "ENG-101", CourseName = "Aviation English", Description = "Aviation English for technicians.", DurationHours = 60, Status = "Active" }
+            );
             await context.SaveChangesAsync();
         }
 
@@ -183,7 +189,8 @@ public static class DataSeeder
             context.CompletionRequirements.AddRange(
                 new CompletionRequirement { CourseId = course.CourseId, RequirementName = "Minimum 80% Attendance", IsMandatory = true, DisplayOrder = 1, RequirementType = "MinAttendance", ThresholdValue = 80m },
                 new CompletionRequirement { CourseId = course.CourseId, RequirementName = "All Assessments Passed", Description = "Every mandatory assessment scored at or above its passing score.", IsMandatory = true, DisplayOrder = 2, RequirementType = "AllAssessmentsPassed" },
-                new CompletionRequirement { CourseId = course.CourseId, RequirementName = "All Practical Checklists Signed Off", IsMandatory = true, DisplayOrder = 3, RequirementType = "AllChecklistsSignedOff" });
+                new CompletionRequirement { CourseId = course.CourseId, RequirementName = "All Practical Checklists Signed Off", IsMandatory = true, DisplayOrder = 3, RequirementType = "AllChecklistsSignedOff" },
+                new CompletionRequirement { CourseId = course.CourseId, RequirementName = "OJT Hours Logged", Description = "Complete minimum OJT hours.", IsMandatory = false, DisplayOrder = 4, RequirementType = "Custom", ThresholdValue = 100m });
             await context.SaveChangesAsync();
         }
 
@@ -229,17 +236,22 @@ public static class DataSeeder
 
         if (!await context.Classes.AnyAsync())
         {
-            context.Classes.Add(new Class
-            {
-                ClassCode = ClassCode,
-                ClassName = "AMT-101 Batch 1",
-                CourseId = course.CourseId,
-                StartDate = new DateTime(2026, 1, 5),
-                EndDate = new DateTime(2026, 4, 30),
-                Location = "Hangar 3 Training Center",
-                Capacity = 20,
-                Status = "Completed"
-            });
+            context.Classes.AddRange(
+                new Class
+                {
+                    ClassCode = ClassCode,
+                    ClassName = "AMT-101 Batch 1",
+                    CourseId = course.CourseId,
+                    StartDate = new DateTime(2026, 1, 5),
+                    EndDate = new DateTime(2026, 4, 30),
+                    Location = "Hangar 3 Training Center",
+                    Capacity = 20,
+                    Status = "Completed"
+                },
+                new Class { ClassCode = "AMT101-C2", ClassName = "AMT-101 Batch 2", CourseId = course.CourseId, StartDate = new DateTime(2026, 5, 5), EndDate = new DateTime(2026, 8, 30), Location = "Hangar 3 Training Center", Capacity = 20, Status = "Scheduled" },
+                new Class { ClassCode = "AMT101-C3", ClassName = "AMT-101 Batch 3", CourseId = course.CourseId, StartDate = new DateTime(2026, 9, 5), EndDate = new DateTime(2026, 12, 30), Location = "Hangar 3 Training Center", Capacity = 20, Status = "Scheduled" },
+                new Class { ClassCode = "AMT101-C4", ClassName = "AMT-101 Batch 4", CourseId = course.CourseId, StartDate = new DateTime(2027, 1, 5), EndDate = new DateTime(2027, 4, 30), Location = "Hangar 3 Training Center", Capacity = 20, Status = "Planned" }
+            );
             await context.SaveChangesAsync();
         }
 
@@ -283,16 +295,25 @@ public static class DataSeeder
 
         if (!await context.CourseEnrollments.AnyAsync())
         {
-            context.CourseEnrollments.Add(new CourseEnrollment
-            {
-                AccountId = student.AccountId,
-                ClassId = cls.ClassId,
-                Status = "Completed",
-                EnrolledAt = new DateTime(2026, 1, 5),
-                StartDate = new DateTime(2026, 1, 5),
-                ExpectedCompletionDate = new DateTime(2026, 4, 30),
-                ActualCompletionDate = new DateTime(2026, 4, 30)
-            });
+            var cls2 = await context.Classes.FirstAsync(c => c.ClassCode == "AMT101-C2");
+            var cls3 = await context.Classes.FirstAsync(c => c.ClassCode == "AMT101-C3");
+            var cls4 = await context.Classes.FirstAsync(c => c.ClassCode == "AMT101-C4");
+            
+            context.CourseEnrollments.AddRange(
+                new CourseEnrollment
+                {
+                    AccountId = student.AccountId,
+                    ClassId = cls.ClassId,
+                    Status = "Completed",
+                    EnrolledAt = new DateTime(2026, 1, 5),
+                    StartDate = new DateTime(2026, 1, 5),
+                    ExpectedCompletionDate = new DateTime(2026, 4, 30),
+                    ActualCompletionDate = new DateTime(2026, 4, 30)
+                },
+                new CourseEnrollment { AccountId = student.AccountId, ClassId = cls2.ClassId, Status = "Enrolled", EnrolledAt = new DateTime(2026, 5, 1), ExpectedCompletionDate = new DateTime(2026, 8, 30) },
+                new CourseEnrollment { AccountId = student.AccountId, ClassId = cls3.ClassId, Status = "Enrolled", EnrolledAt = new DateTime(2026, 9, 1), ExpectedCompletionDate = new DateTime(2026, 12, 30) },
+                new CourseEnrollment { AccountId = student.AccountId, ClassId = cls4.ClassId, Status = "Withdrawn", EnrolledAt = new DateTime(2027, 1, 1), ExpectedCompletionDate = new DateTime(2027, 4, 30) }
+            );
             await context.SaveChangesAsync();
         }
     }
@@ -309,16 +330,15 @@ public static class DataSeeder
 
         if (!await context.ETRCourseRecords.AnyAsync())
         {
-            // Created unlocked/in-progress here; the Approval module below moves it to
-            // Completed + locked once the (seeded) manager approval trail exists —
-            // mirroring the real submit -> approve -> lock workflow (see domain.md).
-            context.ETRCourseRecords.Add(new ETRCourseRecord
+            var enrollments = await context.CourseEnrollments.Where(e => e.AccountId == student.AccountId).ToListAsync();
+            var etrRecords = enrollments.Select(e => new ETRCourseRecord
             {
-                EnrollmentId = enrollment.EnrollmentId,
+                EnrollmentId = e.EnrollmentId,
                 Status = "InProgress",
                 IsLocked = false,
                 CreatedBySystem = true
-            });
+            }).ToList();
+            context.ETRCourseRecords.AddRange(etrRecords);
             await context.SaveChangesAsync();
         }
 
@@ -419,16 +439,48 @@ public static class DataSeeder
             retakeResult.AttemptNo = 2;
             context.AssessmentResults.Add(retakeResult);
 
-            context.RetakeHistories.Add(new RetakeHistory
-            {
-                SubjectResultId = subjectResultsByCode["SJ-SYS"].SubjectResultId,
-                RetakeDate = new DateTime(2026, 2, 12),
-                Reason = "Failed first attempt (65 < 70 passing score)",
-                PreviousScore = 65m,
-                NewScore = 78m,
-                AuthorizedByAccountId = instructorId,
-                AttemptNo = 2
-            });
+            context.RetakeHistories.AddRange(
+                new RetakeHistory
+                {
+                    SubjectResultId = subjectResultsByCode["SJ-SYS"].SubjectResultId,
+                    RetakeDate = new DateTime(2026, 2, 12),
+                    Reason = "Failed first attempt (65 < 70 passing score)",
+                    PreviousScore = 65m,
+                    NewScore = 78m,
+                    AuthorizedByAccountId = instructorId,
+                    AttemptNo = 2
+                },
+                new RetakeHistory
+                {
+                    SubjectResultId = subjectResultsByCode["SJ-REG"].SubjectResultId,
+                    RetakeDate = new DateTime(2026, 1, 16),
+                    Reason = "Failed first attempt (60 < 70 passing score)",
+                    PreviousScore = 60m,
+                    NewScore = 88m,
+                    AuthorizedByAccountId = instructorId,
+                    AttemptNo = 2
+                },
+                new RetakeHistory
+                {
+                    SubjectResultId = subjectResultsByCode["SJ-PRA"].SubjectResultId,
+                    RetakeDate = new DateTime(2026, 2, 22),
+                    Reason = "Failed practical attempt 1",
+                    PreviousScore = 50m,
+                    NewScore = 90m,
+                    AuthorizedByAccountId = instructorId,
+                    AttemptNo = 2
+                },
+                new RetakeHistory
+                {
+                    SubjectResultId = subjectResultsByCode["SJ-SAF"].SubjectResultId,
+                    RetakeDate = new DateTime(2026, 3, 6),
+                    Reason = "Failed attempt 1 (68 < 70)",
+                    PreviousScore = 68m,
+                    NewScore = 82m,
+                    AuthorizedByAccountId = instructorId,
+                    AttemptNo = 2
+                }
+            );
             await context.SaveChangesAsync();
         }
     }
@@ -574,7 +626,9 @@ public static class DataSeeder
         var instructorId = (await context.Accounts.FirstAsync(a => a.Username == InstructorUsername)).AccountId;
         var managerId = (await context.Accounts.FirstAsync(a => a.Username == ManagerUsername)).AccountId;
 
-        var approvalRequest = new ApprovalRequest
+        var otherEtrRecords = await context.ETRCourseRecords.Where(e => e.ETRCourseRecordId != etr.ETRCourseRecordId).Take(3).ToListAsync();
+        
+        var approvalRequest1 = new ApprovalRequest
         {
             ETRCourseRecordId = etr.ETRCourseRecordId,
             CurrentStatus = "Approved",
@@ -583,13 +637,37 @@ public static class DataSeeder
             CurrentApproverId = managerId,
             CompletedAt = new DateTime(2026, 5, 10)
         };
-        context.ApprovalRequests.Add(approvalRequest);
+        var approvalRequest2 = new ApprovalRequest { ETRCourseRecordId = otherEtrRecords.ElementAtOrDefault(0)?.ETRCourseRecordId ?? 0, CurrentStatus = "Pending", SubmittedByAccountId = instructorId, SubmittedAt = DateTime.UtcNow.AddDays(-1), CurrentApproverId = managerId };
+        var approvalRequest3 = new ApprovalRequest { ETRCourseRecordId = otherEtrRecords.ElementAtOrDefault(1)?.ETRCourseRecordId ?? 0, CurrentStatus = "Rejected", SubmittedByAccountId = instructorId, SubmittedAt = DateTime.UtcNow.AddDays(-5), CurrentApproverId = managerId, CompletedAt = DateTime.UtcNow.AddDays(-4) };
+        var approvalRequest4 = new ApprovalRequest { ETRCourseRecordId = otherEtrRecords.ElementAtOrDefault(2)?.ETRCourseRecordId ?? 0, CurrentStatus = "UnderReview", SubmittedByAccountId = instructorId, SubmittedAt = DateTime.UtcNow.AddDays(-2), CurrentApproverId = managerId };
+        
+        // Remove dummy ones where ETRCourseRecordId == 0 just in case
+        var requestsToAdd = new List<ApprovalRequest> { approvalRequest1, approvalRequest2, approvalRequest3, approvalRequest4 }
+            .Where(r => r.ETRCourseRecordId != 0).ToList();
+            
+        context.ApprovalRequests.AddRange(requestsToAdd);
         await context.SaveChangesAsync();
 
-        context.ApprovalHistories.AddRange(
-            new ApprovalHistory { ApprovalRequestId = approvalRequest.ApprovalRequestId, ActionByAccountId = instructorId, ActionType = "Submit", NewStatus = "Submitted", ActionAt = new DateTime(2026, 5, 2) },
-            new ApprovalHistory { ApprovalRequestId = approvalRequest.ApprovalRequestId, ActionByAccountId = managerId, ActionType = "Review", PreviousStatus = "Submitted", NewStatus = "UnderReview", ActionAt = new DateTime(2026, 5, 5) },
-            new ApprovalHistory { ApprovalRequestId = approvalRequest.ApprovalRequestId, ActionByAccountId = managerId, ActionType = "Approve", PreviousStatus = "UnderReview", NewStatus = "Approved", ActionAt = new DateTime(2026, 5, 10) });
+        var histories = new List<ApprovalHistory>
+        {
+            new ApprovalHistory { ApprovalRequestId = approvalRequest1.ApprovalRequestId, ActionByAccountId = instructorId, ActionType = "Submit", NewStatus = "Submitted", ActionAt = new DateTime(2026, 5, 2) },
+            new ApprovalHistory { ApprovalRequestId = approvalRequest1.ApprovalRequestId, ActionByAccountId = managerId, ActionType = "Review", PreviousStatus = "Submitted", NewStatus = "UnderReview", ActionAt = new DateTime(2026, 5, 5) },
+            new ApprovalHistory { ApprovalRequestId = approvalRequest1.ApprovalRequestId, ActionByAccountId = managerId, ActionType = "Approve", PreviousStatus = "UnderReview", NewStatus = "Approved", ActionAt = new DateTime(2026, 5, 10) }
+        };
+
+        if (approvalRequest2.ApprovalRequestId != 0) histories.Add(new ApprovalHistory { ApprovalRequestId = approvalRequest2.ApprovalRequestId, ActionByAccountId = instructorId, ActionType = "Submit", NewStatus = "Submitted", ActionAt = DateTime.UtcNow.AddDays(-1) });
+        if (approvalRequest3.ApprovalRequestId != 0)
+        {
+            histories.Add(new ApprovalHistory { ApprovalRequestId = approvalRequest3.ApprovalRequestId, ActionByAccountId = instructorId, ActionType = "Submit", NewStatus = "Submitted", ActionAt = DateTime.UtcNow.AddDays(-5) });
+            histories.Add(new ApprovalHistory { ApprovalRequestId = approvalRequest3.ApprovalRequestId, ActionByAccountId = managerId, ActionType = "Reject", PreviousStatus = "Submitted", NewStatus = "Rejected", ActionAt = DateTime.UtcNow.AddDays(-4) });
+        }
+        if (approvalRequest4.ApprovalRequestId != 0)
+        {
+            histories.Add(new ApprovalHistory { ApprovalRequestId = approvalRequest4.ApprovalRequestId, ActionByAccountId = instructorId, ActionType = "Submit", NewStatus = "Submitted", ActionAt = DateTime.UtcNow.AddDays(-2) });
+            histories.Add(new ApprovalHistory { ApprovalRequestId = approvalRequest4.ApprovalRequestId, ActionByAccountId = managerId, ActionType = "Review", PreviousStatus = "Submitted", NewStatus = "UnderReview", ActionAt = DateTime.UtcNow.AddDays(-1) });
+        }
+
+        context.ApprovalHistories.AddRange(histories);
         await context.SaveChangesAsync();
 
         // Manager approval completes and locks the ETR record (domain.md step 6).
@@ -599,5 +677,173 @@ public static class DataSeeder
         etr.CompletedAt = new DateTime(2026, 5, 10);
         etr.IsLocked = true;
         await context.SaveChangesAsync();
+    }
+
+    // ===================== Module: Miscellaneous =====================
+    // AmendmentRequest, AuditLog, ExportJob
+
+    private static async Task SeedMiscellaneousAsync(AppDbContext context)
+    {
+        var (student, etr, _, subjectResultsByCode) = await GetDemoContextAsync(context);
+        var instructorId = (await context.Accounts.FirstAsync(a => a.Username == InstructorUsername)).AccountId;
+        var managerId = (await context.Accounts.FirstAsync(a => a.Username == ManagerUsername)).AccountId;
+        var qaId = (await context.Accounts.FirstAsync(a => a.Username == QaUsername)).AccountId;
+
+        // AmendmentRequests
+        if (await context.AmendmentRequests.CountAsync() < 4)
+        {
+            context.AmendmentRequests.RemoveRange(context.AmendmentRequests);
+            await context.SaveChangesAsync();
+            var srId = subjectResultsByCode["SJ-REG"].SubjectResultId;
+            context.AmendmentRequests.AddRange(
+                new AmendmentRequest
+                {
+                    SubjectResultId = srId,
+                    RequestedByAccountId = instructorId,
+                    Reason = "Typo in initial score entry",
+                    OldValue = "Passed",
+                    Status = "Pending"
+                },
+                new AmendmentRequest
+                {
+                    SubjectResultId = subjectResultsByCode["SJ-SYS"].SubjectResultId,
+                    RequestedByAccountId = instructorId,
+                    Reason = "Wrong checklist submitted",
+                    OldValue = "Passed",
+                    Status = "Rejected",
+                    ApprovedByAccountId = managerId,
+                    ApprovedAt = DateTime.UtcNow.AddDays(-1),
+                    DecisionComment = "Provide more proof before reopening."
+                },
+                new AmendmentRequest
+                {
+                    SubjectResultId = subjectResultsByCode["SJ-PRA"].SubjectResultId,
+                    RequestedByAccountId = instructorId,
+                    Reason = "Re-evaluation requested by student",
+                    OldValue = "Failed",
+                    Status = "Approved",
+                    ApprovedByAccountId = managerId,
+                    ApprovedAt = DateTime.UtcNow.AddDays(-2),
+                    DecisionComment = "Approved for re-evaluation."
+                },
+                new AmendmentRequest
+                {
+                    SubjectResultId = subjectResultsByCode["SJ-SAF"].SubjectResultId,
+                    RequestedByAccountId = instructorId,
+                    Reason = "System error during sync",
+                    OldValue = "Failed",
+                    Status = "Pending"
+                }
+            );
+            await context.SaveChangesAsync();
+        }
+
+        // AuditLogs
+        if (await context.AuditLogs.CountAsync() < 4)
+        {
+            context.AuditLogs.RemoveRange(context.AuditLogs);
+            await context.SaveChangesAsync();
+            context.AuditLogs.AddRange(
+                new AuditLog
+                {
+                    AccountId = instructorId,
+                    ActionType = "Login",
+                    EntityName = "Account",
+                    RecordId = instructorId,
+                    Description = "Instructor logged in",
+                    IPAddress = "192.168.1.10",
+                    UserAgent = "Mozilla/5.0",
+                    CreatedAt = DateTime.UtcNow.AddDays(-5)
+                },
+                new AuditLog
+                {
+                    AccountId = managerId,
+                    ActionType = "Approve",
+                    EntityName = "ETRCourseRecord",
+                    RecordId = etr.ETRCourseRecordId,
+                    Description = "Manager approved ETR",
+                    IPAddress = "192.168.1.12",
+                    UserAgent = "Mozilla/5.0",
+                    CreatedAt = DateTime.UtcNow.AddDays(-2)
+                },
+                new AuditLog
+                {
+                    AccountId = qaId,
+                    ActionType = "Verify",
+                    EntityName = "EvidenceFile",
+                    RecordId = 1,
+                    Description = "QA verified evidence",
+                    IPAddress = "192.168.1.15",
+                    UserAgent = "Chrome/114",
+                    CreatedAt = DateTime.UtcNow.AddDays(-3)
+                },
+                new AuditLog
+                {
+                    AccountId = instructorId,
+                    ActionType = "Update",
+                    EntityName = "SubjectResult",
+                    RecordId = subjectResultsByCode["SJ-REG"].SubjectResultId,
+                    Description = "Updated score after amendment",
+                    IPAddress = "192.168.1.10",
+                    UserAgent = "Mozilla/5.0",
+                    CreatedAt = DateTime.UtcNow.AddDays(-1)
+                }
+            );
+            await context.SaveChangesAsync();
+        }
+
+        // ExportJobs
+        if (await context.ExportJobs.CountAsync() < 4)
+        {
+            context.ExportJobs.RemoveRange(context.ExportJobs);
+            await context.SaveChangesAsync();
+            context.ExportJobs.AddRange(
+                new ExportJob
+                {
+                    RequestedByAccountId = managerId,
+                    ExportType = "ETRReport",
+                    FileName = "ETR_Report_AMT101.pdf",
+                    FilePath = "/exports/ETR_Report_AMT101.pdf",
+                    Status = "Completed",
+                    RequestedAt = DateTime.UtcNow.AddDays(-1),
+                    CompletedAt = DateTime.UtcNow.AddDays(-1),
+                    ETRCourseRecordId = etr.ETRCourseRecordId
+                },
+                new ExportJob
+                {
+                    RequestedByAccountId = qaId,
+                    ExportType = "AuditReport",
+                    FileName = null,
+                    FilePath = null,
+                    Status = "Processing",
+                    RequestedAt = DateTime.UtcNow.AddMinutes(-30),
+                    CompletedAt = null,
+                    ETRCourseRecordId = null
+                },
+                new ExportJob
+                {
+                    RequestedByAccountId = managerId,
+                    ExportType = "TraineeProgress",
+                    FileName = "Progress_AMT101.xlsx",
+                    FilePath = null,
+                    Status = "Failed",
+                    RequestedAt = DateTime.UtcNow.AddDays(-2),
+                    CompletedAt = DateTime.UtcNow.AddDays(-2),
+                    ETRCourseRecordId = null
+                },
+                new ExportJob
+                {
+                    RequestedByAccountId = instructorId,
+                    ExportType = "ClassRoster",
+                    FileName = "Roster_AMT101.csv",
+                    FilePath = "/exports/Roster_AMT101.csv",
+                    Status = "Completed",
+                    RequestedAt = DateTime.UtcNow.AddHours(-5),
+                    CompletedAt = DateTime.UtcNow.AddHours(-4),
+                    ETRCourseRecordId = null
+                }
+            );
+            await context.SaveChangesAsync();
+        }
     }
 }

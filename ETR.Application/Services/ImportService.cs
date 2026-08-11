@@ -26,7 +26,7 @@ public class ImportService : IImportService
     private const int AsmColRemark          = 6;
     private const int AsmDataStartRow       = 4;
 
-    private static readonly string[] ValidAttendanceStatuses = ["Present", "Absent", "Late"];
+    private static readonly string[] ValidAttendanceStatuses = ["Present", "Absent"];
 
     public ImportService(IUnitOfWork unitOfWork)
     {
@@ -75,7 +75,7 @@ public class ImportService : IImportService
         ws.Cell(3, AttColEnrollmentId).Value = "EnrollmentId";
         ws.Cell(3, AttColFullName).Value     = "Họ và tên";
         ws.Cell(3, AttColUserCode).Value     = "Mã học viên";
-        ws.Cell(3, AttColStatus).Value       = "Trạng thái (Present/Absent/Late)*";
+        ws.Cell(3, AttColStatus).Value       = "Trạng thái (Present/Absent)*";
         ws.Cell(3, AttColRemarks).Value      = "Ghi chú";
         ws.Row(3).Style.Font.SetBold(true)
             .Fill.SetBackgroundColor(XLColor.LightSteelBlue);
@@ -101,7 +101,7 @@ public class ImportService : IImportService
 
         // Dropdown validation for Status column
         var statusRange = ws.Range(AttDataStartRow, AttColStatus, row - 1, AttColStatus);
-        statusRange.CreateDataValidation().List("\"Present,Absent,Late\"", true);
+        statusRange.CreateDataValidation().List("\"Present,Absent\"", true);
 
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
@@ -463,7 +463,7 @@ public class ImportService : IImportService
         {
             if (!ValidAttendanceStatuses.Contains(row.Status, StringComparer.OrdinalIgnoreCase))
                 errors.Add(new ImportRowError(row.RowNumber, "Status",
-                    $"Giá trị '{row.Status}' không hợp lệ. Chấp nhận: Present, Absent, Late."));
+                    $"Giá trị '{row.Status}' không hợp lệ. Chấp nhận: Present, Absent."));
 
             if (!validEnrollments.Contains(row.EnrollmentId))
                 errors.Add(new ImportRowError(row.RowNumber, "EnrollmentId",
