@@ -29,6 +29,7 @@ public static class DependencyInjection
         services.AddScoped<ICompletionRequirementService, CompletionRequirementService>();
         services.AddScoped<IExportService, ExportService>();
         services.AddScoped<IDashboardService, DashboardService>();
+        services.AddScoped<IImportService, ImportService>();
 
         return services;
     }
