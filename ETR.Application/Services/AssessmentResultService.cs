@@ -284,9 +284,33 @@ public class AssessmentResultService : IAssessmentResultService
             throw new BusinessRuleViolationException("Cannot update an AssessmentResult that is already published.");
         }
 
+        var oldScore = result.Score;
+        
         result.Score = request.Score;
         result.Remark = request.Remark;
-        result.GradedByAccountId = updatedByAccountId;
+        
+        // Only set GradedByAccountId if it's currently 0 or the score actually changed,
+        // or just don't overwrite if someone else imported it, wait, instruction says:
+        // "không ghi đè GradedByAccountId khi bản ghi đã có người nhập (giữ dấu vết ai import ban đầu)"
+        if (result.GradedByAccountId == 0)
+        {
+            result.GradedByAccountId = updatedByAccountId;
+        }
+
+        if (oldScore != request.Score)
+        {
+            await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+            {
+                AccountId = updatedByAccountId,
+                ActionType = "UPDATE",
+                EntityName = "AssessmentResult",
+                RecordId = id,
+                OldValue = oldScore.ToString(),
+                NewValue = request.Score.ToString(),
+                Description = $"Updated AssessmentResult score from {oldScore} to {request.Score}",
+                CreatedAt = DateTime.UtcNow
+            }, cancellationToken);
+        }
 
         var assessment = await _unitOfWork.AssessmentRepository.GetByIdAsync(result.AssessmentId, cancellationToken);
         var passingScore = result.PassingScoreSnapshot ?? assessment?.PassingScore;

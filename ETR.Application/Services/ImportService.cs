@@ -178,6 +178,19 @@ public class ImportService : IImportService
                     imported++;
                 }
 
+                if (imported > 0)
+                {
+                    await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                    {
+                        AccountId = recordedByAccountId,
+                        ActionType = "IMPORT_ATTENDANCE",
+                        EntityName = "AttendanceRecord",
+                        RecordId = sessionId,
+                        Description = $"Imported {imported} attendance records for session {sessionId}",
+                        CreatedAt = DateTime.UtcNow
+                    }, innerCt);
+                }
+
                 await _unitOfWork.SaveAsync(innerCt);
 
                 // Recalculate AttendanceRate for each affected enrollment
@@ -391,6 +404,19 @@ public class ImportService : IImportService
                         continue;
                     }
                     imported++;
+                }
+
+                if (imported > 0)
+                {
+                    await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                    {
+                        AccountId = gradedByAccountId,
+                        ActionType = "IMPORT_ASSESSMENT",
+                        EntityName = "AssessmentResult",
+                        RecordId = assessmentId,
+                        Description = $"Imported {imported} assessment results for assessment {assessmentId}",
+                        CreatedAt = DateTime.UtcNow
+                    }, innerCt);
                 }
 
                 await _unitOfWork.SaveAsync(innerCt);

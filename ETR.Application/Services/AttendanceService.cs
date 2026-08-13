@@ -179,10 +179,27 @@ public class AttendanceService : IAttendanceService
                 if (session != null && session.IsConfirmed)
                     throw new BusinessRuleViolationException("Cannot modify an attendance record for a session that has already been confirmed.");
 
+                var oldStatus = record.Status;
+
                 record.Status = request.Status;
                 record.Remarks = request.Remarks;
                 record.UpdatedAt = DateTime.UtcNow;
                 record.UpdatedByAccountId = updatedByAccountId;
+
+                if (oldStatus != request.Status)
+                {
+                    await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                    {
+                        AccountId = updatedByAccountId,
+                        ActionType = "UPDATE",
+                        EntityName = "AttendanceRecord",
+                        RecordId = id,
+                        OldValue = oldStatus,
+                        NewValue = request.Status,
+                        Description = $"Updated AttendanceRecord status from {oldStatus} to {request.Status}",
+                        CreatedAt = DateTime.UtcNow
+                    }, ct);
+                }
 
                 _unitOfWork.AttendanceRecordRepository.Update(record);
                 await _unitOfWork.SaveAsync(ct);

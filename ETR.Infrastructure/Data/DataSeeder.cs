@@ -3,20 +3,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ETR.Infrastructure.Data;
 
-/// <summary>
-/// Single source of truth for baseline + demo seed data. Runs on every app startup
-/// (see Program.cs, after Database.MigrateAsync). Each module guards itself with an
-/// "AnyAsync" check so it only inserts once per table — to change seed data, edit the
-/// values below and reset the target database's data (see Deploy_NukeAndSeed.sql),
-/// then restart the app.
-///
-/// Note: on databases migrated before 2026-07-23, Roles/Departments/Accounts may already
-/// exist with plaintext PasswordHash values from the historical SeedSystemData migration's
-/// raw-SQL insert — in that case the Identity module below is a no-op and those accounts
-/// won't authenticate until the database's Accounts table is cleared and the app restarted.
-/// The migration's raw-SQL seed was removed (it also used sp_MSForEachTable, which isn't
-/// available on Azure SQL Database) — this seeder is now the only source for that data.
-/// </summary>
 public static class DataSeeder
 {
     private const string AdminUsername = "admin@etr.com";
@@ -25,8 +11,6 @@ public static class DataSeeder
     private const string QaUsername = "qa@etr.com";
     private const string ManagerUsername = "manager@etr.com";
     private const string ManagementViewerUsername = "management-viewer@etr.com";
-    private const string CourseCode = "AMT-101";
-    private const string ClassCode = "AMT101-C1";
 
     public static async Task SeedAsync(AppDbContext context)
     {
@@ -44,9 +28,6 @@ public static class DataSeeder
         await SeedMiscellaneousAsync(context);
     }
 
-    // ===================== Module: Identity =====================
-    // Role, Department, Account, UserProfile
-
     private static async Task SeedIdentityAsync(AppDbContext context)
     {
         if (!await context.Roles.AnyAsync())
@@ -59,34 +40,23 @@ public static class DataSeeder
                 new Role { RoleName = "TrainingManager", Description = "Training Manager" },
                 new Role { RoleName = "Student", Description = "Student / Learner" },
                 new Role { RoleName = "Audit", Description = "Auditor" },
-                new Role { RoleName = "ManagementViewer", Description = "Read-only leadership dashboard/report viewer" });
-            await context.SaveChangesAsync();
-        }
-        else if (!await context.Roles.AnyAsync(r => r.RoleName == "ManagementViewer"))
-        {
-            // Added after the initial 7-role seed (FRD `DS_các_role_cuối_cùng_.txt`) — on a database
-            // already seeded before this role existed, the AnyAsync() guard above is a no-op, so it
-            // needs its own idempotent insert here (same pattern as the per-item Department loop below).
-            context.Roles.Add(new Role { RoleName = "ManagementViewer", Description = "Read-only leadership dashboard/report viewer" });
+                new Role { RoleName = "ManagementViewer", Description = "Management Viewer" });
             await context.SaveChangesAsync();
         }
 
         var defaultDepartments = new[]
         {
-            new Department { DepartmentName = "Administration", Description = "General Admin" },
-            new Department { DepartmentName = "Training", Description = "Training Dept" },
-            new Department { DepartmentName = "Flight Crew", Description = "Flight Crew Dept" },
-            new Department { DepartmentName = "Cabin Crew", Description = "Cabin Crew Dept" },
-            new Department { DepartmentName = "Engineering & Maintenance", Description = "Engineering & Maintenance Dept" },
-            new Department { DepartmentName = "Ground Operations", Description = "Ground Operations Dept" }
+            new Department { DepartmentName = "Administration" },
+            new Department { DepartmentName = "Training" },
+            new Department { DepartmentName = "Flight Crew" },
+            new Department { DepartmentName = "Cabin Crew" },
+            new Department { DepartmentName = "Engineering & Maintenance" },
+            new Department { DepartmentName = "Ground Operations" }
         };
-
         foreach (var dept in defaultDepartments)
         {
             if (!await context.Departments.AnyAsync(d => d.DepartmentName == dept.DepartmentName))
-            {
                 context.Departments.Add(dept);
-            }
         }
         await context.SaveChangesAsync();
 
@@ -94,754 +64,683 @@ public static class DataSeeder
         {
             var roleIds = await context.Roles.ToDictionaryAsync(r => r.RoleName, r => r.RoleId);
             var deptIds = await context.Departments.ToDictionaryAsync(d => d.DepartmentName, d => d.DepartmentId);
+            var pwd = BCrypt.Net.BCrypt.HashPassword("123456");
 
-            context.Accounts.AddRange(
-                CreateAccount(AdminUsername, roleIds["Admin"], deptIds["Administration"], "ADM-01", "System Admin", new DateTime(1980, 1, 1), "Other"),
-                CreateAccount(InstructorUsername, roleIds["Instructor"], deptIds["Training"], "INS-01", "Senior Instructor", new DateTime(1985, 1, 1), "Male"),
-                CreateAccount(QaUsername, roleIds["QA"], deptIds["Administration"], "QA-01", "QA Specialist", new DateTime(1990, 1, 1), "Female"),
-                CreateAccount("academic@etr.com", roleIds["Academic"], deptIds["Administration"], "ACA-01", "Academic Staff", new DateTime(1992, 1, 1), "Female"),
-                CreateAccount(ManagerUsername, roleIds["TrainingManager"], deptIds["Training"], "MGR-01", "Training Manager", new DateTime(1988, 1, 1), "Male"),
-                CreateAccount(StudentUsername, roleIds["Student"], deptIds["Training"], "STU-01", "Jane Student", new DateTime(2000, 1, 1), "Female"),
-                CreateAccount("audit@etr.com", roleIds["Audit"], deptIds["Administration"], "AUD-01", "Audit Staff", new DateTime(1985, 1, 1), "Other"),
-                CreateAccount(ManagementViewerUsername, roleIds["ManagementViewer"], deptIds["Administration"], "MGV-01", "Management Viewer", new DateTime(1978, 1, 1), "Other"));
-            await context.SaveChangesAsync();
-        }
-        else if (!await context.Accounts.AnyAsync(a => a.Username == ManagementViewerUsername))
-        {
-            // Same "added after initial seed" situation as the ManagementViewer role above.
-            var roleIds = await context.Roles.ToDictionaryAsync(r => r.RoleName, r => r.RoleId);
-            var deptIds = await context.Departments.ToDictionaryAsync(d => d.DepartmentName, d => d.DepartmentId);
-            context.Accounts.Add(CreateAccount(ManagementViewerUsername, roleIds["ManagementViewer"], deptIds["Administration"], "MGV-01", "Management Viewer", new DateTime(1978, 1, 1), "Other"));
-            await context.SaveChangesAsync();
-        }
-    }
-
-    private static Account CreateAccount(string username, int roleId, int departmentId, string userCode, string fullName, DateTime dateOfBirth, string gender)
-    {
-        return new Account
-        {
-            Username = username,
-            // Demo credential remains "123456" for local/dev login convenience, but is
-            // now stored as a bcrypt hash rather than plaintext.
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("123456"),
-            RoleId = roleId,
-            DepartmentId = departmentId,
-            Status = "Active",
-            Profile = new UserProfile
+            var accounts = new List<Account>
             {
-                UserCode = userCode,
-                FullName = fullName,
-                Email = username,
-                DateOfBirth = dateOfBirth,
-                Gender = gender
-            }
-        };
-    }
+                new Account { Username = AdminUsername, PasswordHash = pwd, RoleId = roleIds["Admin"], DepartmentId = deptIds["Administration"], Status = "Active", Profile = new UserProfile { UserCode = "ADM-01", FullName = "System Admin", Email = AdminUsername } },
+                new Account { Username = InstructorUsername, PasswordHash = pwd, RoleId = roleIds["Instructor"], DepartmentId = deptIds["Training"], Status = "Active", Profile = new UserProfile { UserCode = "INS-01", FullName = "Senior Instructor", Email = InstructorUsername } },
+                new Account { Username = QaUsername, PasswordHash = pwd, RoleId = roleIds["QA"], DepartmentId = deptIds["Administration"], Status = "Active", Profile = new UserProfile { UserCode = "QA-01", FullName = "QA Specialist", Email = QaUsername } },
+                new Account { Username = ManagerUsername, PasswordHash = pwd, RoleId = roleIds["TrainingManager"], DepartmentId = deptIds["Training"], Status = "Active", Profile = new UserProfile { UserCode = "MGR-01", FullName = "Training Manager", Email = ManagerUsername } },
+                new Account { Username = StudentUsername, PasswordHash = pwd, RoleId = roleIds["Student"], DepartmentId = deptIds["Training"], Status = "Active", Profile = new UserProfile { UserCode = "STU-01", FullName = "Jane Student", Email = StudentUsername } },
+                new Account { Username = ManagementViewerUsername, PasswordHash = pwd, RoleId = roleIds["ManagementViewer"], DepartmentId = deptIds["Administration"], Status = "Active", Profile = new UserProfile { UserCode = "MGV-01", FullName = "Management Viewer", Email = ManagementViewerUsername } },
+                new Account { Username = "academic@etr.com", PasswordHash = pwd, RoleId = roleIds["Academic"], DepartmentId = deptIds["Administration"], Status = "Active", Profile = new UserProfile { UserCode = "ACA-01", FullName = "Academic Staff", Email = "academic@etr.com" } },
+                new Account { Username = "audit@etr.com", PasswordHash = pwd, RoleId = roleIds["Audit"], DepartmentId = deptIds["Administration"], Status = "Active", Profile = new UserProfile { UserCode = "AUD-01", FullName = "Audit Staff", Email = "audit@etr.com" } }
+            };
 
-    // ===================== Module: Catalog / Curriculum =====================
-    // Course, Subject, CourseSubject, CompletionRequirement, Assessment, PracticalChecklist, EvidenceType
+            // Mass seed students
+            for(int i=2; i<=30; i++) {
+                accounts.Add(new Account { Username = $"student{i}@etr.com", PasswordHash = pwd, RoleId = roleIds["Student"], DepartmentId = deptIds["Training"], Status = "Active", Profile = new UserProfile { UserCode = $"STU-{i:00}", FullName = $"Student {i}", Email = $"student{i}@etr.com" } });
+            }
+            // Mass seed instructors
+            for(int i=2; i<=10; i++) {
+                accounts.Add(new Account { Username = $"instructor{i}@etr.com", PasswordHash = pwd, RoleId = roleIds["Instructor"], DepartmentId = deptIds["Training"], Status = "Active", Profile = new UserProfile { UserCode = $"INS-{i:00}", FullName = $"Instructor {i}", Email = $"instructor{i}@etr.com" } });
+            }
+
+            context.Accounts.AddRange(accounts);
+            await context.SaveChangesAsync();
+        }
+    }
 
     private static async Task SeedCatalogAsync(AppDbContext context)
     {
         if (!await context.Courses.AnyAsync())
         {
-            context.Courses.AddRange(
-                new Course
-                {
-                    CourseCode = CourseCode,
-                    CourseName = "Aircraft Maintenance Technician - Basic",
-                    Description = "Foundational course covering regulations, aircraft systems, practical maintenance skills, and safety for entry-level maintenance technicians.",
-                    DurationHours = 120,
-                    Status = "Active"
-                },
-                new Course { CourseCode = "B737-TR", CourseName = "B737 Type Rating", Description = "Type rating course for B737 NG/MAX.", DurationHours = 160, Status = "Active" },
-                new Course { CourseCode = "A320-FAM", CourseName = "A320 Familiarization", Description = "A320 family general familiarization.", DurationHours = 40, Status = "Active" },
-                new Course { CourseCode = "ENG-101", CourseName = "Aviation English", Description = "Aviation English for technicians.", DurationHours = 60, Status = "Active" }
-            );
+            context.Courses.Add(new Course { CourseCode = "AMT-101", CourseName = "Aircraft Maintenance Technician", DurationHours = 120, Status = "Active" });
+            context.Courses.Add(new Course { CourseCode = "B737-TR", CourseName = "B737 Type Rating", DurationHours = 160, Status = "Active" });
+            context.Courses.Add(new Course { CourseCode = "A320-FAM", CourseName = "A320 Familiarization", DurationHours = 40, Status = "Active" });
+            context.Courses.Add(new Course { CourseCode = "ENG-101", CourseName = "Aviation English", DurationHours = 60, Status = "Active" });
+            context.Courses.Add(new Course { CourseCode = "SMS-101", CourseName = "Safety Management Systems", DurationHours = 20, Status = "Active" });
+            context.Courses.Add(new Course { CourseCode = "HF-101", CourseName = "Human Factors", DurationHours = 15, Status = "Active" });
+            context.Courses.Add(new Course { CourseCode = "A350-TR", CourseName = "A350 Type Rating", DurationHours = 160, Status = "Active" });
+            context.Courses.Add(new Course { CourseCode = "B787-TR", CourseName = "B787 Type Rating", DurationHours = 160, Status = "Active" });
+            context.Courses.Add(new Course { CourseCode = "DGR-101", CourseName = "Dangerous Goods Regulations", DurationHours = 10, Status = "Active" });
+            context.Courses.Add(new Course { CourseCode = "SEC-101", CourseName = "Aviation Security", DurationHours = 10, Status = "Active" });
             await context.SaveChangesAsync();
         }
-
+        
         if (!await context.Subjects.AnyAsync())
         {
-            context.Subjects.AddRange(
-                new Subject { SubjectCode = "SJ-REG", SubjectName = "Aviation Regulations & Compliance", SubjectType = "Theory", DefaultHours = 20, AssessmentMethod = "Written Exam", Description = "Civil aviation regulations and compliance requirements.", Status = "Active" },
-                new Subject { SubjectCode = "SJ-SYS", SubjectName = "Aircraft Systems Fundamentals", SubjectType = "Theory", DefaultHours = 40, AssessmentMethod = "Written Exam", Description = "Core aircraft systems: hydraulics, electrical, avionics.", Status = "Active" },
-                new Subject { SubjectCode = "SJ-PRA", SubjectName = "Practical Maintenance Skills", SubjectType = "Practical", DefaultHours = 50, AssessmentMethod = "Practical Checklist", Description = "Hands-on maintenance tasks performed under supervision.", Status = "Active" },
-                new Subject { SubjectCode = "SJ-SAF", SubjectName = "Safety & Human Factors", SubjectType = "Theory", DefaultHours = 10, AssessmentMethod = "Written Exam", Description = "Human factors and safety management systems.", Status = "Active" });
+            context.Subjects.Add(new Subject { SubjectCode = "SJ-REG", SubjectName = "Aviation Regulations", SubjectType = "Theory", Status = "Active" });
+            context.Subjects.Add(new Subject { SubjectCode = "SJ-SYS", SubjectName = "Aircraft Systems", SubjectType = "Theory", Status = "Active" });
+            context.Subjects.Add(new Subject { SubjectCode = "SJ-PRA", SubjectName = "Practical Maintenance", SubjectType = "Practical", Status = "Active" });
+            context.Subjects.Add(new Subject { SubjectCode = "SJ-SAF", SubjectName = "Safety & Human Factors", SubjectType = "Theory", Status = "Active" });
+            context.Subjects.Add(new Subject { SubjectCode = "SJ-ENG", SubjectName = "Technical English", SubjectType = "Theory", Status = "Active" });
             await context.SaveChangesAsync();
         }
-
-        var course = await context.Courses.FirstAsync(c => c.CourseCode == CourseCode);
-        var subjects = await context.Subjects.ToDictionaryAsync(s => s.SubjectCode, s => s);
 
         if (!await context.CourseSubjects.AnyAsync())
         {
-            context.CourseSubjects.AddRange(
-                new CourseSubject { CourseId = course.CourseId, SubjectId = subjects["SJ-REG"].SubjectId, SequenceNo = 1, RequiredHours = 20, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" },
-                new CourseSubject { CourseId = course.CourseId, SubjectId = subjects["SJ-SYS"].SubjectId, SequenceNo = 2, RequiredHours = 40, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" },
-                new CourseSubject { CourseId = course.CourseId, SubjectId = subjects["SJ-PRA"].SubjectId, SequenceNo = 3, RequiredHours = 50, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" },
-                new CourseSubject { CourseId = course.CourseId, SubjectId = subjects["SJ-SAF"].SubjectId, SequenceNo = 4, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            var courses = await context.Courses.ToDictionaryAsync(c => c.CourseCode, c => c.CourseId);
+            var subjects = await context.Subjects.ToDictionaryAsync(s => s.SubjectCode, s => s.SubjectId);
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["AMT-101"], SubjectId = subjects["SJ-REG"], SequenceNo = 1, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["AMT-101"], SubjectId = subjects["SJ-SYS"], SequenceNo = 2, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["AMT-101"], SubjectId = subjects["SJ-PRA"], SequenceNo = 3, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["AMT-101"], SubjectId = subjects["SJ-SAF"], SequenceNo = 4, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["AMT-101"], SubjectId = subjects["SJ-ENG"], SequenceNo = 5, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["B737-TR"], SubjectId = subjects["SJ-REG"], SequenceNo = 1, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["B737-TR"], SubjectId = subjects["SJ-SYS"], SequenceNo = 2, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["B737-TR"], SubjectId = subjects["SJ-PRA"], SequenceNo = 3, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["B737-TR"], SubjectId = subjects["SJ-SAF"], SequenceNo = 4, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["B737-TR"], SubjectId = subjects["SJ-ENG"], SequenceNo = 5, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["A320-FAM"], SubjectId = subjects["SJ-REG"], SequenceNo = 1, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["A320-FAM"], SubjectId = subjects["SJ-SYS"], SequenceNo = 2, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["A320-FAM"], SubjectId = subjects["SJ-PRA"], SequenceNo = 3, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["A320-FAM"], SubjectId = subjects["SJ-SAF"], SequenceNo = 4, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["A320-FAM"], SubjectId = subjects["SJ-ENG"], SequenceNo = 5, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["ENG-101"], SubjectId = subjects["SJ-ENG"], SequenceNo = 1, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["SMS-101"], SubjectId = subjects["SJ-REG"], SequenceNo = 1, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["SMS-101"], SubjectId = subjects["SJ-SYS"], SequenceNo = 2, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["SMS-101"], SubjectId = subjects["SJ-PRA"], SequenceNo = 3, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["SMS-101"], SubjectId = subjects["SJ-SAF"], SequenceNo = 4, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["SMS-101"], SubjectId = subjects["SJ-ENG"], SequenceNo = 5, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["HF-101"], SubjectId = subjects["SJ-REG"], SequenceNo = 1, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["HF-101"], SubjectId = subjects["SJ-SYS"], SequenceNo = 2, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["HF-101"], SubjectId = subjects["SJ-PRA"], SequenceNo = 3, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["HF-101"], SubjectId = subjects["SJ-SAF"], SequenceNo = 4, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["HF-101"], SubjectId = subjects["SJ-ENG"], SequenceNo = 5, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["A350-TR"], SubjectId = subjects["SJ-REG"], SequenceNo = 1, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["A350-TR"], SubjectId = subjects["SJ-SYS"], SequenceNo = 2, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["A350-TR"], SubjectId = subjects["SJ-PRA"], SequenceNo = 3, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["A350-TR"], SubjectId = subjects["SJ-SAF"], SequenceNo = 4, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["A350-TR"], SubjectId = subjects["SJ-ENG"], SequenceNo = 5, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["B787-TR"], SubjectId = subjects["SJ-REG"], SequenceNo = 1, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["B787-TR"], SubjectId = subjects["SJ-SYS"], SequenceNo = 2, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["B787-TR"], SubjectId = subjects["SJ-PRA"], SequenceNo = 3, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["B787-TR"], SubjectId = subjects["SJ-SAF"], SequenceNo = 4, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["B787-TR"], SubjectId = subjects["SJ-ENG"], SequenceNo = 5, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["DGR-101"], SubjectId = subjects["SJ-REG"], SequenceNo = 1, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["DGR-101"], SubjectId = subjects["SJ-SYS"], SequenceNo = 2, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["DGR-101"], SubjectId = subjects["SJ-PRA"], SequenceNo = 3, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["DGR-101"], SubjectId = subjects["SJ-SAF"], SequenceNo = 4, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["DGR-101"], SubjectId = subjects["SJ-ENG"], SequenceNo = 5, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["SEC-101"], SubjectId = subjects["SJ-REG"], SequenceNo = 1, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["SEC-101"], SubjectId = subjects["SJ-SYS"], SequenceNo = 2, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["SEC-101"], SubjectId = subjects["SJ-PRA"], SequenceNo = 3, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["SEC-101"], SubjectId = subjects["SJ-SAF"], SequenceNo = 4, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["SEC-101"], SubjectId = subjects["SJ-ENG"], SequenceNo = 5, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
             await context.SaveChangesAsync();
         }
 
         if (!await context.CompletionRequirements.AnyAsync())
         {
-            context.CompletionRequirements.AddRange(
-                new CompletionRequirement { CourseId = course.CourseId, RequirementName = "Minimum 80% Attendance", IsMandatory = true, DisplayOrder = 1, RequirementType = "MinAttendance", ThresholdValue = 80m },
-                new CompletionRequirement { CourseId = course.CourseId, RequirementName = "All Assessments Passed", Description = "Every mandatory assessment scored at or above its passing score.", IsMandatory = true, DisplayOrder = 2, RequirementType = "AllAssessmentsPassed" },
-                new CompletionRequirement { CourseId = course.CourseId, RequirementName = "All Practical Checklists Signed Off", IsMandatory = true, DisplayOrder = 3, RequirementType = "AllChecklistsSignedOff" },
-                new CompletionRequirement { CourseId = course.CourseId, RequirementName = "OJT Hours Logged", Description = "Complete minimum OJT hours.", IsMandatory = false, DisplayOrder = 4, RequirementType = "Custom", ThresholdValue = 100m });
+            var courses = await context.Courses.ToDictionaryAsync(c => c.CourseCode, c => c.CourseId);
+            context.CompletionRequirements.Add(new CompletionRequirement { CourseId = courses["AMT-101"], RequirementName = "Minimum 80% Attendance", IsMandatory = true, DisplayOrder = 1, RequirementType = "MinAttendance", ThresholdValue = 80m });
+            context.CompletionRequirements.Add(new CompletionRequirement { CourseId = courses["AMT-101"], RequirementName = "All Assessments Passed", IsMandatory = true, DisplayOrder = 2, RequirementType = "AllAssessmentsPassed" });
+            context.CompletionRequirements.Add(new CompletionRequirement { CourseId = courses["B737-TR"], RequirementName = "Minimum 80% Attendance", IsMandatory = true, DisplayOrder = 1, RequirementType = "MinAttendance", ThresholdValue = 80m });
+            context.CompletionRequirements.Add(new CompletionRequirement { CourseId = courses["B737-TR"], RequirementName = "All Assessments Passed", IsMandatory = true, DisplayOrder = 2, RequirementType = "AllAssessmentsPassed" });
+            context.CompletionRequirements.Add(new CompletionRequirement { CourseId = courses["A320-FAM"], RequirementName = "Minimum 80% Attendance", IsMandatory = true, DisplayOrder = 1, RequirementType = "MinAttendance", ThresholdValue = 80m });
+            context.CompletionRequirements.Add(new CompletionRequirement { CourseId = courses["A320-FAM"], RequirementName = "All Assessments Passed", IsMandatory = true, DisplayOrder = 2, RequirementType = "AllAssessmentsPassed" });
+            context.CompletionRequirements.Add(new CompletionRequirement { CourseId = courses["ENG-101"], RequirementName = "Minimum 80% Attendance", IsMandatory = true, DisplayOrder = 1, RequirementType = "MinAttendance", ThresholdValue = 80m });
+            context.CompletionRequirements.Add(new CompletionRequirement { CourseId = courses["ENG-101"], RequirementName = "All Assessments Passed", IsMandatory = true, DisplayOrder = 2, RequirementType = "AllAssessmentsPassed" });
+            context.CompletionRequirements.Add(new CompletionRequirement { CourseId = courses["SMS-101"], RequirementName = "Minimum 80% Attendance", IsMandatory = true, DisplayOrder = 1, RequirementType = "MinAttendance", ThresholdValue = 80m });
+            context.CompletionRequirements.Add(new CompletionRequirement { CourseId = courses["SMS-101"], RequirementName = "All Assessments Passed", IsMandatory = true, DisplayOrder = 2, RequirementType = "AllAssessmentsPassed" });
+            context.CompletionRequirements.Add(new CompletionRequirement { CourseId = courses["HF-101"], RequirementName = "Minimum 80% Attendance", IsMandatory = true, DisplayOrder = 1, RequirementType = "MinAttendance", ThresholdValue = 80m });
+            context.CompletionRequirements.Add(new CompletionRequirement { CourseId = courses["HF-101"], RequirementName = "All Assessments Passed", IsMandatory = true, DisplayOrder = 2, RequirementType = "AllAssessmentsPassed" });
+            context.CompletionRequirements.Add(new CompletionRequirement { CourseId = courses["A350-TR"], RequirementName = "Minimum 80% Attendance", IsMandatory = true, DisplayOrder = 1, RequirementType = "MinAttendance", ThresholdValue = 80m });
+            context.CompletionRequirements.Add(new CompletionRequirement { CourseId = courses["A350-TR"], RequirementName = "All Assessments Passed", IsMandatory = true, DisplayOrder = 2, RequirementType = "AllAssessmentsPassed" });
+            context.CompletionRequirements.Add(new CompletionRequirement { CourseId = courses["B787-TR"], RequirementName = "Minimum 80% Attendance", IsMandatory = true, DisplayOrder = 1, RequirementType = "MinAttendance", ThresholdValue = 80m });
+            context.CompletionRequirements.Add(new CompletionRequirement { CourseId = courses["B787-TR"], RequirementName = "All Assessments Passed", IsMandatory = true, DisplayOrder = 2, RequirementType = "AllAssessmentsPassed" });
+            context.CompletionRequirements.Add(new CompletionRequirement { CourseId = courses["DGR-101"], RequirementName = "Minimum 80% Attendance", IsMandatory = true, DisplayOrder = 1, RequirementType = "MinAttendance", ThresholdValue = 80m });
+            context.CompletionRequirements.Add(new CompletionRequirement { CourseId = courses["DGR-101"], RequirementName = "All Assessments Passed", IsMandatory = true, DisplayOrder = 2, RequirementType = "AllAssessmentsPassed" });
+            context.CompletionRequirements.Add(new CompletionRequirement { CourseId = courses["SEC-101"], RequirementName = "Minimum 80% Attendance", IsMandatory = true, DisplayOrder = 1, RequirementType = "MinAttendance", ThresholdValue = 80m });
+            context.CompletionRequirements.Add(new CompletionRequirement { CourseId = courses["SEC-101"], RequirementName = "All Assessments Passed", IsMandatory = true, DisplayOrder = 2, RequirementType = "AllAssessmentsPassed" });
             await context.SaveChangesAsync();
         }
 
         if (!await context.Assessments.AnyAsync())
         {
-            context.Assessments.AddRange(
-                new Assessment { CourseId = course.CourseId, SubjectId = subjects["SJ-REG"].SubjectId, ComponentName = "Regulations Written Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 },
-                new Assessment { CourseId = course.CourseId, SubjectId = subjects["SJ-SYS"].SubjectId, ComponentName = "Systems Midterm Quiz", AssessmentType = "Theory", Weight = 40, PassingScore = 70, IsRequired = true, DisplayOrder = 1 },
-                new Assessment { CourseId = course.CourseId, SubjectId = subjects["SJ-SYS"].SubjectId, ComponentName = "Systems Final Exam", AssessmentType = "Theory", Weight = 60, PassingScore = 70, IsRequired = true, DisplayOrder = 2 },
-                new Assessment { CourseId = course.CourseId, SubjectId = subjects["SJ-PRA"].SubjectId, ComponentName = "Practical Skills Exam", AssessmentType = "Practical", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 },
-                new Assessment { CourseId = course.CourseId, SubjectId = subjects["SJ-SAF"].SubjectId, ComponentName = "Safety & Human Factors Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            var courses = await context.Courses.ToDictionaryAsync(c => c.CourseCode, c => c.CourseId);
+            var subjects = await context.Subjects.ToDictionaryAsync(s => s.SubjectCode, s => s.SubjectId);
+            context.Assessments.Add(new Assessment { CourseId = courses["AMT-101"], SubjectId = subjects["SJ-REG"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["AMT-101"], SubjectId = subjects["SJ-SYS"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["AMT-101"], SubjectId = subjects["SJ-PRA"], ComponentName = "Final Exam", AssessmentType = "Practical", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["AMT-101"], SubjectId = subjects["SJ-SAF"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["AMT-101"], SubjectId = subjects["SJ-ENG"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["B737-TR"], SubjectId = subjects["SJ-REG"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["B737-TR"], SubjectId = subjects["SJ-SYS"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["B737-TR"], SubjectId = subjects["SJ-PRA"], ComponentName = "Final Exam", AssessmentType = "Practical", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["B737-TR"], SubjectId = subjects["SJ-SAF"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["B737-TR"], SubjectId = subjects["SJ-ENG"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["A320-FAM"], SubjectId = subjects["SJ-REG"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["A320-FAM"], SubjectId = subjects["SJ-SYS"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["A320-FAM"], SubjectId = subjects["SJ-PRA"], ComponentName = "Final Exam", AssessmentType = "Practical", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["A320-FAM"], SubjectId = subjects["SJ-SAF"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["A320-FAM"], SubjectId = subjects["SJ-ENG"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["ENG-101"], SubjectId = subjects["SJ-ENG"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["SMS-101"], SubjectId = subjects["SJ-REG"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["SMS-101"], SubjectId = subjects["SJ-SYS"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["SMS-101"], SubjectId = subjects["SJ-PRA"], ComponentName = "Final Exam", AssessmentType = "Practical", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["SMS-101"], SubjectId = subjects["SJ-SAF"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["SMS-101"], SubjectId = subjects["SJ-ENG"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["HF-101"], SubjectId = subjects["SJ-REG"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["HF-101"], SubjectId = subjects["SJ-SYS"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["HF-101"], SubjectId = subjects["SJ-PRA"], ComponentName = "Final Exam", AssessmentType = "Practical", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["HF-101"], SubjectId = subjects["SJ-SAF"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["HF-101"], SubjectId = subjects["SJ-ENG"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["A350-TR"], SubjectId = subjects["SJ-REG"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["A350-TR"], SubjectId = subjects["SJ-SYS"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["A350-TR"], SubjectId = subjects["SJ-PRA"], ComponentName = "Final Exam", AssessmentType = "Practical", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["A350-TR"], SubjectId = subjects["SJ-SAF"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["A350-TR"], SubjectId = subjects["SJ-ENG"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["B787-TR"], SubjectId = subjects["SJ-REG"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["B787-TR"], SubjectId = subjects["SJ-SYS"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["B787-TR"], SubjectId = subjects["SJ-PRA"], ComponentName = "Final Exam", AssessmentType = "Practical", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["B787-TR"], SubjectId = subjects["SJ-SAF"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["B787-TR"], SubjectId = subjects["SJ-ENG"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["DGR-101"], SubjectId = subjects["SJ-REG"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["DGR-101"], SubjectId = subjects["SJ-SYS"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["DGR-101"], SubjectId = subjects["SJ-PRA"], ComponentName = "Final Exam", AssessmentType = "Practical", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["DGR-101"], SubjectId = subjects["SJ-SAF"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["DGR-101"], SubjectId = subjects["SJ-ENG"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["SEC-101"], SubjectId = subjects["SJ-REG"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["SEC-101"], SubjectId = subjects["SJ-SYS"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["SEC-101"], SubjectId = subjects["SJ-PRA"], ComponentName = "Final Exam", AssessmentType = "Practical", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["SEC-101"], SubjectId = subjects["SJ-SAF"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
+            context.Assessments.Add(new Assessment { CourseId = courses["SEC-101"], SubjectId = subjects["SJ-ENG"], ComponentName = "Final Exam", AssessmentType = "Theory", Weight = 100, PassingScore = 70, IsRequired = true, DisplayOrder = 1 });
             await context.SaveChangesAsync();
         }
 
         if (!await context.PracticalChecklists.AnyAsync())
         {
-            var practicalSubjectId = subjects["SJ-PRA"].SubjectId;
-            context.PracticalChecklists.AddRange(
-                new PracticalChecklist { CourseId = course.CourseId, SubjectId = practicalSubjectId, ItemName = "Torque Wrench Calibration Check", IsRequired = true, DisplayOrder = 1 },
-                new PracticalChecklist { CourseId = course.CourseId, SubjectId = practicalSubjectId, ItemName = "Panel Removal & Installation", IsRequired = true, DisplayOrder = 2 },
-                new PracticalChecklist { CourseId = course.CourseId, SubjectId = practicalSubjectId, ItemName = "Hydraulic System Inspection", IsRequired = true, DisplayOrder = 3 },
-                new PracticalChecklist { CourseId = course.CourseId, SubjectId = practicalSubjectId, ItemName = "Tool Control Accountability", IsRequired = true, DisplayOrder = 4 });
+            var courses = await context.Courses.ToDictionaryAsync(c => c.CourseCode, c => c.CourseId);
+            var subjects = await context.Subjects.ToDictionaryAsync(s => s.SubjectCode, s => s.SubjectId);
+            context.PracticalChecklists.Add(new PracticalChecklist { CourseId = courses["AMT-101"], SubjectId = subjects["SJ-PRA"], ItemName = "Checklist 1", IsRequired = true, DisplayOrder = 1 });
+            context.PracticalChecklists.Add(new PracticalChecklist { CourseId = courses["AMT-101"], SubjectId = subjects["SJ-PRA"], ItemName = "Checklist 2", IsRequired = true, DisplayOrder = 2 });
+            context.PracticalChecklists.Add(new PracticalChecklist { CourseId = courses["B737-TR"], SubjectId = subjects["SJ-PRA"], ItemName = "Checklist 1", IsRequired = true, DisplayOrder = 1 });
+            context.PracticalChecklists.Add(new PracticalChecklist { CourseId = courses["B737-TR"], SubjectId = subjects["SJ-PRA"], ItemName = "Checklist 2", IsRequired = true, DisplayOrder = 2 });
+            context.PracticalChecklists.Add(new PracticalChecklist { CourseId = courses["A320-FAM"], SubjectId = subjects["SJ-PRA"], ItemName = "Checklist 1", IsRequired = true, DisplayOrder = 1 });
+            context.PracticalChecklists.Add(new PracticalChecklist { CourseId = courses["A320-FAM"], SubjectId = subjects["SJ-PRA"], ItemName = "Checklist 2", IsRequired = true, DisplayOrder = 2 });
+            context.PracticalChecklists.Add(new PracticalChecklist { CourseId = courses["SMS-101"], SubjectId = subjects["SJ-PRA"], ItemName = "Checklist 1", IsRequired = true, DisplayOrder = 1 });
+            context.PracticalChecklists.Add(new PracticalChecklist { CourseId = courses["SMS-101"], SubjectId = subjects["SJ-PRA"], ItemName = "Checklist 2", IsRequired = true, DisplayOrder = 2 });
+            context.PracticalChecklists.Add(new PracticalChecklist { CourseId = courses["HF-101"], SubjectId = subjects["SJ-PRA"], ItemName = "Checklist 1", IsRequired = true, DisplayOrder = 1 });
+            context.PracticalChecklists.Add(new PracticalChecklist { CourseId = courses["HF-101"], SubjectId = subjects["SJ-PRA"], ItemName = "Checklist 2", IsRequired = true, DisplayOrder = 2 });
+            context.PracticalChecklists.Add(new PracticalChecklist { CourseId = courses["A350-TR"], SubjectId = subjects["SJ-PRA"], ItemName = "Checklist 1", IsRequired = true, DisplayOrder = 1 });
+            context.PracticalChecklists.Add(new PracticalChecklist { CourseId = courses["A350-TR"], SubjectId = subjects["SJ-PRA"], ItemName = "Checklist 2", IsRequired = true, DisplayOrder = 2 });
+            context.PracticalChecklists.Add(new PracticalChecklist { CourseId = courses["B787-TR"], SubjectId = subjects["SJ-PRA"], ItemName = "Checklist 1", IsRequired = true, DisplayOrder = 1 });
+            context.PracticalChecklists.Add(new PracticalChecklist { CourseId = courses["B787-TR"], SubjectId = subjects["SJ-PRA"], ItemName = "Checklist 2", IsRequired = true, DisplayOrder = 2 });
+            context.PracticalChecklists.Add(new PracticalChecklist { CourseId = courses["DGR-101"], SubjectId = subjects["SJ-PRA"], ItemName = "Checklist 1", IsRequired = true, DisplayOrder = 1 });
+            context.PracticalChecklists.Add(new PracticalChecklist { CourseId = courses["DGR-101"], SubjectId = subjects["SJ-PRA"], ItemName = "Checklist 2", IsRequired = true, DisplayOrder = 2 });
+            context.PracticalChecklists.Add(new PracticalChecklist { CourseId = courses["SEC-101"], SubjectId = subjects["SJ-PRA"], ItemName = "Checklist 1", IsRequired = true, DisplayOrder = 1 });
+            context.PracticalChecklists.Add(new PracticalChecklist { CourseId = courses["SEC-101"], SubjectId = subjects["SJ-PRA"], ItemName = "Checklist 2", IsRequired = true, DisplayOrder = 2 });
             await context.SaveChangesAsync();
         }
 
         if (!await context.EvidenceTypes.AnyAsync())
         {
             context.EvidenceTypes.AddRange(
-                new EvidenceType { TypeName = "Photo Evidence", Description = "Photographic proof of task completion." },
-                new EvidenceType { TypeName = "Signed Paper Form", Description = "Scanned physical sign-off form." },
-                new EvidenceType { TypeName = "Digital Certificate", Description = "System-issued completion certificate." },
-                new EvidenceType { TypeName = "Video Recording", Description = "Video proof of a practical task." });
+                new EvidenceType { TypeName = "Photo Evidence" },
+                new EvidenceType { TypeName = "Signed Paper Form" },
+                new EvidenceType { TypeName = "Digital Certificate" });
             await context.SaveChangesAsync();
         }
     }
 
-    // ===================== Module: Class & Scheduling =====================
-    // Class, Session
-
     private static async Task SeedClassSchedulingAsync(AppDbContext context)
     {
-        var course = await context.Courses.FirstAsync(c => c.CourseCode == CourseCode);
-
         if (!await context.Classes.AnyAsync())
         {
-            context.Classes.AddRange(
-                new Class
-                {
-                    ClassCode = ClassCode,
-                    ClassName = "AMT-101 Batch 1",
-                    CourseId = course.CourseId,
-                    StartDate = new DateTime(2026, 1, 5),
-                    EndDate = new DateTime(2026, 4, 30),
-                    Location = "Hangar 3 Training Center",
-                    Capacity = 20,
-                    Status = "Completed"
-                },
-                new Class { ClassCode = "AMT101-C2", ClassName = "AMT-101 Batch 2", CourseId = course.CourseId, StartDate = new DateTime(2026, 5, 5), EndDate = new DateTime(2026, 8, 30), Location = "Hangar 3 Training Center", Capacity = 20, Status = "Scheduled" },
-                new Class { ClassCode = "AMT101-C3", ClassName = "AMT-101 Batch 3", CourseId = course.CourseId, StartDate = new DateTime(2026, 9, 5), EndDate = new DateTime(2026, 12, 30), Location = "Hangar 3 Training Center", Capacity = 20, Status = "Scheduled" },
-                new Class { ClassCode = "AMT101-C4", ClassName = "AMT-101 Batch 4", CourseId = course.CourseId, StartDate = new DateTime(2027, 1, 5), EndDate = new DateTime(2027, 4, 30), Location = "Hangar 3 Training Center", Capacity = 20, Status = "Planned" }
-            );
+            var courses = await context.Courses.ToDictionaryAsync(c => c.CourseCode, c => c.CourseId);
+            context.Classes.Add(new Class { ClassCode = "AMT-101-C1", ClassName = "Aircraft Maintenance Technician Batch 1", CourseId = courses["AMT-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Completed" });
+            context.Classes.Add(new Class { ClassCode = "AMT-101-C2", ClassName = "Aircraft Maintenance Technician Batch 2", CourseId = courses["AMT-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Scheduled" });
+            context.Classes.Add(new Class { ClassCode = "AMT-101-C3", ClassName = "Aircraft Maintenance Technician Batch 3", CourseId = courses["AMT-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Planned" });
+            context.Classes.Add(new Class { ClassCode = "B737-TR-C1", ClassName = "B737 Type Rating Batch 1", CourseId = courses["B737-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Completed" });
+            context.Classes.Add(new Class { ClassCode = "B737-TR-C2", ClassName = "B737 Type Rating Batch 2", CourseId = courses["B737-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Scheduled" });
+            context.Classes.Add(new Class { ClassCode = "B737-TR-C3", ClassName = "B737 Type Rating Batch 3", CourseId = courses["B737-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Planned" });
+            context.Classes.Add(new Class { ClassCode = "A320-FAM-C1", ClassName = "A320 Familiarization Batch 1", CourseId = courses["A320-FAM"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Completed" });
+            context.Classes.Add(new Class { ClassCode = "A320-FAM-C2", ClassName = "A320 Familiarization Batch 2", CourseId = courses["A320-FAM"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Scheduled" });
+            context.Classes.Add(new Class { ClassCode = "A320-FAM-C3", ClassName = "A320 Familiarization Batch 3", CourseId = courses["A320-FAM"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Planned" });
+            context.Classes.Add(new Class { ClassCode = "ENG-101-C1", ClassName = "Aviation English Batch 1", CourseId = courses["ENG-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Completed" });
+            context.Classes.Add(new Class { ClassCode = "ENG-101-C2", ClassName = "Aviation English Batch 2", CourseId = courses["ENG-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Scheduled" });
+            context.Classes.Add(new Class { ClassCode = "ENG-101-C3", ClassName = "Aviation English Batch 3", CourseId = courses["ENG-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Planned" });
+            context.Classes.Add(new Class { ClassCode = "SMS-101-C1", ClassName = "Safety Management Systems Batch 1", CourseId = courses["SMS-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Completed" });
+            context.Classes.Add(new Class { ClassCode = "SMS-101-C2", ClassName = "Safety Management Systems Batch 2", CourseId = courses["SMS-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Scheduled" });
+            context.Classes.Add(new Class { ClassCode = "SMS-101-C3", ClassName = "Safety Management Systems Batch 3", CourseId = courses["SMS-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Planned" });
+            context.Classes.Add(new Class { ClassCode = "HF-101-C1", ClassName = "Human Factors Batch 1", CourseId = courses["HF-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Completed" });
+            context.Classes.Add(new Class { ClassCode = "HF-101-C2", ClassName = "Human Factors Batch 2", CourseId = courses["HF-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Scheduled" });
+            context.Classes.Add(new Class { ClassCode = "HF-101-C3", ClassName = "Human Factors Batch 3", CourseId = courses["HF-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Planned" });
+            context.Classes.Add(new Class { ClassCode = "A350-TR-C1", ClassName = "A350 Type Rating Batch 1", CourseId = courses["A350-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Completed" });
+            context.Classes.Add(new Class { ClassCode = "A350-TR-C2", ClassName = "A350 Type Rating Batch 2", CourseId = courses["A350-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Scheduled" });
+            context.Classes.Add(new Class { ClassCode = "A350-TR-C3", ClassName = "A350 Type Rating Batch 3", CourseId = courses["A350-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Planned" });
+            context.Classes.Add(new Class { ClassCode = "B787-TR-C1", ClassName = "B787 Type Rating Batch 1", CourseId = courses["B787-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Completed" });
+            context.Classes.Add(new Class { ClassCode = "B787-TR-C2", ClassName = "B787 Type Rating Batch 2", CourseId = courses["B787-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Scheduled" });
+            context.Classes.Add(new Class { ClassCode = "B787-TR-C3", ClassName = "B787 Type Rating Batch 3", CourseId = courses["B787-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Planned" });
+            context.Classes.Add(new Class { ClassCode = "DGR-101-C1", ClassName = "Dangerous Goods Regulations Batch 1", CourseId = courses["DGR-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Completed" });
+            context.Classes.Add(new Class { ClassCode = "DGR-101-C2", ClassName = "Dangerous Goods Regulations Batch 2", CourseId = courses["DGR-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Scheduled" });
+            context.Classes.Add(new Class { ClassCode = "DGR-101-C3", ClassName = "Dangerous Goods Regulations Batch 3", CourseId = courses["DGR-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Planned" });
+            context.Classes.Add(new Class { ClassCode = "SEC-101-C1", ClassName = "Aviation Security Batch 1", CourseId = courses["SEC-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Completed" });
+            context.Classes.Add(new Class { ClassCode = "SEC-101-C2", ClassName = "Aviation Security Batch 2", CourseId = courses["SEC-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Scheduled" });
+            context.Classes.Add(new Class { ClassCode = "SEC-101-C3", ClassName = "Aviation Security Batch 3", CourseId = courses["SEC-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Planned" });
             await context.SaveChangesAsync();
         }
 
         if (!await context.ClassSubjects.AnyAsync())
         {
-            var cls = await context.Classes.FirstAsync(c => c.ClassCode == ClassCode);
-            var instructorId = (await context.Accounts.FirstAsync(a => a.Username == InstructorUsername)).AccountId;
-            var subjectIds = await context.Subjects.ToDictionaryAsync(s => s.SubjectCode, s => s.SubjectId);
-
-            context.ClassSubjects.AddRange(
-                new ClassSubject { ClassId = cls.ClassId, SubjectId = subjectIds["SJ-REG"], InstructorAccountId = instructorId, CreatedAt = DateTime.UtcNow },
-                new ClassSubject { ClassId = cls.ClassId, SubjectId = subjectIds["SJ-SYS"], InstructorAccountId = instructorId, CreatedAt = DateTime.UtcNow },
-                new ClassSubject { ClassId = cls.ClassId, SubjectId = subjectIds["SJ-PRA"], InstructorAccountId = instructorId, CreatedAt = DateTime.UtcNow },
-                new ClassSubject { ClassId = cls.ClassId, SubjectId = subjectIds["SJ-SAF"], InstructorAccountId = instructorId, CreatedAt = DateTime.UtcNow }
-            );
+            var instructors = await context.Accounts.Where(a => a.RoleId == 2).Select(a => a.AccountId).ToListAsync(); // 2 is instructor usually, but let's just fetch dynamically
+            var instructorIds = await context.Accounts.Where(a => a.Username.StartsWith("instructor")).Select(a => a.AccountId).ToListAsync();
+            var classEntities = await context.Classes.ToListAsync();
+            var courseSubjects = await context.CourseSubjects.ToListAsync();
+            
+            var rand = new Random(42);
+            foreach(var cls in classEntities)
+            {
+                var subjectsForCourse = courseSubjects.Where(cs => cs.CourseId == cls.CourseId).ToList();
+                foreach(var sub in subjectsForCourse)
+                {
+                    var instructorId = instructorIds[rand.Next(instructorIds.Count)];
+                    context.ClassSubjects.Add(new ClassSubject { ClassId = cls.ClassId, SubjectId = sub.SubjectId, InstructorAccountId = instructorId, CreatedAt = DateTime.UtcNow });
+                }
+            }
             await context.SaveChangesAsync();
         }
 
         if (!await context.Sessions.AnyAsync())
         {
-            var cls = await context.Classes.FirstAsync(c => c.ClassCode == ClassCode);
-            var instructorId = (await context.Accounts.FirstAsync(a => a.Username == InstructorUsername)).AccountId;
-            var subjectIds = await context.Subjects.ToDictionaryAsync(s => s.SubjectCode, s => s.SubjectId);
+            var classSubjects = await context.ClassSubjects.ToListAsync();
+            var assessments = await context.Assessments.ToListAsync();
+            var checklists = await context.PracticalChecklists.ToListAsync();
 
-            context.Sessions.AddRange(
-                new Session { ClassId = cls.ClassId, SubjectId = subjectIds["SJ-REG"], SessionTitle = "Regulations Overview", SessionDate = new DateTime(2026, 1, 6), Location = "Room A", IsConfirmed = true, ConfirmedByAccountId = instructorId, ConfirmedAt = new DateTime(2026, 1, 6) },
-                new Session { ClassId = cls.ClassId, SubjectId = subjectIds["SJ-SYS"], SessionTitle = "Systems Fundamentals Lecture", SessionDate = new DateTime(2026, 1, 20), Location = "Room A", IsConfirmed = true, ConfirmedByAccountId = instructorId, ConfirmedAt = new DateTime(2026, 1, 20), IsAssessmentRequired = true },
-                new Session { ClassId = cls.ClassId, SubjectId = subjectIds["SJ-PRA"], SessionTitle = "Hands-on Workshop 1", SessionDate = new DateTime(2026, 2, 10), Location = "Hangar 3", IsConfirmed = true, ConfirmedByAccountId = instructorId, ConfirmedAt = new DateTime(2026, 2, 10), IsChecklistRequired = true },
-                new Session { ClassId = cls.ClassId, SubjectId = subjectIds["SJ-SAF"], SessionTitle = "Human Factors Workshop", SessionDate = new DateTime(2026, 3, 1), Location = "Room B", IsConfirmed = true, ConfirmedByAccountId = instructorId, ConfirmedAt = new DateTime(2026, 3, 1), IsAssessmentRequired = true });
+            foreach(var cs in classSubjects)
+            {
+                var assessment = assessments.FirstOrDefault(a => a.SubjectId == cs.SubjectId);
+                var checklist = checklists.FirstOrDefault(c => c.SubjectId == cs.SubjectId);
+
+                // Session 1 is confirmed, Session 2 is unconfirmed so instructor can test attendance
+                context.Sessions.Add(new Session { ClassId = cs.ClassId, SubjectId = cs.SubjectId, SessionTitle = "Session 1", SessionDate = DateTime.UtcNow.AddDays(-10), IsConfirmed = true, ConfirmedByAccountId = cs.InstructorAccountId });
+                context.Sessions.Add(new Session { ClassId = cs.ClassId, SubjectId = cs.SubjectId, SessionTitle = "Session 2", SessionDate = DateTime.UtcNow.AddDays(2), IsConfirmed = false, ConfirmedByAccountId = null });
+                
+                // Add exam sessions
+                if (assessment != null)
+                {
+                    context.Sessions.Add(new Session { ClassId = cs.ClassId, SubjectId = cs.SubjectId, SessionTitle = "Theory Exam", SessionDate = DateTime.UtcNow.AddDays(4), IsConfirmed = false, ConfirmedByAccountId = null, IsAssessmentRequired = true, AssessmentId = assessment.AssessmentId });
+                }
+                
+                if (checklist != null)
+                {
+                    context.Sessions.Add(new Session { ClassId = cs.ClassId, SubjectId = cs.SubjectId, SessionTitle = "Practical Exam", SessionDate = DateTime.UtcNow.AddDays(5), IsConfirmed = false, ConfirmedByAccountId = null, IsChecklistRequired = true, PracticalChecklistId = checklist.PracticalChecklistId });
+                }
+            }
             await context.SaveChangesAsync();
         }
     }
-
-    // ===================== Module: Enrollment =====================
-    // CourseEnrollment
 
     private static async Task SeedEnrollmentAsync(AppDbContext context)
     {
-        var cls = await context.Classes.FirstAsync(c => c.ClassCode == ClassCode);
-        var student = await context.Accounts.FirstAsync(a => a.Username == StudentUsername);
-
         if (!await context.CourseEnrollments.AnyAsync())
         {
-            var cls2 = await context.Classes.FirstAsync(c => c.ClassCode == "AMT101-C2");
-            var cls3 = await context.Classes.FirstAsync(c => c.ClassCode == "AMT101-C3");
-            var cls4 = await context.Classes.FirstAsync(c => c.ClassCode == "AMT101-C4");
-            
-            context.CourseEnrollments.AddRange(
-                new CourseEnrollment
+            var studentIds = await context.Accounts.Where(a => a.Username.StartsWith("student")).Select(a => a.AccountId).ToListAsync();
+            var classEntities = await context.Classes.ToListAsync();
+            var rand = new Random(42);
+
+            foreach (var stu in studentIds)
+            {
+                // Each student enrolls in 3 random classes
+                var selectedClasses = classEntities.OrderBy(x => rand.Next()).Take(3).ToList();
+                foreach (var cls in selectedClasses)
                 {
-                    AccountId = student.AccountId,
-                    ClassId = cls.ClassId,
-                    Status = "Completed",
-                    EnrolledAt = new DateTime(2026, 1, 5),
-                    StartDate = new DateTime(2026, 1, 5),
-                    ExpectedCompletionDate = new DateTime(2026, 4, 30),
-                    ActualCompletionDate = new DateTime(2026, 4, 30)
-                },
-                new CourseEnrollment { AccountId = student.AccountId, ClassId = cls2.ClassId, Status = "Enrolled", EnrolledAt = new DateTime(2026, 5, 1), ExpectedCompletionDate = new DateTime(2026, 8, 30) },
-                new CourseEnrollment { AccountId = student.AccountId, ClassId = cls3.ClassId, Status = "Enrolled", EnrolledAt = new DateTime(2026, 9, 1), ExpectedCompletionDate = new DateTime(2026, 12, 30) },
-                new CourseEnrollment { AccountId = student.AccountId, ClassId = cls4.ClassId, Status = "Withdrawn", EnrolledAt = new DateTime(2027, 1, 1), ExpectedCompletionDate = new DateTime(2027, 4, 30) }
-            );
+                    context.CourseEnrollments.Add(new CourseEnrollment
+                    {
+                        AccountId = stu,
+                        ClassId = cls.ClassId,
+                        Status = cls.Status == "Completed" ? "Completed" : "Enrolled",
+                        EnrolledAt = DateTime.UtcNow.AddMonths(-1)
+                    });
+                }
+            }
             await context.SaveChangesAsync();
         }
     }
 
-    // ===================== Module: ETR & Subject Results =====================
-    // ETRCourseRecord, SubjectResult
-
     private static async Task SeedEtrAndSubjectResultsAsync(AppDbContext context)
     {
-        var course = await context.Courses.FirstAsync(c => c.CourseCode == CourseCode);
-        var cls = await context.Classes.FirstAsync(c => c.ClassCode == ClassCode);
-        var student = await context.Accounts.FirstAsync(a => a.Username == StudentUsername);
-        var enrollment = await context.CourseEnrollments.FirstAsync(e => e.AccountId == student.AccountId && e.ClassId == cls.ClassId);
-
         if (!await context.ETRCourseRecords.AnyAsync())
         {
-            var enrollments = await context.CourseEnrollments.Where(e => e.AccountId == student.AccountId).ToListAsync();
-            var etrRecords = enrollments.Select(e => new ETRCourseRecord
+            var enrollments = await context.CourseEnrollments.ToListAsync();
+            var rand = new Random(42);
+            foreach(var enrollment in enrollments)
             {
-                EnrollmentId = e.EnrollmentId,
-                Status = "InProgress",
-                IsLocked = false,
-                CreatedBySystem = true
-            }).ToList();
-            context.ETRCourseRecords.AddRange(etrRecords);
+                var status = enrollment.Status == "Completed" ? "Completed" : "InProgress";
+                var etr = new ETRCourseRecord 
+                { 
+                    EnrollmentId = enrollment.EnrollmentId, 
+                    CourseVersionNo = 1, 
+                    Status = status 
+                };
+                
+                if (status != "Draft")
+                {
+                    etr.SubmittedAt = DateTime.UtcNow.AddDays(-10);
+                }
+                if (status == "Approved" || status == "Completed" || status == "Verified")
+                {
+                    etr.VerifiedAt = DateTime.UtcNow.AddDays(-2);
+                    etr.CompletedAt = DateTime.UtcNow.AddDays(-2);
+                }
+                
+                context.ETRCourseRecords.Add(etr);
+            }
             await context.SaveChangesAsync();
         }
 
         if (!await context.SubjectResults.AnyAsync())
         {
-            var etr = await context.ETRCourseRecords.FirstAsync(e => e.EnrollmentId == enrollment.EnrollmentId);
-            var instructorId = (await context.Accounts.FirstAsync(a => a.Username == InstructorUsername)).AccountId;
-            var courseSubjects = await context.CourseSubjects.Where(cs => cs.CourseId == course.CourseId).ToListAsync();
-
-            var subjectResults = courseSubjects.Select(cs => new SubjectResult
+            var etrs = await context.ETRCourseRecords.ToListAsync();
+            var enrollments = await context.CourseEnrollments.ToListAsync();
+            var classSubjects = await context.ClassSubjects.ToListAsync();
+            
+            foreach(var etr in etrs)
             {
-                EtrId = etr.ETRCourseRecordId,
-                CourseId = cs.CourseId,
-                SubjectId = cs.SubjectId,
-                AttendanceRate = 100m,
-                Score = 85m,
-                Status = "Passed",
-                EvaluatedByAccountId = instructorId,
-                EvaluatedAt = new DateTime(2026, 4, 30)
-            }).ToList();
-
-            context.SubjectResults.AddRange(subjectResults);
+                var enrollment = enrollments.FirstOrDefault(e => e.EnrollmentId == etr.EnrollmentId);
+                if (enrollment == null) continue;
+                
+                var subjects = classSubjects.Where(cs => cs.ClassId == enrollment.ClassId).ToList();
+                foreach(var sub in subjects)
+                {
+                    var cls = await context.Classes.FirstAsync(c => c.ClassId == enrollment.ClassId);
+                    context.SubjectResults.Add(new SubjectResult
+                    {
+                        EtrId = etr.ETRCourseRecordId,
+                        CourseId = cls.CourseId,
+                        SubjectId = sub.SubjectId,
+                        AttendanceRate = 100m,
+                        Score = 85m,
+                        Status = "Passed",
+                        EvaluatedByAccountId = sub.InstructorAccountId,
+                        EvaluatedAt = DateTime.UtcNow.AddDays(-1)
+                    });
+                }
+            }
             await context.SaveChangesAsync();
         }
     }
-
-    /// <summary>Shared lookups reused by the result-recording modules below.</summary>
-    private static async Task<(Account Student, ETRCourseRecord Etr, CourseEnrollment Enrollment, Dictionary<string, SubjectResult> SubjectResultsByCode)> GetDemoContextAsync(AppDbContext context)
-    {
-        var student = await context.Accounts.FirstAsync(a => a.Username == StudentUsername);
-        var cls = await context.Classes.FirstAsync(c => c.ClassCode == ClassCode);
-        var enrollment = await context.CourseEnrollments.FirstAsync(e => e.AccountId == student.AccountId && e.ClassId == cls.ClassId);
-        var etr = await context.ETRCourseRecords.FirstAsync(e => e.EnrollmentId == enrollment.EnrollmentId);
-
-        var subjectCodesById = await context.Subjects.ToDictionaryAsync(s => s.SubjectId, s => s.SubjectCode);
-        var subjectResultsByCode = await context.SubjectResults
-            .Where(sr => sr.EtrId == etr.ETRCourseRecordId)
-            .ToDictionaryAsync(sr => subjectCodesById[sr.SubjectId], sr => sr);
-
-        return (student, etr, enrollment, subjectResultsByCode);
-    }
-
-    // ===================== Module: Attendance =====================
-    // AttendanceRecord
 
     private static async Task SeedAttendanceAsync(AppDbContext context)
     {
-        if (await context.AttendanceRecords.AnyAsync())
+        if (!await context.AttendanceRecords.AnyAsync())
         {
-            return;
+            var sessions = await context.Sessions.ToListAsync();
+            var enrollments = await context.CourseEnrollments.ToListAsync();
+            var rand = new Random(42);
+
+            foreach(var session in sessions)
+            {
+                if (!session.IsConfirmed) continue;
+                
+                var sessionEnrollments = enrollments.Where(e => e.ClassId == session.ClassId).ToList();
+                foreach(var e in sessionEnrollments)
+                {
+                    context.AttendanceRecords.Add(new AttendanceRecord
+                    {
+                        SessionId = session.SessionId,
+                        EnrollmentId = e.EnrollmentId,
+                        Status = rand.NextDouble() > 0.1 ? "Present" : "Absent",
+                        RecordedByAccountId = session.ConfirmedByAccountId ?? 1,
+                        RecordedAt = DateTime.UtcNow
+                    });
+                }
+            }
+            await context.SaveChangesAsync();
         }
-
-        var (_, _, enrollment, _) = await GetDemoContextAsync(context);
-        var instructorId = (await context.Accounts.FirstAsync(a => a.Username == InstructorUsername)).AccountId;
-        var sessions = await context.Sessions.Where(s => s.IsConfirmed).ToListAsync();
-
-        var records = sessions.Select(s => new AttendanceRecord
-        {
-            SessionId = s.SessionId,
-            EnrollmentId = enrollment.EnrollmentId,
-            Status = "Present",
-            RecordedByAccountId = instructorId,
-            RecordedAt = s.SessionDate ?? DateTime.UtcNow
-        }).ToList();
-
-        context.AttendanceRecords.AddRange(records);
-        await context.SaveChangesAsync();
     }
-
-    // ===================== Module: Assessment Results & Retakes =====================
-    // AssessmentResult, RetakeHistory
 
     private static async Task SeedAssessmentResultsAsync(AppDbContext context)
     {
-        if (await context.AssessmentResults.AnyAsync())
+        if (!await context.AssessmentResults.AnyAsync())
         {
-            return;
-        }
+            var subjectResults = await context.SubjectResults.ToListAsync();
+            var assessments = await context.Assessments.ToListAsync();
+            var rand = new Random(42);
 
-        var (student, _, _, subjectResultsByCode) = await GetDemoContextAsync(context);
-        var instructorId = (await context.Accounts.FirstAsync(a => a.Username == InstructorUsername)).AccountId;
-        var assessments = await context.Assessments.ToDictionaryAsync(a => a.ComponentName, a => a);
-
-        context.AssessmentResults.AddRange(
-            BuildAssessmentResult(assessments["Regulations Written Exam"], student.AccountId, subjectResultsByCode["SJ-REG"].SubjectResultId, 88m, instructorId, new DateTime(2026, 1, 15)),
-            BuildAssessmentResult(assessments["Systems Midterm Quiz"], student.AccountId, subjectResultsByCode["SJ-SYS"].SubjectResultId, 75m, instructorId, new DateTime(2026, 1, 25)),
-            BuildAssessmentResult(assessments["Systems Final Exam"], student.AccountId, subjectResultsByCode["SJ-SYS"].SubjectResultId, 65m, instructorId, new DateTime(2026, 2, 5)),
-            BuildAssessmentResult(assessments["Practical Skills Exam"], student.AccountId, subjectResultsByCode["SJ-PRA"].SubjectResultId, 90m, instructorId, new DateTime(2026, 2, 20)),
-            BuildAssessmentResult(assessments["Safety & Human Factors Exam"], student.AccountId, subjectResultsByCode["SJ-SAF"].SubjectResultId, 82m, instructorId, new DateTime(2026, 3, 5)));
-        await context.SaveChangesAsync();
-
-        if (!await context.RetakeHistories.AnyAsync())
-        {
-            // Demonstrates the retake flow: student failed the Systems Final Exam on
-            // attempt 1 (65 < 70 passing score) and passed on attempt 2.
-            var retakeExam = assessments["Systems Final Exam"];
-            var retakeResult = BuildAssessmentResult(retakeExam, student.AccountId, subjectResultsByCode["SJ-SYS"].SubjectResultId, 78m, instructorId, new DateTime(2026, 2, 12));
-            retakeResult.AttemptNo = 2;
-            context.AssessmentResults.Add(retakeResult);
-
-            context.RetakeHistories.AddRange(
-                new RetakeHistory
+            foreach(var sr in subjectResults)
+            {
+                var subAssessments = assessments.Where(a => a.CourseId == sr.CourseId && a.SubjectId == sr.SubjectId).ToList();
+                foreach(var a in subAssessments)
                 {
-                    SubjectResultId = subjectResultsByCode["SJ-SYS"].SubjectResultId,
-                    RetakeDate = new DateTime(2026, 2, 12),
-                    Reason = "Failed first attempt (65 < 70 passing score)",
-                    PreviousScore = 65m,
-                    NewScore = 78m,
-                    AuthorizedByAccountId = instructorId,
-                    AttemptNo = 2
-                },
-                new RetakeHistory
-                {
-                    SubjectResultId = subjectResultsByCode["SJ-REG"].SubjectResultId,
-                    RetakeDate = new DateTime(2026, 1, 16),
-                    Reason = "Failed first attempt (60 < 70 passing score)",
-                    PreviousScore = 60m,
-                    NewScore = 88m,
-                    AuthorizedByAccountId = instructorId,
-                    AttemptNo = 2
-                },
-                new RetakeHistory
-                {
-                    SubjectResultId = subjectResultsByCode["SJ-PRA"].SubjectResultId,
-                    RetakeDate = new DateTime(2026, 2, 22),
-                    Reason = "Failed practical attempt 1",
-                    PreviousScore = 50m,
-                    NewScore = 90m,
-                    AuthorizedByAccountId = instructorId,
-                    AttemptNo = 2
-                },
-                new RetakeHistory
-                {
-                    SubjectResultId = subjectResultsByCode["SJ-SAF"].SubjectResultId,
-                    RetakeDate = new DateTime(2026, 3, 6),
-                    Reason = "Failed attempt 1 (68 < 70)",
-                    PreviousScore = 68m,
-                    NewScore = 82m,
-                    AuthorizedByAccountId = instructorId,
-                    AttemptNo = 2
+                    var etr = await context.ETRCourseRecords.FirstAsync(e => e.ETRCourseRecordId == sr.EtrId);
+                    var enrollment = await context.CourseEnrollments.FirstAsync(e => e.EnrollmentId == etr.EnrollmentId);
+                    
+                    context.AssessmentResults.Add(new AssessmentResult
+                    {
+                        AssessmentId = a.AssessmentId,
+                        AccountId = enrollment.AccountId,
+                        SubjectResultId = sr.SubjectResultId,
+                        Score = rand.Next(70, 100),
+                        ResultStatus = "Passed",
+                        GradedByAccountId = sr.EvaluatedByAccountId ?? 1,
+                        TakenAt = DateTime.UtcNow,
+                        RecordedAt = DateTime.UtcNow,
+                        IsPublished = true,
+                        AttemptNo = 1
+                    });
                 }
-            );
+            }
             await context.SaveChangesAsync();
         }
     }
-
-    private static AssessmentResult BuildAssessmentResult(Assessment assessment, int accountId, int subjectResultId, decimal score, int gradedByAccountId, DateTime takenAt)
-    {
-        return new AssessmentResult
-        {
-            AssessmentId = assessment.AssessmentId,
-            AccountId = accountId,
-            SubjectResultId = subjectResultId,
-            Score = score,
-            ResultStatus = score >= assessment.PassingScore ? "Passed" : "Failed",
-            GradedByAccountId = gradedByAccountId,
-            RecordedAt = takenAt,
-            PublishedAt = takenAt,
-            IsPublished = true,
-            TakenAt = takenAt,
-            AttemptNo = 1
-        };
-    }
-
-    // ===================== Module: Practical Checklist Results =====================
-    // PracticalChecklistResult
 
     private static async Task SeedPracticalChecklistResultsAsync(AppDbContext context)
     {
-        if (await context.PracticalChecklistResults.AnyAsync())
+        if (!await context.PracticalChecklistResults.AnyAsync())
         {
-            return;
+            var subjectResults = await context.SubjectResults.ToListAsync();
+            var checklists = await context.PracticalChecklists.ToListAsync();
+            var qaId = (await context.Accounts.FirstAsync(a => a.Username == QaUsername)).AccountId;
+
+            foreach(var sr in subjectResults)
+            {
+                var subChecklists = checklists.Where(c => c.CourseId == sr.CourseId && c.SubjectId == sr.SubjectId).ToList();
+                foreach(var c in subChecklists)
+                {
+                    context.PracticalChecklistResults.Add(new PracticalChecklistResult
+                    {
+                        SubjectResultId = sr.SubjectResultId,
+                        PracticalChecklistId = c.PracticalChecklistId,
+                        Score = 100m,
+                        ResultStatus = "Completed",
+                        VerifiedByAccountId = qaId,
+                        CompletedAt = DateTime.UtcNow,
+                        IsPublished = true
+                    });
+                }
+            }
+            await context.SaveChangesAsync();
         }
-
-        var (_, _, _, subjectResultsByCode) = await GetDemoContextAsync(context);
-        var qaId = (await context.Accounts.FirstAsync(a => a.Username == QaUsername)).AccountId;
-        var checklistItems = await context.PracticalChecklists.OrderBy(pc => pc.DisplayOrder).ToListAsync();
-        var practicalSubjectResultId = subjectResultsByCode["SJ-PRA"].SubjectResultId;
-
-        var results = checklistItems.Select(item => new PracticalChecklistResult
-        {
-            SubjectResultId = practicalSubjectResultId,
-            PracticalChecklistId = item.PracticalChecklistId,
-            Score = 100m,
-            ResultStatus = "Completed",
-            VerifiedByAccountId = qaId,
-            CompletedAt = new DateTime(2026, 2, 20),
-            IsPublished = true,
-            PublishedAt = new DateTime(2026, 2, 20)
-        }).ToList();
-
-        context.PracticalChecklistResults.AddRange(results);
-        await context.SaveChangesAsync();
     }
-
-    // ===================== Module: Signoff =====================
-    // SubjectSignoff
 
     private static async Task SeedSignoffAsync(AppDbContext context)
     {
-        if (await context.SubjectSignoffs.AnyAsync())
+        if (!await context.SubjectSignoffs.AnyAsync())
         {
-            return;
+            var subjectResults = await context.SubjectResults.ToListAsync();
+            foreach(var sr in subjectResults)
+            {
+                context.SubjectSignoffs.Add(new SubjectSignoff
+                {
+                    SubjectResultId = sr.SubjectResultId,
+                    SignoffByAccountId = sr.EvaluatedByAccountId ?? 1,
+                    Role = "Instructor",
+                    SignoffAt = DateTime.UtcNow,
+                    Comment = "Passed"
+                });
+            }
+            await context.SaveChangesAsync();
         }
-
-        var (_, _, _, subjectResultsByCode) = await GetDemoContextAsync(context);
-        var instructorId = (await context.Accounts.FirstAsync(a => a.Username == InstructorUsername)).AccountId;
-
-        var signoffs = subjectResultsByCode.Values.Select(sr => new SubjectSignoff
-        {
-            SubjectResultId = sr.SubjectResultId,
-            SignoffByAccountId = instructorId,
-            Role = "Instructor",
-            SignoffAt = new DateTime(2026, 4, 25),
-            Comment = "All requirements met; subject passed."
-        }).ToList();
-
-        context.SubjectSignoffs.AddRange(signoffs);
-        await context.SaveChangesAsync();
     }
-
-    // ===================== Module: Evidence =====================
-    // EvidenceFile
 
     private static async Task SeedEvidenceAsync(AppDbContext context)
     {
-        if (await context.EvidenceFiles.AnyAsync())
+        if (!await context.EvidenceFiles.AnyAsync())
         {
-            return;
+            var subjectResults = await context.SubjectResults.ToListAsync();
+            var evidenceTypes = await context.EvidenceTypes.ToListAsync();
+            var qaId = (await context.Accounts.FirstAsync(a => a.Username == QaUsername)).AccountId;
+            var rand = new Random(42);
+
+            // Create physical directory
+            var uploadDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "evidences");
+            if (!Directory.Exists(uploadDir))
+                Directory.CreateDirectory(uploadDir);
+
+            // Generate two dummy files
+            var dummyPdfPath = Path.Combine(uploadDir, "dummy_evidence.pdf");
+            if (!File.Exists(dummyPdfPath)) {
+                // A very basic valid PDF structure
+                string pdfContent = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 4 0 R >> >> /MediaBox [0 0 612 792] /Contents 5 0 R >>\nendobj\n4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n5 0 obj\n<< /Length 44 >>\nstream\nBT /F1 24 Tf 100 700 Td (Dummy Evidence File) Tj ET\nendstream\nendobj\nxref\n0 6\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \n0000000219 00000 n \n0000000307 00000 n \ntrailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n402\n%%EOF";
+                File.WriteAllText(dummyPdfPath, pdfContent);
+            }
+            
+            var dummyImgPath = Path.Combine(uploadDir, "dummy_evidence.jpg");
+            if (!File.Exists(dummyImgPath)) {
+                // Minimal 1x1 valid JPEG
+                byte[] jpegContent = new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x01, 0x00, 0x48, 0x00, 0x48, 0x00, 0x00, 0xFF, 0xDB, 0x00, 0x43, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xC0, 0x00, 0x0B, 0x08, 0x00, 0x01, 0x00, 0x01, 0x01, 0x01, 0x11, 0x00, 0xFF, 0xC4, 0x00, 0x14, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xC4, 0x00, 0x14, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00, 0x37, 0xFF, 0xD9 };
+                File.WriteAllBytes(dummyImgPath, jpegContent);
+            }
+
+            // Take just a sample of SubjectResults to avoid inserting thousands of evidences which slows down EF
+            var sampleResults = subjectResults.OrderBy(x => rand.Next()).Take(50).ToList();
+
+            foreach(var sr in sampleResults)
+            {
+                var etr = await context.ETRCourseRecords.FirstAsync(e => e.ETRCourseRecordId == sr.EtrId);
+                var enrollment = await context.CourseEnrollments.FirstAsync(e => e.EnrollmentId == etr.EnrollmentId);
+                
+                context.EvidenceFiles.Add(new EvidenceFile
+                {
+                    EvidenceTypeId = evidenceTypes[0].EvidenceTypeId, // Photo
+                    UploadedByAccountId = sr.EvaluatedByAccountId ?? 1,
+                    AccountId = enrollment.AccountId,
+                    SubjectResultId = sr.SubjectResultId,
+                    FileName = "dummy_evidence.jpg",
+                    FilePath = "uploads/evidences/dummy_evidence.jpg",
+                    FileExtension = ".jpg",
+                    MimeType = "image/jpeg",
+                    FileSize = 135,
+                    VerificationStatus = "Verified",
+                    VerifiedByAccountId = qaId,
+                    VerifiedAt = DateTime.UtcNow,
+                    UploadedAt = DateTime.UtcNow
+                });
+                
+                context.EvidenceFiles.Add(new EvidenceFile
+                {
+                    EvidenceTypeId = evidenceTypes[2].EvidenceTypeId, // PDF
+                    UploadedByAccountId = sr.EvaluatedByAccountId ?? 1,
+                    AccountId = enrollment.AccountId,
+                    SubjectResultId = sr.SubjectResultId,
+                    FileName = "dummy_evidence.pdf",
+                    FilePath = "uploads/evidences/dummy_evidence.pdf",
+                    FileExtension = ".pdf",
+                    MimeType = "application/pdf",
+                    FileSize = 402,
+                    VerificationStatus = "Verified",
+                    VerifiedByAccountId = qaId,
+                    VerifiedAt = DateTime.UtcNow,
+                    UploadedAt = DateTime.UtcNow
+                });
+            }
+            await context.SaveChangesAsync();
         }
-
-        var (student, _, _, subjectResultsByCode) = await GetDemoContextAsync(context);
-        var instructorId = (await context.Accounts.FirstAsync(a => a.Username == InstructorUsername)).AccountId;
-        var qaId = (await context.Accounts.FirstAsync(a => a.Username == QaUsername)).AccountId;
-        var evidenceTypeIds = await context.EvidenceTypes.ToDictionaryAsync(et => et.TypeName, et => et.EvidenceTypeId);
-        var practicalSubjectResultId = subjectResultsByCode["SJ-PRA"].SubjectResultId;
-
-        context.EvidenceFiles.AddRange(
-            new EvidenceFile
-            {
-                EvidenceTypeId = evidenceTypeIds["Photo Evidence"],
-                UploadedByAccountId = instructorId,
-                AccountId = student.AccountId,
-                SubjectResultId = practicalSubjectResultId,
-                FileName = "hydraulic-inspection-photo.jpg",
-                FilePath = "/evidence/amt101/hydraulic-inspection-photo.jpg",
-                FileExtension = ".jpg",
-                MimeType = "image/jpeg",
-                FileSize = 245_000,
-                VerificationStatus = "Verified",
-                VerifiedByAccountId = qaId,
-                VerifiedAt = new DateTime(2026, 2, 22),
-                UploadedAt = new DateTime(2026, 2, 20)
-            },
-            new EvidenceFile
-            {
-                EvidenceTypeId = evidenceTypeIds["Digital Certificate"],
-                UploadedByAccountId = instructorId,
-                AccountId = student.AccountId,
-                SubjectResultId = practicalSubjectResultId,
-                FileName = "practical-completion-certificate.pdf",
-                FilePath = "/evidence/amt101/practical-completion-certificate.pdf",
-                FileExtension = ".pdf",
-                MimeType = "application/pdf",
-                FileSize = 82_000,
-                VerificationStatus = "Verified",
-                VerifiedByAccountId = qaId,
-                VerifiedAt = new DateTime(2026, 2, 22),
-                UploadedAt = new DateTime(2026, 2, 21)
-            });
-        await context.SaveChangesAsync();
     }
-
-    // ===================== Module: Approval Workflow =====================
-    // ApprovalRequest, ApprovalHistory
 
     private static async Task SeedApprovalWorkflowAsync(AppDbContext context)
     {
-        if (await context.ApprovalRequests.AnyAsync())
+        if (!await context.ApprovalRequests.AnyAsync())
         {
-            return;
-        }
+            var etrs = await context.ETRCourseRecords.ToListAsync();
+            var managerId = (await context.Accounts.FirstAsync(a => a.Username == ManagerUsername)).AccountId;
+            var instructorId = (await context.Accounts.FirstAsync(a => a.Username == InstructorUsername)).AccountId;
+            var rand = new Random(42);
 
-        var (_, etr, _, _) = await GetDemoContextAsync(context);
-        var instructorId = (await context.Accounts.FirstAsync(a => a.Username == InstructorUsername)).AccountId;
-        var managerId = (await context.Accounts.FirstAsync(a => a.Username == ManagerUsername)).AccountId;
-
-        var otherEtrRecords = await context.ETRCourseRecords.Where(e => e.ETRCourseRecordId != etr.ETRCourseRecordId).Take(3).ToListAsync();
-        
-        var approvalRequest1 = new ApprovalRequest
-        {
-            ETRCourseRecordId = etr.ETRCourseRecordId,
-            CurrentStatus = "Approved",
-            SubmittedByAccountId = instructorId,
-            SubmittedAt = new DateTime(2026, 5, 2),
-            CurrentApproverId = managerId,
-            CompletedAt = new DateTime(2026, 5, 10)
-        };
-        var approvalRequest2 = new ApprovalRequest { ETRCourseRecordId = otherEtrRecords.ElementAtOrDefault(0)?.ETRCourseRecordId ?? 0, CurrentStatus = "Pending", SubmittedByAccountId = instructorId, SubmittedAt = DateTime.UtcNow.AddDays(-1), CurrentApproverId = managerId };
-        var approvalRequest3 = new ApprovalRequest { ETRCourseRecordId = otherEtrRecords.ElementAtOrDefault(1)?.ETRCourseRecordId ?? 0, CurrentStatus = "Rejected", SubmittedByAccountId = instructorId, SubmittedAt = DateTime.UtcNow.AddDays(-5), CurrentApproverId = managerId, CompletedAt = DateTime.UtcNow.AddDays(-4) };
-        var approvalRequest4 = new ApprovalRequest { ETRCourseRecordId = otherEtrRecords.ElementAtOrDefault(2)?.ETRCourseRecordId ?? 0, CurrentStatus = "UnderReview", SubmittedByAccountId = instructorId, SubmittedAt = DateTime.UtcNow.AddDays(-2), CurrentApproverId = managerId };
-        
-        // Remove dummy ones where ETRCourseRecordId == 0 just in case
-        var requestsToAdd = new List<ApprovalRequest> { approvalRequest1, approvalRequest2, approvalRequest3, approvalRequest4 }
-            .Where(r => r.ETRCourseRecordId != 0).ToList();
+            var sampleEtrs = etrs.OrderBy(x => rand.Next()).Take(30).ToList();
             
-        context.ApprovalRequests.AddRange(requestsToAdd);
-        await context.SaveChangesAsync();
-
-        var histories = new List<ApprovalHistory>
-        {
-            new ApprovalHistory { ApprovalRequestId = approvalRequest1.ApprovalRequestId, ActionByAccountId = instructorId, ActionType = "Submit", NewStatus = "Submitted", ActionAt = new DateTime(2026, 5, 2) },
-            new ApprovalHistory { ApprovalRequestId = approvalRequest1.ApprovalRequestId, ActionByAccountId = managerId, ActionType = "Review", PreviousStatus = "Submitted", NewStatus = "UnderReview", ActionAt = new DateTime(2026, 5, 5) },
-            new ApprovalHistory { ApprovalRequestId = approvalRequest1.ApprovalRequestId, ActionByAccountId = managerId, ActionType = "Approve", PreviousStatus = "UnderReview", NewStatus = "Approved", ActionAt = new DateTime(2026, 5, 10) }
-        };
-
-        if (approvalRequest2.ApprovalRequestId != 0) histories.Add(new ApprovalHistory { ApprovalRequestId = approvalRequest2.ApprovalRequestId, ActionByAccountId = instructorId, ActionType = "Submit", NewStatus = "Submitted", ActionAt = DateTime.UtcNow.AddDays(-1) });
-        if (approvalRequest3.ApprovalRequestId != 0)
-        {
-            histories.Add(new ApprovalHistory { ApprovalRequestId = approvalRequest3.ApprovalRequestId, ActionByAccountId = instructorId, ActionType = "Submit", NewStatus = "Submitted", ActionAt = DateTime.UtcNow.AddDays(-5) });
-            histories.Add(new ApprovalHistory { ApprovalRequestId = approvalRequest3.ApprovalRequestId, ActionByAccountId = managerId, ActionType = "Reject", PreviousStatus = "Submitted", NewStatus = "Rejected", ActionAt = DateTime.UtcNow.AddDays(-4) });
+            foreach(var etr in sampleEtrs)
+            {
+                var statuses = new[] { "Pending", "UnderReview", "Approved", "Rejected" };
+                var status = statuses[rand.Next(statuses.Length)];
+                
+                var request = new ApprovalRequest
+                {
+                    ETRCourseRecordId = etr.ETRCourseRecordId,
+                    CurrentStatus = status,
+                    SubmittedByAccountId = instructorId,
+                    SubmittedAt = DateTime.UtcNow.AddDays(-5),
+                    CurrentApproverId = managerId,
+                    CompletedAt = (status == "Approved" || status == "Rejected") ? DateTime.UtcNow.AddDays(-1) : null
+                };
+                context.ApprovalRequests.Add(request);
+                await context.SaveChangesAsync(); // Save to get ID
+                
+                context.ApprovalHistories.Add(new ApprovalHistory
+                {
+                    ApprovalRequestId = request.ApprovalRequestId,
+                    ActionByAccountId = instructorId,
+                    ActionType = "Submit",
+                    NewStatus = "Pending",
+                    ActionAt = DateTime.UtcNow.AddDays(-5)
+                });
+                
+                if (status == "UnderReview" || status == "Approved" || status == "Rejected")
+                {
+                    context.ApprovalHistories.Add(new ApprovalHistory
+                    {
+                        ApprovalRequestId = request.ApprovalRequestId,
+                        ActionByAccountId = managerId,
+                        ActionType = "Review",
+                        PreviousStatus = "Pending",
+                        NewStatus = "UnderReview",
+                        ActionAt = DateTime.UtcNow.AddDays(-3)
+                    });
+                }
+                
+                if (status == "Approved")
+                {
+                    context.ApprovalHistories.Add(new ApprovalHistory
+                    {
+                        ApprovalRequestId = request.ApprovalRequestId,
+                        ActionByAccountId = managerId,
+                        ActionType = "Approve",
+                        PreviousStatus = "UnderReview",
+                        NewStatus = "Approved",
+                        ActionAt = DateTime.UtcNow.AddDays(-1)
+                    });
+                }
+                else if (status == "Rejected")
+                {
+                    context.ApprovalHistories.Add(new ApprovalHistory
+                    {
+                        ApprovalRequestId = request.ApprovalRequestId,
+                        ActionByAccountId = managerId,
+                        ActionType = "Reject",
+                        PreviousStatus = "UnderReview",
+                        NewStatus = "Rejected",
+                        ActionAt = DateTime.UtcNow.AddDays(-1)
+                    });
+                }
+            }
+            await context.SaveChangesAsync();
         }
-        if (approvalRequest4.ApprovalRequestId != 0)
-        {
-            histories.Add(new ApprovalHistory { ApprovalRequestId = approvalRequest4.ApprovalRequestId, ActionByAccountId = instructorId, ActionType = "Submit", NewStatus = "Submitted", ActionAt = DateTime.UtcNow.AddDays(-2) });
-            histories.Add(new ApprovalHistory { ApprovalRequestId = approvalRequest4.ApprovalRequestId, ActionByAccountId = managerId, ActionType = "Review", PreviousStatus = "Submitted", NewStatus = "UnderReview", ActionAt = DateTime.UtcNow.AddDays(-1) });
-        }
-
-        context.ApprovalHistories.AddRange(histories);
-        await context.SaveChangesAsync();
-
-        // Manager approval completes and locks the ETR record (domain.md step 6).
-        etr.Status = "Completed";
-        etr.SubmittedAt = new DateTime(2026, 5, 2);
-        etr.VerifiedAt = new DateTime(2026, 5, 5);
-        etr.CompletedAt = new DateTime(2026, 5, 10);
-        etr.IsLocked = true;
-        await context.SaveChangesAsync();
     }
-
-    // ===================== Module: Miscellaneous =====================
-    // AmendmentRequest, AuditLog, ExportJob
 
     private static async Task SeedMiscellaneousAsync(AppDbContext context)
     {
-        var (student, etr, _, subjectResultsByCode) = await GetDemoContextAsync(context);
-        var instructorId = (await context.Accounts.FirstAsync(a => a.Username == InstructorUsername)).AccountId;
-        var managerId = (await context.Accounts.FirstAsync(a => a.Username == ManagerUsername)).AccountId;
-        var qaId = (await context.Accounts.FirstAsync(a => a.Username == QaUsername)).AccountId;
-
-        // AmendmentRequests
-        if (await context.AmendmentRequests.CountAsync() < 4)
+        if (!await context.ExportJobs.AnyAsync())
         {
-            context.AmendmentRequests.RemoveRange(context.AmendmentRequests);
-            await context.SaveChangesAsync();
-            var srId = subjectResultsByCode["SJ-REG"].SubjectResultId;
-            context.AmendmentRequests.AddRange(
-                new AmendmentRequest
-                {
-                    SubjectResultId = srId,
-                    RequestedByAccountId = instructorId,
-                    Reason = "Typo in initial score entry",
-                    OldValue = "Passed",
-                    Status = "Pending"
-                },
-                new AmendmentRequest
-                {
-                    SubjectResultId = subjectResultsByCode["SJ-SYS"].SubjectResultId,
-                    RequestedByAccountId = instructorId,
-                    Reason = "Wrong checklist submitted",
-                    OldValue = "Passed",
-                    Status = "Rejected",
-                    ApprovedByAccountId = managerId,
-                    ApprovedAt = DateTime.UtcNow.AddDays(-1),
-                    DecisionComment = "Provide more proof before reopening."
-                },
-                new AmendmentRequest
-                {
-                    SubjectResultId = subjectResultsByCode["SJ-PRA"].SubjectResultId,
-                    RequestedByAccountId = instructorId,
-                    Reason = "Re-evaluation requested by student",
-                    OldValue = "Failed",
-                    Status = "Approved",
-                    ApprovedByAccountId = managerId,
-                    ApprovedAt = DateTime.UtcNow.AddDays(-2),
-                    DecisionComment = "Approved for re-evaluation."
-                },
-                new AmendmentRequest
-                {
-                    SubjectResultId = subjectResultsByCode["SJ-SAF"].SubjectResultId,
-                    RequestedByAccountId = instructorId,
-                    Reason = "System error during sync",
-                    OldValue = "Failed",
-                    Status = "Pending"
-                }
-            );
-            await context.SaveChangesAsync();
-        }
-
-        // AuditLogs
-        if (await context.AuditLogs.CountAsync() < 4)
-        {
-            context.AuditLogs.RemoveRange(context.AuditLogs);
-            await context.SaveChangesAsync();
-            context.AuditLogs.AddRange(
-                new AuditLog
-                {
-                    AccountId = instructorId,
-                    ActionType = "Login",
-                    EntityName = "Account",
-                    RecordId = instructorId,
-                    Description = "Instructor logged in",
-                    IPAddress = "192.168.1.10",
-                    UserAgent = "Mozilla/5.0",
-                    CreatedAt = DateTime.UtcNow.AddDays(-5)
-                },
-                new AuditLog
-                {
-                    AccountId = managerId,
-                    ActionType = "Approve",
-                    EntityName = "ETRCourseRecord",
-                    RecordId = etr.ETRCourseRecordId,
-                    Description = "Manager approved ETR",
-                    IPAddress = "192.168.1.12",
-                    UserAgent = "Mozilla/5.0",
-                    CreatedAt = DateTime.UtcNow.AddDays(-2)
-                },
-                new AuditLog
-                {
-                    AccountId = qaId,
-                    ActionType = "Verify",
-                    EntityName = "EvidenceFile",
-                    RecordId = 1,
-                    Description = "QA verified evidence",
-                    IPAddress = "192.168.1.15",
-                    UserAgent = "Chrome/114",
-                    CreatedAt = DateTime.UtcNow.AddDays(-3)
-                },
-                new AuditLog
-                {
-                    AccountId = instructorId,
-                    ActionType = "Update",
-                    EntityName = "SubjectResult",
-                    RecordId = subjectResultsByCode["SJ-REG"].SubjectResultId,
-                    Description = "Updated score after amendment",
-                    IPAddress = "192.168.1.10",
-                    UserAgent = "Mozilla/5.0",
-                    CreatedAt = DateTime.UtcNow.AddDays(-1)
-                }
-            );
-            await context.SaveChangesAsync();
-        }
-
-        // ExportJobs
-        if (await context.ExportJobs.CountAsync() < 4)
-        {
-            context.ExportJobs.RemoveRange(context.ExportJobs);
-            await context.SaveChangesAsync();
+            var adminId = (await context.Accounts.FirstAsync(a => a.Username == AdminUsername)).AccountId;
+            
             context.ExportJobs.AddRange(
-                new ExportJob
-                {
-                    RequestedByAccountId = managerId,
-                    ExportType = "ETRReport",
-                    FileName = "ETR_Report_AMT101.pdf",
-                    FilePath = "/exports/ETR_Report_AMT101.pdf",
-                    Status = "Completed",
-                    RequestedAt = DateTime.UtcNow.AddDays(-1),
-                    CompletedAt = DateTime.UtcNow.AddDays(-1),
-                    ETRCourseRecordId = etr.ETRCourseRecordId
-                },
-                new ExportJob
-                {
-                    RequestedByAccountId = qaId,
-                    ExportType = "AuditReport",
-                    FileName = null,
-                    FilePath = null,
-                    Status = "Processing",
-                    RequestedAt = DateTime.UtcNow.AddMinutes(-30),
-                    CompletedAt = null,
-                    ETRCourseRecordId = null
-                },
-                new ExportJob
-                {
-                    RequestedByAccountId = managerId,
-                    ExportType = "TraineeProgress",
-                    FileName = "Progress_AMT101.xlsx",
-                    FilePath = null,
-                    Status = "Failed",
-                    RequestedAt = DateTime.UtcNow.AddDays(-2),
-                    CompletedAt = DateTime.UtcNow.AddDays(-2),
-                    ETRCourseRecordId = null
-                },
-                new ExportJob
-                {
-                    RequestedByAccountId = instructorId,
-                    ExportType = "ClassRoster",
-                    FileName = "Roster_AMT101.csv",
-                    FilePath = "/exports/Roster_AMT101.csv",
-                    Status = "Completed",
-                    RequestedAt = DateTime.UtcNow.AddHours(-5),
-                    CompletedAt = DateTime.UtcNow.AddHours(-4),
-                    ETRCourseRecordId = null
-                }
+                new ExportJob { RequestedByAccountId = adminId, ExportType = "ComplianceReport", Status = "Completed", RequestedAt = DateTime.UtcNow, CompletedAt = DateTime.UtcNow, FileName = "report1.pdf", FilePath = "/exports/report1.pdf" },
+                new ExportJob { RequestedByAccountId = adminId, ExportType = "TrainingPackage", Status = "InProgress", RequestedAt = DateTime.UtcNow },
+                new ExportJob { RequestedByAccountId = adminId, ExportType = "TrainingPackage", Status = "Completed", RequestedAt = DateTime.UtcNow.AddDays(-1), CompletedAt = DateTime.UtcNow.AddDays(-1), FileName = "package1.zip", FilePath = "/exports/package1.zip" }
             );
             await context.SaveChangesAsync();
         }
