@@ -74,7 +74,7 @@ Instructor chỉ được commit cho môn mình được phân công (`ClassSubj
   "errorRows": 2,
   "canCommit": false,
   "errors": [
-    { "row": 5,  "column": "Status",       "message": "Giá trị 'Pesent' không hợp lệ. Chấp nhận: Present, Absent, Late." },
+    { "row": 5,  "column": "Status",       "message": "Giá trị 'Pesent' không hợp lệ. Chấp nhận: Present, Absent." },
     { "row": 12, "column": "EnrollmentId", "message": "EnrollmentId 999 không thuộc lớp của session này." }
   ]
 }
@@ -115,7 +115,7 @@ Instructor chỉ được commit cho môn mình được phân công (`ClassSubj
 | A | `EnrollmentId` | ✅ (nền xám) | ❌ |
 | B | `Họ và tên` | ✅ (nền xám) | ❌ |
 | C | `Mã học viên` | ✅ (nền xám) | ❌ |
-| D | `Trạng thái (Present/Absent/Late)*` | ❌ | ✅ (dropdown) |
+| D | `Trạng thái (Present/Absent)*` | ❌ | ✅ (dropdown) |
 | E | `Ghi chú` | ❌ | ✅ (tự do) |
 
 **Row 1:** `BẢNG ĐIỂM DANH - {SessionTitle} - {ClassCode}`  

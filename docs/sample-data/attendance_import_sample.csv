@@ -1,13 +1,13 @@
 BẢNG ĐIỂM DANH - Buổi 1 - CLS-2026-001,,,,
 SessionId: 1,ClassId: 1,SubjectId: 1,Ngày: 15/08/2026,Môn: Aviation Safety Fundamentals
-EnrollmentId,Họ và tên,Mã học viên,Trạng thái (Present/Absent/Late)*,Ghi chú
+EnrollmentId,Họ và tên,Mã học viên,Trạng thái (Present/Absent)*,Ghi chú
 1,Nguyễn Văn An,STU001,Present,
 2,Trần Thị Bình,STU002,Present,
 3,Lê Văn Cường,STU003,Absent,Nghỉ bệnh có phép
-4,Phạm Thị Dung,STU004,Late,Đến muộn 15 phút do kẹt xe
+4,Phạm Thị Dung,STU004,Present,Đến muộn 15 phút do kẹt xe
 5,Hoàng Văn Em,STU005,Present,
 6,Đỗ Thị Fương,STU006,Present,
 7,Ngô Văn Giang,STU007,Absent,Không phép
 8,Vũ Thị Hoa,STU008,Present,
 9,Bùi Văn Inh,STU009,Present,
-10,Đinh Thị Kim,STU010,Late,Lý do cá nhân
+10,Đinh Thị Kim,STU010,Absent,Lý do cá nhân
