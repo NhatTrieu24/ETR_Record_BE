@@ -184,6 +184,16 @@ public class ClassService : IClassService
 
                 var oldStatus = cls.Status;
 
+                if (request.Status == "Completed" && oldStatus != "Completed")
+                {
+                    var unconfirmedSessions = _unitOfWork.SessionRepository.GetQueryable()
+                        .Any(s => s.ClassId == id && !s.IsConfirmed && !s.IsDeleted);
+                    if (unconfirmedSessions)
+                    {
+                        throw new BusinessRuleViolationException("Cannot mark class as Completed because there are still unconfirmed sessions.");
+                    }
+                }
+
                 cls.ClassCode = request.ClassCode;
                 cls.ClassName = request.ClassName;
                 cls.CourseId = request.CourseId; // Although this shouldn't normally change

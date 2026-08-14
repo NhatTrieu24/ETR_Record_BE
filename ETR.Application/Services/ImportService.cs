@@ -146,39 +146,64 @@ public class ImportService : IImportService
             .ToHashSet();
 
         var commitErrors = new List<ImportRowError>();
-        int imported = 0, skipped = 0;
+        int imported = 0, skipped = 0, updated = 0;
 
         return await _unitOfWork.ExecuteInStrategyAsync(async (innerCt) =>
         {
             await _unitOfWork.BeginTransactionAsync(innerCt);
             try
             {
+                var allRecords = await _unitOfWork.AttendanceRecordRepository.GetAllAsync(innerCt);
+
                 foreach (var row in rows)
                 {
-                    if (existingRecords.Contains(row.EnrollmentId))
-                    {
-                        commitErrors.Add(new ImportRowError(row.RowNumber, "EnrollmentId",
-                            $"Enrollment {row.EnrollmentId} đã được điểm danh trong session này."));
-                        skipped++;
-                        continue;
-                    }
+                    var existingRecord = allRecords.FirstOrDefault(r => r.SessionId == sessionId && r.EnrollmentId == row.EnrollmentId && !r.IsDeleted);
 
-                    var record = new AttendanceRecord
+                    if (existingRecord != null)
                     {
-                        SessionId            = sessionId,
-                        EnrollmentId         = row.EnrollmentId,
-                        Status               = row.Status,
-                        Remarks              = row.Remarks,
-                        RecordedByAccountId  = recordedByAccountId,
-                        RecordedAt           = DateTime.UtcNow,
-                        CreatedAt            = DateTime.UtcNow,
-                        CreatedByAccountId   = recordedByAccountId
-                    };
-                    await _unitOfWork.AttendanceRecordRepository.AddAsync(record, innerCt);
-                    imported++;
+                        var oldStatus = existingRecord.Status;
+                        existingRecord.Status = row.Status;
+                        existingRecord.Remarks = row.Remarks;
+                        existingRecord.UpdatedAt = DateTime.UtcNow;
+                        existingRecord.UpdatedByAccountId = recordedByAccountId;
+                        
+                        _unitOfWork.AttendanceRecordRepository.Update(existingRecord);
+                        updated++;
+
+                        if (oldStatus != row.Status)
+                        {
+                            await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                            {
+                                AccountId = recordedByAccountId,
+                                ActionType = "UPDATE",
+                                EntityName = "AttendanceRecord",
+                                RecordId = existingRecord.AttendanceRecordId,
+                                OldValue = oldStatus,
+                                NewValue = row.Status,
+                                Description = $"Import updated AttendanceRecord status from {oldStatus} to {row.Status}",
+                                CreatedAt = DateTime.UtcNow
+                            }, innerCt);
+                        }
+                    }
+                    else
+                    {
+                        var record = new AttendanceRecord
+                        {
+                            SessionId            = sessionId,
+                            EnrollmentId         = row.EnrollmentId,
+                            Status               = row.Status,
+                            Remarks              = row.Remarks,
+                            RecordedByAccountId  = recordedByAccountId,
+                            RecordedAt           = DateTime.UtcNow,
+                            CreatedAt            = DateTime.UtcNow,
+                            CreatedByAccountId   = recordedByAccountId
+                        };
+                        await _unitOfWork.AttendanceRecordRepository.AddAsync(record, innerCt);
+                        imported++;
+                    }
                 }
 
-                if (imported > 0)
+                if (imported > 0 || updated > 0)
                 {
                     await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                     {
@@ -186,7 +211,7 @@ public class ImportService : IImportService
                         ActionType = "IMPORT_ATTENDANCE",
                         EntityName = "AttendanceRecord",
                         RecordId = sessionId,
-                        Description = $"Imported {imported} attendance records for session {sessionId}",
+                        Description = $"Imported {imported} new and updated {updated} attendance records for session {sessionId}",
                         CreatedAt = DateTime.UtcNow
                     }, innerCt);
                 }
@@ -479,9 +504,9 @@ public class ImportService : IImportService
             .Select(e => e.EnrollmentId)
             .ToHashSet();
 
-        var existing = (await _unitOfWork.AttendanceRecordRepository.GetAllAsync(ct))
-            .Where(r => r.SessionId == sessionId && !r.IsDeleted)
-            .Select(r => r.EnrollmentId)
+        var lockedEtrEnrollments = (await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(ct))
+            .Where(e => validEnrollments.Contains(e.EnrollmentId) && e.IsLocked && !e.IsDeleted)
+            .Select(e => e.EnrollmentId)
             .ToHashSet();
 
         var seenInFile = new HashSet<int>();
@@ -495,9 +520,9 @@ public class ImportService : IImportService
                 errors.Add(new ImportRowError(row.RowNumber, "EnrollmentId",
                     $"EnrollmentId {row.EnrollmentId} không thuộc lớp của session này."));
 
-            if (existing.Contains(row.EnrollmentId))
+            if (lockedEtrEnrollments.Contains(row.EnrollmentId))
                 errors.Add(new ImportRowError(row.RowNumber, "EnrollmentId",
-                    $"EnrollmentId {row.EnrollmentId} đã có bản ghi điểm danh trong session này."));
+                    $"Học viên này đã bị khóa ETR (ETR Locked), không thể thao tác."));
 
             if (!seenInFile.Add(row.EnrollmentId))
                 errors.Add(new ImportRowError(row.RowNumber, "EnrollmentId",
@@ -544,9 +569,21 @@ public class ImportService : IImportService
             return errors;
         }
 
-        var validAccountIds = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct))
-            .Where(e => !e.IsDeleted && e.Status == "Active")
-            .Select(e => e.AccountId)
+        var classesInCourse = (await _unitOfWork.ClassRepository.GetAllAsync(ct))
+            .Where(c => c.CourseId == assessment.CourseId && !c.IsDeleted)
+            .Select(c => c.ClassId)
+            .ToHashSet();
+
+        var activeEnrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct))
+            .Where(e => !e.IsDeleted && e.Status == "Active" && classesInCourse.Contains(e.ClassId))
+            .ToList();
+
+        var validAccountIds = activeEnrollments.Select(e => e.AccountId).ToHashSet();
+        var activeEnrollmentIds = activeEnrollments.Select(e => e.EnrollmentId).ToHashSet();
+
+        var lockedEtrAccountIds = (await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(ct))
+            .Where(e => activeEnrollmentIds.Contains(e.EnrollmentId) && e.IsLocked && !e.IsDeleted)
+            .Select(e => activeEnrollments.First(en => en.EnrollmentId == e.EnrollmentId).AccountId)
             .ToHashSet();
 
         var seenInFile = new HashSet<int>();
@@ -563,6 +600,10 @@ public class ImportService : IImportService
             if (row.SubjectResultId <= 0)
                 errors.Add(new ImportRowError(row.RowNumber, "SubjectResultId",
                     $"SubjectResultId {row.SubjectResultId} không hợp lệ. Hãy dùng template được generate từ server."));
+
+            if (lockedEtrAccountIds.Contains(row.AccountId))
+                errors.Add(new ImportRowError(row.RowNumber, "AccountId",
+                    $"Học viên này đã bị khóa ETR (ETR Locked), không thể thao tác."));
 
             if (!seenInFile.Add(row.AccountId))
                 errors.Add(new ImportRowError(row.RowNumber, "AccountId",
