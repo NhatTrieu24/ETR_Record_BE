@@ -32,6 +32,24 @@ public class ExportsController : ControllerBase
 
     /// <summary>
     /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
+    /// [Core Responsibility]: Lấy danh sách phân trang các công việc xuất tệp (export jobs) đã thực hiện.
+    /// [Target Audience]: Admin, Audit, Academic
+    /// </summary>
+    [HttpGet]
+    public async Task<ActionResult<PagedResponse<ExportJobResponse>>> GetExportJobs([FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken cancellationToken = default)
+    {
+        page = Math.Max(page, 1);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        var jobs = (await _unitOfWork.ExportJobRepository.GetAllAsync(cancellationToken))
+            .OrderByDescending(j => j.RequestedAt)
+            .ToList();
+        var pageItems = jobs.Skip((page - 1) * pageSize).Take(pageSize).Select(MapJobToResponse);
+        return Ok(new PagedResponse<ExportJobResponse>(pageItems, jobs.Count, page, pageSize));
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
     /// [Core Responsibility]: Lấy thông tin một công việc xuất tệp (export job) cụ thể theo ID.
     /// [Target Audience]: Admin
     /// </summary>

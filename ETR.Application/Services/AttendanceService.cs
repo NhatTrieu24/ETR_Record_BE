@@ -2,6 +2,7 @@ using ETR.Application.Compliance;
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 
 namespace ETR.Application.Services;
 
@@ -191,7 +192,7 @@ public class AttendanceService : IAttendanceService
                     await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                     {
                         AccountId = updatedByAccountId,
-                        ActionType = "UPDATE",
+                        ActionType = AuditActionType.UPDATE.ToString(),
                         EntityName = "AttendanceRecord",
                         RecordId = id,
                         OldValue = oldStatus,

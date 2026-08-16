@@ -2,6 +2,7 @@ using System.Text.Json;
 using ETR.Application.Compliance;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 
@@ -224,7 +225,7 @@ public partial class AppDbContext
             .Where(e => e.State is EntityState.Added or EntityState.Modified)
             .Select(entry => new PendingAuditEntry(
                 entry,
-                entry.State == EntityState.Added ? "INSERT" : "UPDATE",
+                entry.State == EntityState.Added ? AuditActionType.INSERT.ToString() : AuditActionType.UPDATE.ToString(),
                 entry.State == EntityState.Added ? null : SerializePropertyValues(entry.OriginalValues),
                 SerializePropertyValues(entry.CurrentValues),
                 ResolveAuditUserId(entry),

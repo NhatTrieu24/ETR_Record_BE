@@ -2,6 +2,7 @@ using ETR.Application.Compliance;
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 using System.ComponentModel.DataAnnotations;
 
 namespace ETR.Application.Services;
@@ -287,7 +288,7 @@ public class EtrService : IEtrService
         {
             ETRRecordId = etrCourseRecordId,
             AccountId = accountId,
-            ActionType = "SUBMIT",
+            ActionType = AuditActionType.SUBMIT.ToString(),
             EntityName = nameof(ETRCourseRecord),
             RecordId = etrCourseRecordId,
             OldValue = etr.Status,
@@ -422,7 +423,7 @@ public class EtrService : IEtrService
         {
             ETRRecordId = etrCourseRecordId,
             AccountId = accountId,
-            ActionType = "VERIFY",
+            ActionType = AuditActionType.VERIFY.ToString(),
             EntityName = nameof(ETRCourseRecord),
             RecordId = etrCourseRecordId,
             OldValue = etr.Status,
@@ -458,7 +459,7 @@ public class EtrService : IEtrService
         {
             ETRRecordId = etrCourseRecordId,
             AccountId = accountId,
-            ActionType = "RETURN",
+            ActionType = AuditActionType.RETURN.ToString(),
             EntityName = nameof(ETRCourseRecord),
             RecordId = etrCourseRecordId,
             OldValue = etr.Status,
@@ -523,7 +524,7 @@ public class EtrService : IEtrService
         {
             ETRRecordId = etrCourseRecordId,
             AccountId = accountId,
-            ActionType = "APPROVE",
+            ActionType = AuditActionType.APPROVE.ToString(),
             EntityName = nameof(ETRCourseRecord),
             RecordId = etrCourseRecordId,
             OldValue = etr.Status,
@@ -568,7 +569,7 @@ public class EtrService : IEtrService
             {
                 ApprovalRequestId = approvalRequest.ApprovalRequestId,
                 ActionByAccountId = accountId,
-                ActionType = "Approve",
+                ActionType = ApprovalHistoryActionType.Approve.ToString(),
                 PreviousStatus = previousApprovalStatus,
                 NewStatus = "Approved",
                 Comments = "ETR completed directly via /api/etr/{id}/complete",
@@ -594,7 +595,7 @@ public class EtrService : IEtrService
                 await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                 {
                     AccountId = accountId,
-                    ActionType = "UPDATE",
+                    ActionType = AuditActionType.UPDATE.ToString(),
                     EntityName = nameof(UserProfile),
                     RecordId = learnerProfile.AccountId,
                     OldValue = LearnerStatus.Grounded,
@@ -622,7 +623,7 @@ public class EtrService : IEtrService
         {
             ETRRecordId = etrCourseRecordId,
             AccountId = accountId,
-            ActionType = "LOCK",
+            ActionType = AuditActionType.LOCK.ToString(),
             EntityName = nameof(ETRCourseRecord),
             RecordId = etrCourseRecordId,
             OldValue = etr.IsLocked.ToString(),
@@ -663,7 +664,7 @@ public class EtrService : IEtrService
         {
             ETRRecordId = etrCourseRecordId,
             AccountId = accountId,
-            ActionType = "UNLOCK",
+            ActionType = AuditActionType.UNLOCK.ToString(),
             EntityName = nameof(ETRCourseRecord),
             RecordId = etrCourseRecordId,
             OldValue = wasCompleted ? "True / Completed" : "True",
@@ -866,7 +867,7 @@ public class EtrService : IEtrService
                 await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                 {
                     AccountId = actorAccountId,
-                    ActionType = "UPDATE",
+                    ActionType = AuditActionType.UPDATE.ToString(),
                     EntityName = nameof(UserProfile),
                     RecordId = profile.AccountId,
                     OldValue = profile.Status,
@@ -885,7 +886,7 @@ public class EtrService : IEtrService
                 await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                 {
                     AccountId = actorAccountId,
-                    ActionType = "UPDATE",
+                    ActionType = AuditActionType.UPDATE.ToString(),
                     EntityName = nameof(UserProfile),
                     RecordId = profile.AccountId,
                     OldValue = profile.Status,

@@ -105,4 +105,68 @@ public static class DashboardKpiCalculator
             returnedForCorrectionCount,
             missingEvidenceCount);
     }
+
+    public static async Task<SystemStatsSummary> ComputeSystemStatsAsync(IUnitOfWork unitOfWork, CancellationToken cancellationToken)
+    {
+        var accounts = (await unitOfWork.AccountRepository.GetAllAsync(cancellationToken)).ToList();
+        var roles = (await unitOfWork.RoleRepository.GetAllAsync(cancellationToken)).ToDictionary(r => r.RoleId, r => r.RoleName);
+        var courses = await unitOfWork.CourseRepository.GetAllAsync(cancellationToken);
+        var classes = await unitOfWork.ClassRepository.GetAllAsync(cancellationToken);
+
+        var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+
+        int CountByRole(string roleName) => accounts.Count(a => roles.GetValueOrDefault(a.RoleId) == roleName);
+
+        return new SystemStatsSummary(
+            accounts.Count,
+            CountByRole("Student"),
+            CountByRole("Instructor"),
+            courses.Count(),
+            classes.Count(),
+            accounts.Count(a => a.IsActive),
+            accounts.Count(a => a.CreatedAt >= monthStart));
+    }
+
+    // Shared by TrainingManager ("locked vs. returned" chase-up trend) and Auditor (compliance trend)
+    // — "locked" = ETRs that became immutable in that month (CompletedAt month, IsLocked); "returned"
+    // = ApprovalHistory transitions into ReturnedForCorrection in that month, since ETRCourseRecord
+    // itself doesn't stamp when it was last returned.
+    public static async Task<MonthlyTrendSummary> ComputeMonthlyTrendAsync(IUnitOfWork unitOfWork, int monthCount, CancellationToken cancellationToken)
+    {
+        var etrs = await unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken);
+        var approvalHistory = await unitOfWork.ApprovalHistoryRepository.GetAllAsync(cancellationToken);
+
+        var currentMonth = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+        var monthStarts = Enumerable.Range(0, monthCount)
+            .Select(i => currentMonth.AddMonths(-(monthCount - 1 - i)))
+            .ToList();
+
+        var months = monthStarts.Select(m => m.ToString("yyyy-MM")).ToList();
+        var locked = monthStarts
+            .Select(m => etrs.Count(e => e.IsLocked && e.CompletedAt.HasValue && e.CompletedAt.Value.Year == m.Year && e.CompletedAt.Value.Month == m.Month))
+            .ToList();
+        var returned = monthStarts
+            .Select(m => approvalHistory.Count(h => h.NewStatus == "ReturnedForCorrection" && h.ActionAt.Year == m.Year && h.ActionAt.Month == m.Month))
+            .ToList();
+
+        return new MonthlyTrendSummary(months, locked, returned);
+    }
+
+    public static async Task<LockedRecordsSummary> ComputeLockedRecordsSummaryAsync(IUnitOfWork unitOfWork, CancellationToken cancellationToken)
+    {
+        var etrs = (await unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken)).ToList();
+        var totalLocked = etrs.Count(e => e.IsLocked);
+        var complianceRate = etrs.Count > 0 ? Math.Round((decimal)totalLocked / etrs.Count * 100, 2) : 0;
+        return new LockedRecordsSummary(totalLocked, complianceRate);
+    }
+
+    public static async Task<EvidenceSummary> ComputeEvidenceSummaryAsync(IUnitOfWork unitOfWork, CancellationToken cancellationToken)
+    {
+        var evidenceFiles = (await unitOfWork.EvidenceFileRepository.GetAllAsync(cancellationToken)).ToList();
+        return new EvidenceSummary(
+            evidenceFiles.Count,
+            evidenceFiles.Count(e => e.VerificationStatus == "Verified"),
+            evidenceFiles.Count(e => e.VerificationStatus == "Pending"),
+            evidenceFiles.Count(e => e.VerificationStatus == "Rejected"));
+    }
 }

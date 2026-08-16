@@ -3,6 +3,7 @@ using ETR.Application.DTOs.Evidence;
 using ETR.Application.DTOs.Evidence.Requests;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 using System.ComponentModel.DataAnnotations;
 using System.IO;
 
@@ -232,7 +233,7 @@ public class EvidenceService : IEvidenceService
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
         {
             AccountId = verifiedByAccountId,
-            ActionType = "VERIFY",
+            ActionType = AuditActionType.VERIFY.ToString(),
             EntityName = nameof(EvidenceFile),
             RecordId = evidence.EvidenceFileId,
             OldValue = oldStatus,
@@ -266,7 +267,7 @@ public class EvidenceService : IEvidenceService
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
         {
             AccountId = deletedByAccountId,
-            ActionType = "DELETE",
+            ActionType = AuditActionType.DELETE.ToString(),
             EntityName = nameof(EvidenceFile),
             RecordId = id,
             OldValue = evidence.VerificationStatus,

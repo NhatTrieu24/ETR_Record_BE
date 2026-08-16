@@ -2,6 +2,7 @@ using ETR.Application.Compliance;
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 using Microsoft.Extensions.Logging;
 
 namespace ETR.Application.Services;
@@ -302,7 +303,7 @@ public class AssessmentResultService : IAssessmentResultService
             await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
             {
                 AccountId = updatedByAccountId,
-                ActionType = "UPDATE",
+                ActionType = AuditActionType.UPDATE.ToString(),
                 EntityName = "AssessmentResult",
                 RecordId = id,
                 OldValue = oldScore.ToString(),

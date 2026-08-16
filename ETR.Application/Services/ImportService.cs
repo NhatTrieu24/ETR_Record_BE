@@ -3,6 +3,7 @@ using ETR.Application.Compliance;
 using ETR.Application.DTOs.Import;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 
 namespace ETR.Application.Services;
 
@@ -175,7 +176,7 @@ public class ImportService : IImportService
                             await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                             {
                                 AccountId = recordedByAccountId,
-                                ActionType = "UPDATE",
+                                ActionType = AuditActionType.UPDATE.ToString(),
                                 EntityName = "AttendanceRecord",
                                 RecordId = existingRecord.AttendanceRecordId,
                                 OldValue = oldStatus,
@@ -208,7 +209,7 @@ public class ImportService : IImportService
                     await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                     {
                         AccountId = recordedByAccountId,
-                        ActionType = "IMPORT_ATTENDANCE",
+                        ActionType = AuditActionType.IMPORT_ATTENDANCE.ToString(),
                         EntityName = "AttendanceRecord",
                         RecordId = sessionId,
                         Description = $"Imported {imported} new and updated {updated} attendance records for session {sessionId}",
@@ -436,7 +437,7 @@ public class ImportService : IImportService
                     await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                     {
                         AccountId = gradedByAccountId,
-                        ActionType = "IMPORT_ASSESSMENT",
+                        ActionType = AuditActionType.IMPORT_ASSESSMENT.ToString(),
                         EntityName = "AssessmentResult",
                         RecordId = assessmentId,
                         Description = $"Imported {imported} assessment results for assessment {assessmentId}",

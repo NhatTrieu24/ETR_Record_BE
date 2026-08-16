@@ -1,6 +1,7 @@
 using ETR.Application.DTOs.CompletionRequirement;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 
 namespace ETR.Application.Services;
 
@@ -133,7 +134,7 @@ public class CompletionRequirementService : ICompletionRequirementService
                 await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                 {
                     AccountId = updatedByAccountId,
-                    ActionType = "UPDATE",
+                    ActionType = AuditActionType.UPDATE.ToString(),
                     EntityName = nameof(CompletionRequirement),
                     RecordId = id,
                     OldValue = $"RequirementType={item.RequirementType}, ThresholdValue={item.ThresholdValue}, IsMandatory={item.IsMandatory} (VersionNo={item.VersionNo})",
