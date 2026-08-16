@@ -1,4 +1,5 @@
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace ETR.Infrastructure.Data;
@@ -684,7 +685,7 @@ public static class DataSeeder
                 {
                     ApprovalRequestId = request.ApprovalRequestId,
                     ActionByAccountId = instructorId,
-                    ActionType = "Submit",
+                    ActionType = ApprovalHistoryActionType.Submit.ToString(),
                     NewStatus = "Pending",
                     ActionAt = DateTime.UtcNow.AddDays(-5)
                 });
@@ -695,7 +696,7 @@ public static class DataSeeder
                     {
                         ApprovalRequestId = request.ApprovalRequestId,
                         ActionByAccountId = managerId,
-                        ActionType = "Review",
+                        ActionType = ApprovalHistoryActionType.Review.ToString(),
                         PreviousStatus = "Pending",
                         NewStatus = "UnderReview",
                         ActionAt = DateTime.UtcNow.AddDays(-3)
@@ -708,7 +709,7 @@ public static class DataSeeder
                     {
                         ApprovalRequestId = request.ApprovalRequestId,
                         ActionByAccountId = managerId,
-                        ActionType = "Approve",
+                        ActionType = ApprovalHistoryActionType.Approve.ToString(),
                         PreviousStatus = "UnderReview",
                         NewStatus = "Approved",
                         ActionAt = DateTime.UtcNow.AddDays(-1)
@@ -720,7 +721,7 @@ public static class DataSeeder
                     {
                         ApprovalRequestId = request.ApprovalRequestId,
                         ActionByAccountId = managerId,
-                        ActionType = "Reject",
+                        ActionType = ApprovalHistoryActionType.Reject.ToString(),
                         PreviousStatus = "UnderReview",
                         NewStatus = "Rejected",
                         ActionAt = DateTime.UtcNow.AddDays(-1)

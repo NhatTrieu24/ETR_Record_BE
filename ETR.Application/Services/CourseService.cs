@@ -1,6 +1,7 @@
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 
 namespace ETR.Application.Services;
 
@@ -68,7 +69,7 @@ public class CourseService : ICourseService
                 await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                 {
                     AccountId = createdByAccountId,
-                    ActionType = "INSERT",
+                    ActionType = AuditActionType.INSERT.ToString(),
                     EntityName = nameof(Course),
                     RecordId = course.CourseId,
                     NewValue = course.CourseCode,
@@ -98,7 +99,7 @@ public class CourseService : ICourseService
                     await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                     {
                         AccountId = createdByAccountId,
-                        ActionType = "INSERT",
+                        ActionType = AuditActionType.INSERT.ToString(),
                         EntityName = nameof(CourseSubject),
                         RecordId = course.CourseId,
                         NewValue = $"SubjectId: {s.SubjectId}, Seq: {s.SequenceNo}",
@@ -171,7 +172,7 @@ public class CourseService : ICourseService
                 await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                 {
                     AccountId = updatedByAccountId,
-                    ActionType = "UPDATE",
+                    ActionType = AuditActionType.UPDATE.ToString(),
                     EntityName = nameof(Course),
                     RecordId = course.CourseId,
                     OldValue = oldStatus,
@@ -198,7 +199,7 @@ public class CourseService : ICourseService
                     await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                     {
                         AccountId = updatedByAccountId,
-                        ActionType = "DELETE",
+                        ActionType = AuditActionType.DELETE.ToString(),
                         EntityName = nameof(CourseSubject),
                         RecordId = course.CourseId,
                         OldValue = $"SubjectId: {toRemove.SubjectId}",
@@ -247,7 +248,7 @@ public class CourseService : ICourseService
                         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                         {
                             AccountId = updatedByAccountId,
-                            ActionType = "INSERT",
+                            ActionType = AuditActionType.INSERT.ToString(),
                             EntityName = nameof(CourseSubject),
                             RecordId = course.CourseId,
                             NewValue = $"SubjectId: {reqSub.SubjectId}, Seq: {reqSub.SequenceNo}",
@@ -291,7 +292,7 @@ public class CourseService : ICourseService
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
         {
             AccountId = deletedByAccountId,
-            ActionType = "DELETE",
+            ActionType = AuditActionType.DELETE.ToString(),
             EntityName = nameof(Course),
             RecordId = course.CourseId,
             OldValue = course.Status,
@@ -338,7 +339,7 @@ public class CourseService : ICourseService
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
         {
             AccountId = addedByAccountId,
-            ActionType = "INSERT",
+            ActionType = AuditActionType.INSERT.ToString(),
             EntityName = nameof(CourseSubject),
             RecordId = courseId, // Using CourseId as RecordId since it's a mapping
             NewValue = $"SubjectId: {request.SubjectId}, Seq: {request.SequenceNo}",
@@ -391,7 +392,7 @@ public class CourseService : ICourseService
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
         {
             AccountId = updatedByAccountId,
-            ActionType = "UPDATE",
+            ActionType = AuditActionType.UPDATE.ToString(),
             EntityName = nameof(CourseSubject),
             RecordId = courseId,
             NewValue = $"Seq: {request.SequenceNo}, Pass: {request.PassingScore}",
@@ -429,7 +430,7 @@ public class CourseService : ICourseService
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
         {
             AccountId = deletedByAccountId,
-            ActionType = "DELETE",
+            ActionType = AuditActionType.DELETE.ToString(),
             EntityName = nameof(CourseSubject),
             RecordId = courseId,
             OldValue = $"SubjectId: {subjectId}",

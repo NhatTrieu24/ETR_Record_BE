@@ -2,6 +2,7 @@ using ETR.Application.Compliance;
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 
 namespace ETR.Application.Services;
 
@@ -150,7 +151,7 @@ public class ClassService : IClassService
                 await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                 {
                     AccountId = createdByAccountId,
-                    ActionType = "INSERT",
+                    ActionType = AuditActionType.INSERT.ToString(),
                     EntityName = nameof(Class),
                     RecordId = cls.ClassId,
                     NewValue = cls.ClassCode,
@@ -248,7 +249,7 @@ public class ClassService : IClassService
                 await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                 {
                     AccountId = updatedByAccountId,
-                    ActionType = "UPDATE",
+                    ActionType = AuditActionType.UPDATE.ToString(),
                     EntityName = nameof(Class),
                     RecordId = cls.ClassId,
                     OldValue = oldStatus,
@@ -287,7 +288,7 @@ public class ClassService : IClassService
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
         {
             AccountId = deletedByAccountId,
-            ActionType = "DELETE",
+            ActionType = AuditActionType.DELETE.ToString(),
             EntityName = nameof(Class),
             RecordId = cls.ClassId,
             OldValue = cls.Status,

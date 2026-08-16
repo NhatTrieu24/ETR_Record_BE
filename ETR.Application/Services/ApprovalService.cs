@@ -3,6 +3,7 @@ using ETR.Application.DTOs;
 using ETR.Application.DTOs.Approval;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 using System.ComponentModel.DataAnnotations;
 
 namespace ETR.Application.Services;
@@ -58,6 +59,26 @@ public class ApprovalService : IApprovalService
         [ApprovalActionType.Return] = ["QA", "Admin"],
     };
 
+    // ApprovalActionType (API/DTO contract for ?action=) is a deliberately separate enum from
+    // ApprovalHistoryActionType/AuditActionType (persisted history taxonomies) — this maps between
+    // them instead of relying on ToString()/ToUpperInvariant() string transforms, so a rename on
+    // either side fails to compile instead of silently producing a mismatched persisted value.
+    private static readonly Dictionary<ApprovalActionType, ApprovalHistoryActionType> HistoryActionByApprovalAction = new()
+    {
+        [ApprovalActionType.Verify] = ApprovalHistoryActionType.Verify,
+        [ApprovalActionType.Approve] = ApprovalHistoryActionType.Approve,
+        [ApprovalActionType.Reject] = ApprovalHistoryActionType.Reject,
+        [ApprovalActionType.Return] = ApprovalHistoryActionType.Return,
+    };
+
+    private static readonly Dictionary<ApprovalActionType, AuditActionType> AuditActionByApprovalAction = new()
+    {
+        [ApprovalActionType.Verify] = AuditActionType.VERIFY,
+        [ApprovalActionType.Approve] = AuditActionType.APPROVE,
+        [ApprovalActionType.Reject] = AuditActionType.REJECT,
+        [ApprovalActionType.Return] = AuditActionType.RETURN,
+    };
+
     public async Task<ApprovalRequestResponse> ProcessApprovalActionAsync(int approvalRequestId, ApprovalActionType action, int actionByAccountId, string? actionByRoleName, string? comment, CancellationToken cancellationToken = default)
     {
         // action is a real enum now (see ApprovalActionType) — ASP.NET Core model binding already
@@ -107,7 +128,7 @@ public class ApprovalService : IApprovalService
                 {
                     ApprovalRequestId = request.ApprovalRequestId,
                     ActionByAccountId = actionByAccountId,
-                    ActionType = action.ToString(),
+                    ActionType = HistoryActionByApprovalAction[action].ToString(),
                     PreviousStatus = prevStatus,
                     NewStatus = newStatus,
                     Comments = comment,
@@ -126,7 +147,7 @@ public class ApprovalService : IApprovalService
                 {
                     ETRRecordId = request.ETRCourseRecordId,
                     AccountId = actionByAccountId,
-                    ActionType = action.ToString().ToUpperInvariant(),
+                    ActionType = AuditActionByApprovalAction[action].ToString(),
                     EntityName = nameof(ApprovalRequest),
                     RecordId = request.ApprovalRequestId,
                     OldValue = prevStatus,

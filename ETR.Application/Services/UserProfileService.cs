@@ -1,6 +1,7 @@
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 
 namespace ETR.Application.Services;
 
@@ -160,7 +161,7 @@ public class UserProfileService : IUserProfileService
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
         {
             AccountId = updatedByAccountId,
-            ActionType = "UPDATE",
+            ActionType = AuditActionType.UPDATE.ToString(),
             EntityName = nameof(UserProfile),
             RecordId = profile.AccountId,
             OldValue = oldStatus,

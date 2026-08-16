@@ -3,6 +3,7 @@ using ETR.Application.DTOs.Amendment;
 using ETR.Application.DTOs.Amendment.Requests;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 using System.ComponentModel.DataAnnotations;
 
 namespace ETR.Application.Services;
@@ -99,7 +100,7 @@ public class AmendmentService : IAmendmentService
             ? new AuditLog
             {
                 AccountId = requestedByAccountId,
-                ActionType = "ADMIN_FORCE_UNLOCK",
+                ActionType = AuditActionType.ADMIN_FORCE_UNLOCK.ToString(),
                 EntityName = nameof(SubjectResult),
                 RecordId = subjectResultId,
                 OldValue = subjectResult.Status,
@@ -109,7 +110,7 @@ public class AmendmentService : IAmendmentService
             : new AuditLog
             {
                 AccountId = requestedByAccountId,
-                ActionType = "AMENDMENT_REQUEST",
+                ActionType = AuditActionType.AMENDMENT_REQUEST.ToString(),
                 EntityName = nameof(SubjectResult),
                 RecordId = subjectResultId,
                 OldValue = subjectResult.Status,
@@ -179,7 +180,7 @@ public class AmendmentService : IAmendmentService
                 await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                 {
                     AccountId = approvedByAccountId,
-                    ActionType = "AMENDMENT_APPROVE",
+                    ActionType = AuditActionType.AMENDMENT_APPROVE.ToString(),
                     EntityName = nameof(SubjectResult),
                     RecordId = amendment.SubjectResultId,
                     OldValue = amendment.OldValue,
@@ -218,7 +219,7 @@ public class AmendmentService : IAmendmentService
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
         {
             AccountId = rejectedByAccountId,
-            ActionType = "AMENDMENT_REJECT",
+            ActionType = AuditActionType.AMENDMENT_REJECT.ToString(),
             EntityName = nameof(SubjectResult),
             RecordId = amendment.SubjectResultId,
             OldValue = amendment.OldValue,

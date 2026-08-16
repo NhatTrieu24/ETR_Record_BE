@@ -2,6 +2,7 @@ using ETR.Application.Compliance;
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 
 namespace ETR.Application.Services;
 
@@ -300,7 +301,7 @@ public class EnrollmentService : IEnrollmentService
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
         {
             AccountId = deletedByAccountId,
-            ActionType = "DELETE",
+            ActionType = AuditActionType.DELETE.ToString(),
             EntityName = nameof(CourseEnrollment),
             RecordId = id,
             OldValue = item.Status,

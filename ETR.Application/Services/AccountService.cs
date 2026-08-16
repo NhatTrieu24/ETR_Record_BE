@@ -2,6 +2,7 @@ using ETR.Application.Compliance;
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 
 namespace ETR.Application.Services;
 
@@ -102,7 +103,7 @@ public class AccountService : IAccountService
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
         {
             AccountId = updatedByAccountId,
-            ActionType = "UPDATE",
+            ActionType = AuditActionType.UPDATE.ToString(),
             EntityName = nameof(Account),
             RecordId = accountId,
             OldValue = account.Status,
@@ -128,7 +129,7 @@ public class AccountService : IAccountService
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
         {
             AccountId = updatedByAccountId,
-            ActionType = "UPDATE",
+            ActionType = AuditActionType.UPDATE.ToString(),
             EntityName = nameof(Account),
             RecordId = accountId,
             OldValue = account.RoleId.ToString(),
@@ -155,7 +156,7 @@ public class AccountService : IAccountService
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
         {
             AccountId = updatedByAccountId,
-            ActionType = "UPDATE",
+            ActionType = AuditActionType.UPDATE.ToString(),
             EntityName = nameof(Account),
             RecordId = accountId,
             OldValue = account.DepartmentId.ToString(),
@@ -179,7 +180,7 @@ public class AccountService : IAccountService
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
         {
             AccountId = deletedByAccountId,
-            ActionType = "DELETE",
+            ActionType = AuditActionType.DELETE.ToString(),
             EntityName = nameof(Account),
             RecordId = accountId,
             OldValue = account.Status,
