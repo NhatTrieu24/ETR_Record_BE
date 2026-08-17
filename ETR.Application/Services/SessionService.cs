@@ -19,10 +19,14 @@ public class SessionService : ISessionService
         var sessions = await _unitOfWork.SessionRepository.GetAllAsync(cancellationToken);
         var assessments = await _unitOfWork.AssessmentRepository.GetAllAsync(cancellationToken);
         var checklists = await _unitOfWork.PracticalChecklistRepository.GetAllAsync(cancellationToken);
+        var classes = await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken);
+        var subjects = await _unitOfWork.SubjectRepository.GetAllAsync(cancellationToken);
         return sessions.Select(s => MapToResponse(
             s, 
             assessments.FirstOrDefault(a => a.AssessmentId == s.AssessmentId),
-            checklists.FirstOrDefault(c => c.PracticalChecklistId == s.PracticalChecklistId)
+            checklists.FirstOrDefault(c => c.PracticalChecklistId == s.PracticalChecklistId),
+            classes.FirstOrDefault(c => c.ClassId == s.ClassId),
+            subjects.FirstOrDefault(sub => sub.SubjectId == s.SubjectId)
         )).ToList();
     }
 
@@ -32,10 +36,14 @@ public class SessionService : ISessionService
         var classSessions = sessions.Where(s => s.ClassId == classId).ToList();
         var assessments = await _unitOfWork.AssessmentRepository.GetAllAsync(cancellationToken);
         var checklists = await _unitOfWork.PracticalChecklistRepository.GetAllAsync(cancellationToken);
+        var classes = await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken);
+        var subjects = await _unitOfWork.SubjectRepository.GetAllAsync(cancellationToken);
         return classSessions.Select(s => MapToResponse(
             s, 
             assessments.FirstOrDefault(a => a.AssessmentId == s.AssessmentId),
-            checklists.FirstOrDefault(c => c.PracticalChecklistId == s.PracticalChecklistId)
+            checklists.FirstOrDefault(c => c.PracticalChecklistId == s.PracticalChecklistId),
+            classes.FirstOrDefault(c => c.ClassId == s.ClassId),
+            subjects.FirstOrDefault(sub => sub.SubjectId == s.SubjectId)
         )).ToList();
     }
 
@@ -57,7 +65,10 @@ public class SessionService : ISessionService
             checklist = await _unitOfWork.PracticalChecklistRepository.GetByIdAsync(session.PracticalChecklistId.Value, cancellationToken);
         }
 
-        return MapToResponse(session, assessment, checklist);
+        Class? cls = await _unitOfWork.ClassRepository.GetByIdAsync(session.ClassId, cancellationToken);
+        Subject? subject = await _unitOfWork.SubjectRepository.GetByIdAsync(session.SubjectId, cancellationToken);
+
+        return MapToResponse(session, assessment, checklist, cls, subject);
     }
 
     public Task<SessionResponse> CreateSessionAsync(CreateSessionRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
@@ -93,6 +104,34 @@ public class SessionService : ISessionService
                 throw new ValidationException("PracticalChecklist does not match the class's course or the specified subject.");
         }
 
+        // Since request.SessionDate is a DateTime (not nullable), we can just validate it.
+        // We do this if we consider request.SessionDate effectively always provided.
+        {
+            var classSubject = _unitOfWork.ClassSubjectRepository.GetQueryable()
+                .FirstOrDefault(cs => cs.ClassId == session.ClassId && cs.SubjectId == session.SubjectId);
+            
+            if (classSubject != null)
+            {
+                var instructorId = classSubject.InstructorAccountId;
+                var instructorClassSubjects = _unitOfWork.ClassSubjectRepository.GetQueryable()
+                    .Where(cs => cs.InstructorAccountId == instructorId)
+                    .ToList();
+
+                var sessionsOnSameDay = _unitOfWork.SessionRepository.GetQueryable()
+                    .Where(s => s.SessionId != id && s.SessionDate.HasValue && s.SessionDate.Value.Date == request.SessionDate.Date)
+                    .ToList();
+
+                var isOverlap = sessionsOnSameDay.Any(s => 
+                    instructorClassSubjects.Any(cs => cs.ClassId == s.ClassId && cs.SubjectId == s.SubjectId) &&
+                    Math.Abs((s.SessionDate!.Value - request.SessionDate).TotalHours) < 2);
+
+                if (isOverlap)
+                {
+                    throw new ValidationException("Giảng viên đã có lịch dạy vào khung giờ này (trùng giờ).");
+                }
+            }
+        }
+
         // Only these fields can be updated by Instructor/Admin
         session.SessionDate = request.SessionDate;
         session.Location = request.Location;
@@ -106,7 +145,10 @@ public class SessionService : ISessionService
         _unitOfWork.SessionRepository.Update(session);
         await _unitOfWork.SaveAsync(cancellationToken);
 
-        return MapToResponse(session, assessment, checklist);
+        Class? cls = await _unitOfWork.ClassRepository.GetByIdAsync(session.ClassId, cancellationToken);
+        Subject? subject = await _unitOfWork.SubjectRepository.GetByIdAsync(session.SubjectId, cancellationToken);
+
+        return MapToResponse(session, assessment, checklist, cls, subject);
     }
 
     public Task DeleteSessionAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default)
@@ -114,13 +156,16 @@ public class SessionService : ISessionService
         throw new NotSupportedException("Sessions are auto-provisioned and cannot be manually deleted.");
     }
 
-    private SessionResponse MapToResponse(Session session, Assessment? assessment = null, PracticalChecklist? practicalChecklist = null)
+    private SessionResponse MapToResponse(Session session, Assessment? assessment = null, PracticalChecklist? practicalChecklist = null, Class? cls = null, Subject? subject = null)
     {
         return new SessionResponse
         {
             SessionId = session.SessionId,
             ClassId = session.ClassId,
+            ClassCode = cls?.ClassCode ?? string.Empty,
+            ClassName = cls?.ClassName ?? string.Empty,
             SubjectId = session.SubjectId,
+            SubjectName = subject?.SubjectName ?? string.Empty,
             SessionTitle = session.SessionTitle,
             SessionDate = session.SessionDate,
             Location = session.Location,

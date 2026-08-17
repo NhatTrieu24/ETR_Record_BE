@@ -333,12 +333,13 @@ public static class DataSeeder
             var courseSubjects = await context.CourseSubjects.ToListAsync();
             
             var rand = new Random(42);
+            int instructorIndex = 0;
             foreach(var cls in classEntities)
             {
                 var subjectsForCourse = courseSubjects.Where(cs => cs.CourseId == cls.CourseId).ToList();
                 foreach(var sub in subjectsForCourse)
                 {
-                    var instructorId = instructorIds[rand.Next(instructorIds.Count)];
+                    var instructorId = instructorIds[instructorIndex++ % instructorIds.Count];
                     context.ClassSubjects.Add(new ClassSubject { ClassId = cls.ClassId, SubjectId = sub.SubjectId, InstructorAccountId = instructorId, CreatedAt = DateTime.UtcNow });
                 }
             }
@@ -350,25 +351,28 @@ public static class DataSeeder
             var classSubjects = await context.ClassSubjects.ToListAsync();
             var assessments = await context.Assessments.ToListAsync();
             var checklists = await context.PracticalChecklists.ToListAsync();
+            var rand = new Random(42);
 
             foreach(var cs in classSubjects)
             {
                 var assessment = assessments.FirstOrDefault(a => a.SubjectId == cs.SubjectId);
                 var checklist = checklists.FirstOrDefault(c => c.SubjectId == cs.SubjectId);
+                
+                var baseDate = DateTime.UtcNow.Date.AddDays(rand.Next(-14, 14)).AddHours(rand.Next(8, 17));
 
                 // Session 1 is confirmed, Session 2 is unconfirmed so instructor can test attendance
-                context.Sessions.Add(new Session { ClassId = cs.ClassId, SubjectId = cs.SubjectId, SessionTitle = "Session 1", SessionDate = DateTime.UtcNow.AddDays(-10), IsConfirmed = true, ConfirmedByAccountId = cs.InstructorAccountId });
-                context.Sessions.Add(new Session { ClassId = cs.ClassId, SubjectId = cs.SubjectId, SessionTitle = "Session 2", SessionDate = DateTime.UtcNow.AddDays(2), IsConfirmed = false, ConfirmedByAccountId = null });
+                context.Sessions.Add(new Session { ClassId = cs.ClassId, SubjectId = cs.SubjectId, SessionTitle = "Session 1", SessionDate = baseDate, IsConfirmed = true, ConfirmedByAccountId = cs.InstructorAccountId });
+                context.Sessions.Add(new Session { ClassId = cs.ClassId, SubjectId = cs.SubjectId, SessionTitle = "Session 2", SessionDate = baseDate.AddDays(2).Date.AddHours(rand.Next(8, 17)), IsConfirmed = false, ConfirmedByAccountId = null });
                 
                 // Add exam sessions
                 if (assessment != null)
                 {
-                    context.Sessions.Add(new Session { ClassId = cs.ClassId, SubjectId = cs.SubjectId, SessionTitle = "Theory Exam", SessionDate = DateTime.UtcNow.AddDays(4), IsConfirmed = false, ConfirmedByAccountId = null, IsAssessmentRequired = true, AssessmentId = assessment.AssessmentId });
+                    context.Sessions.Add(new Session { ClassId = cs.ClassId, SubjectId = cs.SubjectId, SessionTitle = "Theory Exam", SessionDate = baseDate.AddDays(4).Date.AddHours(rand.Next(8, 17)), IsConfirmed = false, ConfirmedByAccountId = null, IsAssessmentRequired = true, AssessmentId = assessment.AssessmentId });
                 }
                 
                 if (checklist != null)
                 {
-                    context.Sessions.Add(new Session { ClassId = cs.ClassId, SubjectId = cs.SubjectId, SessionTitle = "Practical Exam", SessionDate = DateTime.UtcNow.AddDays(5), IsConfirmed = false, ConfirmedByAccountId = null, IsChecklistRequired = true, PracticalChecklistId = checklist.PracticalChecklistId });
+                    context.Sessions.Add(new Session { ClassId = cs.ClassId, SubjectId = cs.SubjectId, SessionTitle = "Practical Exam", SessionDate = baseDate.AddDays(5).Date.AddHours(rand.Next(8, 17)), IsConfirmed = false, ConfirmedByAccountId = null, IsChecklistRequired = true, PracticalChecklistId = checklist.PracticalChecklistId });
                 }
             }
             await context.SaveChangesAsync();

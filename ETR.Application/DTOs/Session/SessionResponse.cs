@@ -4,7 +4,10 @@ public class SessionResponse
 {
     public int SessionId { get; set; }
     public int ClassId { get; set; }
+    public string ClassCode { get; set; } = string.Empty;
+    public string ClassName { get; set; } = string.Empty;
     public int SubjectId { get; set; }
+    public string SubjectName { get; set; } = string.Empty;
     public string SessionTitle { get; set; } = string.Empty;
     public DateTime? SessionDate { get; set; }
     public string? Location { get; set; }
