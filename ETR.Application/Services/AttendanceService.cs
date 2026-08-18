@@ -51,6 +51,17 @@ public class AttendanceService : IAttendanceService
                 if (session == null || session.IsConfirmed)
                     throw new BusinessRuleViolationException("Session not found or already confirmed.");
 
+                // Kiểm tra Grace Period (48 giờ): Nếu buổi học đã diễn ra quá 48h, Instructor không thể tự ý điểm danh bù
+                // trừ khi có quyền quản trị (Admin/Academic) can thiệp hỗ trợ.
+                if (session.SessionDate.HasValue)
+                {
+                    var sessionExpiryTime = session.SessionDate.Value.Date.AddDays(1).AddHours(BusinessRuleEngine.AttendanceGracePeriodHours);
+                    if (DateTime.UtcNow > sessionExpiryTime && string.Equals(recordedByRoleName, "Instructor", StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new BusinessRuleViolationException($"Buổi học ngày {session.SessionDate.Value:dd/MM/yyyy} đã vượt quá thời gian cho phép điểm danh bù ({BusinessRuleEngine.AttendanceGracePeriodHours} giờ). Vui lòng liên hệ Academic Staff để xử lý ngoại lệ.");
+                    }
+                }
+
                 // "Sân nhà ai nấy đá" — Instructor can only record attendance for a class they are
                 // actually assigned to (see ClassOwnershipValidator).
                 var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(session.ClassId, ct);
