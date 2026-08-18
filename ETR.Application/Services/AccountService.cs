@@ -97,6 +97,11 @@ public class AccountService : IAccountService
 
     public async Task UpdateAccountStatusAsync(int accountId, string status, int updatedByAccountId, CancellationToken cancellationToken = default)
     {
+        if (accountId == updatedByAccountId && (string.Equals(status, "Inactive", StringComparison.OrdinalIgnoreCase) || string.Equals(status, "Disabled", StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new BusinessRuleViolationException("Không thể tự vô hiệu hóa tài khoản của chính mình.");
+        }
+
         var account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken)
             ?? throw new KeyNotFoundException($"Account {accountId} not found.");
 
@@ -112,6 +117,7 @@ public class AccountService : IAccountService
         }, cancellationToken);
 
         account.Status = status;
+        account.IsActive = string.Equals(status, "Active", StringComparison.OrdinalIgnoreCase);
         account.UpdatedAt = DateTime.UtcNow;
         account.UpdatedByAccountId = updatedByAccountId;
 
@@ -174,6 +180,11 @@ public class AccountService : IAccountService
 
     public async Task DeleteAccountAsync(int accountId, int deletedByAccountId, CancellationToken cancellationToken = default)
     {
+        if (accountId == deletedByAccountId)
+        {
+            throw new BusinessRuleViolationException("Không thể tự xóa tài khoản của chính mình (cả xóa mềm lẫn xóa cứng).");
+        }
+
         var account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken)
             ?? throw new KeyNotFoundException($"Account {accountId} not found.");
 
@@ -190,6 +201,8 @@ public class AccountService : IAccountService
 
         account.IsActive = false;
         account.Status = "Inactive";
+        account.IsDeleted = true;
+        account.DeletedAt = DateTime.UtcNow;
         account.UpdatedAt = DateTime.UtcNow;
         account.UpdatedByAccountId = deletedByAccountId;
 

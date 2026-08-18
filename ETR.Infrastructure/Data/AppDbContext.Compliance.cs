@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ETR.Application.Compliance;
+using ETR.Application.Exceptions;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
 using ETR.Domain.Enums;
@@ -26,6 +27,7 @@ public partial class AppDbContext
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        ValidateAccountSelfDeletion();
         await EnforceImmutabilityAsync(cancellationToken);
 
         StampAuditRequestMetadata();
@@ -42,6 +44,53 @@ public partial class AppDbContext
         changeCount += await base.SaveChangesAsync(cancellationToken);
 
         return changeCount;
+    }
+
+    /// <summary>
+    /// Chặn không cho Admin (hoặc bất kỳ ai) tự xóa chính mình (xóa cứng hoặc xóa mềm) hoặc tự vô hiệu hóa tài khoản của chính mình.
+    /// </summary>
+    private void ValidateAccountSelfDeletion()
+    {
+        if (_currentUserService?.AccountId is not { } currentUserId || currentUserId <= 0)
+        {
+            return;
+        }
+
+        var accountEntries = ChangeTracker.Entries<Account>()
+            .Where(e => e.Entity.AccountId == currentUserId);
+
+        foreach (var entry in accountEntries)
+        {
+            // Chặn xóa cứng (Hard Delete)
+            if (entry.State == EntityState.Deleted)
+            {
+                throw new BusinessRuleViolationException("Không thể tự xóa cứng tài khoản của chính mình.");
+            }
+
+            // Chặn xóa mềm (Soft Delete qua IsDeleted = true)
+            if (entry.State == EntityState.Modified
+                && entry.Property(nameof(BaseEntity.IsDeleted)).IsModified
+                && entry.Entity.IsDeleted)
+            {
+                throw new BusinessRuleViolationException("Không thể tự xóa mềm tài khoản của chính mình.");
+            }
+
+            // Chặn tự vô hiệu hóa tài khoản (Status = Inactive/Disabled hoặc IsActive = false)
+            if (entry.State == EntityState.Modified)
+            {
+                if (entry.Property(nameof(Account.Status)).IsModified
+                    && (string.Equals(entry.Entity.Status, "Inactive", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(entry.Entity.Status, "Disabled", StringComparison.OrdinalIgnoreCase)))
+                {
+                    throw new BusinessRuleViolationException("Không thể tự vô hiệu hóa tài khoản của chính mình.");
+                }
+
+                if (entry.Property(nameof(Account.IsActive)).IsModified && !entry.Entity.IsActive)
+                {
+                    throw new BusinessRuleViolationException("Không thể tự vô hiệu hóa tài khoản của chính mình.");
+                }
+            }
+        }
     }
 
     /// <summary>Backfills IPAddress/UserAgent onto any AuditLog rows about to be inserted —
