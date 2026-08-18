@@ -1,3 +1,5 @@
+using ETR.Domain.Enums;
+
 namespace ETR.Domain.Entities;
 
 public class Class : BaseEntity
@@ -10,5 +12,5 @@ public class Class : BaseEntity
     public DateTime EndDate { get; set; }
     public string? Location { get; set; }
     public int Capacity { get; set; }
-    public string Status { get; set; } = string.Empty;
+    public ClassStatus Status { get; set; }
 }

@@ -120,7 +120,7 @@ public class EnrollmentService : IEnrollmentService
 
                 var studentEnrollments = allEnrollments.Where(e => e.AccountId == accountId).ToList();
                 
-                if (studentEnrollments.Any(e => e.ClassId == classId && e.Status != "Deleted"))
+                if (studentEnrollments.Any(e => e.ClassId == classId && e.Status != EnrollmentStatus.Deleted))
                 {
                     throw new BusinessRuleViolationException("Learner is already enrolled in this exact class.");
                 }
@@ -141,7 +141,7 @@ public class EnrollmentService : IEnrollmentService
                 {
                     AccountId = accountId,
                     ClassId = classId,
-                    Status = "Active",
+                    Status = EnrollmentStatus.Active,
                     EnrolledAt = DateTime.UtcNow,
                     CreatedAt = DateTime.UtcNow,
                     CreatedByAccountId = createdByAccountId
@@ -153,7 +153,7 @@ public class EnrollmentService : IEnrollmentService
                 var etrRecord = new ETRCourseRecord
                 {
                     EnrollmentId = enrollment.EnrollmentId,
-                    Status = "InProgress",
+                    Status = EtrStatus.InProgress,
                     IsLocked = false,
                     CreatedBySystem = true,
                     CreatedAt = DateTime.UtcNow,
@@ -184,7 +184,7 @@ public class EnrollmentService : IEnrollmentService
                         EtrId = etrRecord.ETRCourseRecordId,
                         CourseId = cs.CourseId,
                         SubjectId = cs.SubjectId,
-                        Status = "Pending",
+                        Status = SubjectResultStatus.Pending,
                         PassingScoreSnapshot = cs.PassingScore,
                         CreatedAt = DateTime.UtcNow,
                         CreatedByAccountId = createdByAccountId
@@ -293,7 +293,7 @@ public class EnrollmentService : IEnrollmentService
         var etrRecord = (await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken))
             .FirstOrDefault(e => e.EnrollmentId == id);
 
-        if (etrRecord != null && (etrRecord.IsLocked || (etrRecord.Status != "Draft" && etrRecord.Status != "InProgress")))
+        if (etrRecord != null && (etrRecord.IsLocked || (etrRecord.Status != EtrStatus.Draft && etrRecord.Status != EtrStatus.InProgress)))
         {
             throw new BusinessRuleViolationException($"Cannot delete enrollment because its ETRCourseRecord is already {etrRecord.Status}{(etrRecord.IsLocked ? " and locked" : string.Empty)}.");
         }
@@ -304,12 +304,12 @@ public class EnrollmentService : IEnrollmentService
             ActionType = AuditActionType.DELETE.ToString(),
             EntityName = nameof(CourseEnrollment),
             RecordId = id,
-            OldValue = item.Status,
+            OldValue = item.Status.ToString(),
             NewValue = "Deleted",
             Description = $"Enrollment #{id} (Account {item.AccountId}, Class {item.ClassId}) deleted"
         }, cancellationToken);
 
-        item.Status = "Withdrawn";
+        item.Status = EnrollmentStatus.Withdrawn;
         item.IsDeleted = true;
         item.DeletedAt = DateTime.UtcNow;
         item.UpdatedAt = DateTime.UtcNow;
@@ -324,7 +324,7 @@ public class EnrollmentService : IEnrollmentService
         // in sync anymore — mục #10, docs/todo/9.todo_to_complete_system.md).
         if (etrRecord != null)
         {
-            etrRecord.Status = "Cancelled";
+            etrRecord.Status = EtrStatus.Cancelled;
             etrRecord.IsDeleted = true;
             etrRecord.DeletedAt = DateTime.UtcNow;
             etrRecord.UpdatedAt = DateTime.UtcNow;

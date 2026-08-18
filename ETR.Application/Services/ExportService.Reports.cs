@@ -2,6 +2,7 @@ using ClosedXML.Excel;
 using ETR.Application.Compliance;
 using ETR.Application.DTOs;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -159,7 +160,7 @@ public partial class ExportService
             ETRCourseRecordId = etrCourseRecordId,
             FileName = fileName,
             FilePath = Path.Combine("uploads", "exports", fileName).Replace("\\", "/"),
-            Status = "Completed",
+            Status = ExportJobStatus.Completed,
             RequestedAt = DateTime.UtcNow,
             CompletedAt = DateTime.UtcNow,
             DownloadExpiredAt = DateTime.UtcNow.AddDays(7),
@@ -251,7 +252,7 @@ public partial class ExportService
             sheet.Cell(row, 2).Value = profile?.FullName ?? "-";
             sheet.Cell(row, 3).Value = session?.SessionTitle ?? record.SessionId.ToString();
             sheet.Cell(row, 4).Value = session?.SessionDate?.ToString("yyyy-MM-dd") ?? "-";
-            sheet.Cell(row, 5).Value = record.Status;
+            sheet.Cell(row, 5).Value = record.Status.ToString();
             sheet.Cell(row, 6).Value = record.Remarks ?? "-";
             row++;
         }
@@ -345,7 +346,7 @@ public partial class ExportService
 
             sheet.Cell(row, 1).Value = profile?.UserCode ?? "-";
             sheet.Cell(row, 2).Value = profile?.FullName ?? "-";
-            sheet.Cell(row, 3).Value = etr?.Status ?? "(no ETR)";
+            sheet.Cell(row, 3).Value = etr?.Status.ToString() ?? "(no ETR)";
             sheet.Cell(row, 4).Value = etr?.IssuedDate?.ToString("yyyy-MM-dd") ?? "-";
             sheet.Cell(row, 5).Value = etr?.ExpiryDate?.ToString("yyyy-MM-dd") ?? "-";
             row++;

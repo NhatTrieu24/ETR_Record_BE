@@ -29,6 +29,12 @@ public class ImportService : IImportService
 
     private static readonly string[] ValidAttendanceStatuses = ["Present", "Absent"];
 
+    private const int AccColUsername       = 1;
+    private const int AccColPassword       = 2;
+    private const int AccColRoleName       = 3;
+    private const int AccColDepartmentName = 4;
+    private const int AccDataStartRow      = 3; // row 1 is title, row 2 is header
+
     public ImportService(IUnitOfWork unitOfWork)
     {
         _unitOfWork = unitOfWork;
@@ -49,7 +55,7 @@ public class ImportService : IImportService
         var subject = await _unitOfWork.SubjectRepository.GetByIdAsync(session.SubjectId, ct);
 
         var enrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct))
-            .Where(e => e.ClassId == session.ClassId && !e.IsDeleted && e.Status == "Active")
+            .Where(e => e.ClassId == session.ClassId && !e.IsDeleted && e.Status == EnrollmentStatus.Active)
             .ToList();
 
         var profiles = (await _unitOfWork.UserProfileRepository.GetAllAsync(ct))
@@ -159,19 +165,20 @@ public class ImportService : IImportService
                 foreach (var row in rows)
                 {
                     var existingRecord = allRecords.FirstOrDefault(r => r.SessionId == sessionId && r.EnrollmentId == row.EnrollmentId && !r.IsDeleted);
+                    var newStatus = Enum.Parse<AttendanceStatus>(row.Status, ignoreCase: true);
 
                     if (existingRecord != null)
                     {
                         var oldStatus = existingRecord.Status;
-                        existingRecord.Status = row.Status;
+                        existingRecord.Status = newStatus;
                         existingRecord.Remarks = row.Remarks;
                         existingRecord.UpdatedAt = DateTime.UtcNow;
                         existingRecord.UpdatedByAccountId = recordedByAccountId;
-                        
+
                         _unitOfWork.AttendanceRecordRepository.Update(existingRecord);
                         updated++;
 
-                        if (oldStatus != row.Status)
+                        if (oldStatus != newStatus)
                         {
                             await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                             {
@@ -179,9 +186,9 @@ public class ImportService : IImportService
                                 ActionType = AuditActionType.UPDATE.ToString(),
                                 EntityName = "AttendanceRecord",
                                 RecordId = existingRecord.AttendanceRecordId,
-                                OldValue = oldStatus,
-                                NewValue = row.Status,
-                                Description = $"Import updated AttendanceRecord status from {oldStatus} to {row.Status}",
+                                OldValue = oldStatus.ToString(),
+                                NewValue = newStatus.ToString(),
+                                Description = $"Import updated AttendanceRecord status from {oldStatus} to {newStatus}",
                                 CreatedAt = DateTime.UtcNow
                             }, innerCt);
                         }
@@ -192,7 +199,7 @@ public class ImportService : IImportService
                         {
                             SessionId            = sessionId,
                             EnrollmentId         = row.EnrollmentId,
-                            Status               = row.Status,
+                            Status               = newStatus,
                             Remarks              = row.Remarks,
                             RecordedByAccountId  = recordedByAccountId,
                             RecordedAt           = DateTime.UtcNow,
@@ -253,7 +260,7 @@ public class ImportService : IImportService
             .Select(c => c.ClassId).ToHashSet();
 
         var enrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct))
-            .Where(e => allClasses.Contains(e.ClassId) && !e.IsDeleted && e.Status == "Active")
+            .Where(e => allClasses.Contains(e.ClassId) && !e.IsDeleted && e.Status == EnrollmentStatus.Active)
             .ToList();
 
         var profiles = (await _unitOfWork.UserProfileRepository.GetAllAsync(ct))
@@ -576,7 +583,7 @@ public class ImportService : IImportService
             .ToHashSet();
 
         var activeEnrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct))
-            .Where(e => !e.IsDeleted && e.Status == "Active" && classesInCourse.Contains(e.ClassId))
+            .Where(e => !e.IsDeleted && e.Status == EnrollmentStatus.Active && classesInCourse.Contains(e.ClassId))
             .ToList();
 
         var validAccountIds = activeEnrollments.Select(e => e.AccountId).ToHashSet();
@@ -639,12 +646,188 @@ public class ImportService : IImportService
 
             int present = allRecords.Count(r =>
                 r.EnrollmentId == enrollmentId &&
-                string.Equals(r.Status, "Present", StringComparison.OrdinalIgnoreCase));
+                r.Status == AttendanceStatus.Present);
             sr.AttendanceRate = totalSessions > 0
                 ? Math.Round((decimal)present / totalSessions * 100, 2)
                 : 0;
             sr.UpdatedAt = DateTime.UtcNow;
             _unitOfWork.SubjectResultRepository.Update(sr);
         }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  ACCOUNTS (bulk user creation)
+    // ════════════════════════════════════════════════════════════════════════
+
+    public async Task<byte[]> GenerateAccountImportTemplateAsync(CancellationToken ct = default)
+    {
+        var roles = (await _unitOfWork.RoleRepository.GetAllAsync(ct)).Select(r => r.RoleName).OrderBy(n => n).ToList();
+        var departments = (await _unitOfWork.DepartmentRepository.GetAllAsync(ct)).Select(d => d.DepartmentName).OrderBy(n => n).ToList();
+
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Tài khoản");
+
+        // ── Row 1: title ──────────────────────────────────────────────────
+        ws.Cell(1, 1).Value = "TẠO HÀNG LOẠT TÀI KHOẢN NGƯỜI DÙNG";
+        ws.Range(1, 1, 1, AccColDepartmentName).Merge().Style
+            .Font.SetBold(true)
+            .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+
+        // ── Row 2: column headers ─────────────────────────────────────────
+        ws.Cell(2, AccColUsername).Value = "Username (email)*";
+        ws.Cell(2, AccColPassword).Value = "Mật khẩu*";
+        ws.Cell(2, AccColRoleName).Value = "Vai trò (Role)*";
+        ws.Cell(2, AccColDepartmentName).Value = "Phòng ban (Department)*";
+        ws.Row(2).Style.Font.SetBold(true)
+            .Fill.SetBackgroundColor(XLColor.LightSteelBlue);
+
+        ws.Columns().AdjustToContents();
+
+        // Dropdown validation for Role/Department columns over a generous row range so users can
+        // keep adding rows below the pre-filled ones.
+        const int maxTemplateRows = 500;
+        var roleRange = ws.Range(AccDataStartRow, AccColRoleName, AccDataStartRow + maxTemplateRows, AccColRoleName);
+        roleRange.CreateDataValidation().List($"\"{string.Join(",", roles)}\"", true);
+        var deptRange = ws.Range(AccDataStartRow, AccColDepartmentName, AccDataStartRow + maxTemplateRows, AccColDepartmentName);
+        deptRange.CreateDataValidation().List($"\"{string.Join(",", departments)}\"", true);
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return stream.ToArray();
+    }
+
+    public async Task<ImportValidationResult> ValidateAccountImportAsync(Stream fileStream, bool isCallerAdmin, CancellationToken ct = default)
+    {
+        var rows = await ParseAccountRowsAsync(fileStream, ct);
+        var errors = await ValidateAccountRowsAsync(rows, isCallerAdmin, ct);
+        return new ImportValidationResult(
+            TotalRows: rows.Count,
+            ValidRows: rows.Count - errors.Select(e => e.Row).Distinct().Count(),
+            ErrorRows: errors.Select(e => e.Row).Distinct().Count(),
+            CanCommit: errors.Count == 0,
+            Errors: errors);
+    }
+
+    public async Task<ImportCommitResult> CommitAccountImportAsync(
+        Stream fileStream, int createdByAccountId, bool isCallerAdmin, CancellationToken ct = default)
+    {
+        var rows = await ParseAccountRowsAsync(fileStream, ct);
+        var errors = await ValidateAccountRowsAsync(rows, isCallerAdmin, ct);
+        if (errors.Count > 0)
+            return new ImportCommitResult(Imported: 0, Skipped: rows.Count, Errors: errors);
+
+        return await _unitOfWork.ExecuteInStrategyAsync(async (innerCt) =>
+        {
+            await _unitOfWork.BeginTransactionAsync(innerCt);
+            try
+            {
+                var roles = (await _unitOfWork.RoleRepository.GetAllAsync(innerCt))
+                    .ToDictionary(r => r.RoleName, r => r.RoleId, StringComparer.OrdinalIgnoreCase);
+                var departments = (await _unitOfWork.DepartmentRepository.GetAllAsync(innerCt))
+                    .ToDictionary(d => d.DepartmentName, d => d.DepartmentId, StringComparer.OrdinalIgnoreCase);
+
+                var imported = 0;
+                foreach (var row in rows)
+                {
+                    var account = new Account
+                    {
+                        Username = row.Username,
+                        PasswordHash = BCrypt.Net.BCrypt.HashPassword(row.Password),
+                        RoleId = roles[row.RoleName],
+                        DepartmentId = departments[row.DepartmentName],
+                        Status = AccountStatus.Active,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                        CreatedByAccountId = createdByAccountId
+                    };
+
+                    await _unitOfWork.AccountRepository.AddAsync(account, innerCt);
+                    await _unitOfWork.SaveAsync(innerCt);
+
+                    await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                    {
+                        AccountId = createdByAccountId,
+                        ActionType = AuditActionType.INSERT.ToString(),
+                        EntityName = nameof(Account),
+                        RecordId = account.AccountId,
+                        NewValue = account.Username,
+                        Description = $"Account #{account.AccountId} ({account.Username}) created via bulk Excel import (row {row.RowNumber})"
+                    }, innerCt);
+
+                    imported++;
+                }
+
+                await _unitOfWork.SaveAsync(innerCt);
+                await _unitOfWork.CommitTransactionAsync(innerCt);
+
+                return new ImportCommitResult(Imported: imported, Skipped: 0, Errors: []);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync(innerCt);
+                throw;
+            }
+        }, ct);
+    }
+
+    private static Task<List<AccountImportRow>> ParseAccountRowsAsync(Stream fileStream, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var workbook = new XLWorkbook(fileStream);
+        var ws = workbook.Worksheet(1);
+        var rows = new List<AccountImportRow>();
+        int lastRow = ws.LastRowUsed()?.RowNumber() ?? AccDataStartRow - 1;
+
+        for (int r = AccDataStartRow; r <= lastRow; r++)
+        {
+            var username = ws.Cell(r, AccColUsername).GetString().Trim();
+            if (string.IsNullOrEmpty(username)) continue;
+
+            var password = ws.Cell(r, AccColPassword).GetString().Trim();
+            var roleName = ws.Cell(r, AccColRoleName).GetString().Trim();
+            var departmentName = ws.Cell(r, AccColDepartmentName).GetString().Trim();
+            rows.Add(new AccountImportRow(r, username, password, roleName, departmentName));
+        }
+        return Task.FromResult(rows);
+    }
+
+    private async Task<List<ImportRowError>> ValidateAccountRowsAsync(List<AccountImportRow> rows, bool isCallerAdmin, CancellationToken ct)
+    {
+        var errors = new List<ImportRowError>();
+
+        var roles = (await _unitOfWork.RoleRepository.GetAllAsync(ct))
+            .ToDictionary(r => r.RoleName, r => r.RoleId, StringComparer.OrdinalIgnoreCase);
+        var departments = (await _unitOfWork.DepartmentRepository.GetAllAsync(ct))
+            .Select(d => d.DepartmentName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var existingUsernames = (await _unitOfWork.AccountRepository.GetAllAsync(ct))
+            .Select(a => a.Username)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var seenInFile = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in rows)
+        {
+            if (!new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(row.Username) || row.Username.Length > 255)
+                errors.Add(new ImportRowError(row.RowNumber, "Username", $"Username '{row.Username}' phải là email hợp lệ, tối đa 255 ký tự."));
+
+            if (string.IsNullOrWhiteSpace(row.Password))
+                errors.Add(new ImportRowError(row.RowNumber, "Password", "Mật khẩu không được để trống."));
+
+            if (!roles.ContainsKey(row.RoleName))
+                errors.Add(new ImportRowError(row.RowNumber, "RoleName", $"Vai trò '{row.RoleName}' không tồn tại."));
+            else if (!isCallerAdmin && !string.Equals(row.RoleName, "Student", StringComparison.OrdinalIgnoreCase))
+                errors.Add(new ImportRowError(row.RowNumber, "RoleName", "Academic staff chỉ được tạo tài khoản Student."));
+
+            if (!departments.Contains(row.DepartmentName))
+                errors.Add(new ImportRowError(row.RowNumber, "DepartmentName", $"Phòng ban '{row.DepartmentName}' không tồn tại."));
+
+            if (existingUsernames.Contains(row.Username))
+                errors.Add(new ImportRowError(row.RowNumber, "Username", $"Username '{row.Username}' đã tồn tại trong hệ thống."));
+
+            if (!seenInFile.Add(row.Username))
+                errors.Add(new ImportRowError(row.RowNumber, "Username", $"Username '{row.Username}' bị trùng lặp trong file."));
+        }
+
+        return errors;
     }
 }

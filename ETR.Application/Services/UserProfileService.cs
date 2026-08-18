@@ -1,3 +1,4 @@
+using ETR.Application.Compliance;
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
@@ -150,8 +151,15 @@ public class UserProfileService : IUserProfileService
         return MapToResponse(profile);
     }
 
-    public async Task<UserProfileResponse> UpdateProfileStatusAsync(int accountId, string status, int updatedByAccountId, CancellationToken cancellationToken = default)
+    public async Task<UserProfileResponse> UpdateProfileStatusAsync(int accountId, LearnerStatus status, int updatedByAccountId, CancellationToken cancellationToken = default)
     {
+        // Grounded is set/cleared only by CertificateValidityCalculator consumers (auto-detection of
+        // expired certificates) — never by a manual profile edit, see LearnerStatus enum docs.
+        if (status == LearnerStatus.Grounded)
+        {
+            throw new BusinessRuleViolationException("Status must be one of: Active, Withdrawn, Graduated. Grounded is set automatically by the system.");
+        }
+
         var profiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
         var profile = profiles.FirstOrDefault(p => p.AccountId == accountId)
             ?? throw new KeyNotFoundException($"UserProfile for Account {accountId} not found.");
@@ -164,8 +172,8 @@ public class UserProfileService : IUserProfileService
             ActionType = AuditActionType.UPDATE.ToString(),
             EntityName = nameof(UserProfile),
             RecordId = profile.AccountId,
-            OldValue = oldStatus,
-            NewValue = status,
+            OldValue = oldStatus.ToString(),
+            NewValue = status.ToString(),
             Description = $"UserProfile for Account #{accountId} status changed from '{oldStatus}' to '{status}'"
         }, cancellationToken);
 

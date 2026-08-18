@@ -93,7 +93,7 @@ public class SearchController : ControllerBase
         {
             etrs = etrs.Where(etr =>
             {
-                if (etr.Status.Contains(query, StringComparison.OrdinalIgnoreCase)) return true;
+                if (etr.Status.ToString().Contains(query, StringComparison.OrdinalIgnoreCase)) return true;
                 if (etr.ETRCourseRecordId.ToString() == query) return true;
 
                 var enrollment = enrollments.FirstOrDefault(e => e.EnrollmentId == etr.EnrollmentId);

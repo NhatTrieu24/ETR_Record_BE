@@ -148,4 +148,65 @@ public class ImportController : ControllerBase
 
         return Ok(result);
     }
+
+    // ── Accounts (bulk user creation) ───────────────────────────────────────
+
+    /// <summary>
+    /// [Module/Flow]: Bulk Import — Accounts
+    /// [Core Responsibility]: Tải về file Excel mẫu tạo hàng loạt tài khoản người dùng (dropdown Role/Department).
+    /// [Target Audience]: Admin, Academic
+    /// </summary>
+    [HttpGet("accounts/template")]
+    [Authorize(Roles = "Admin,Academic")]
+    public async Task<IActionResult> GetAccountImportTemplate(CancellationToken cancellationToken)
+    {
+        var bytes = await _importService.GenerateAccountImportTemplateAsync(cancellationToken);
+        return File(bytes,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "bulk_create_accounts.xlsx");
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Bulk Import — Accounts
+    /// [Core Responsibility]: Validate file Excel tạo tài khoản (dry-run, không ghi DB). Trả về danh sách lỗi nếu có.
+    /// [Target Audience]: Admin, Academic
+    /// </summary>
+    [HttpPost("accounts/validate")]
+    [Authorize(Roles = "Admin,Academic")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> ValidateAccountImport(IFormFile file, CancellationToken cancellationToken)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("File không được để trống.");
+
+        var isCallerAdmin = User.IsInRole("Admin");
+        await using var stream = file.OpenReadStream();
+        var result = await _importService.ValidateAccountImportAsync(stream, isCallerAdmin, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Bulk Import — Accounts
+    /// [Core Responsibility]: Validate và tạo toàn bộ tài khoản từ file Excel vào DB trong một transaction.
+    /// [Target Audience]: Admin, Academic
+    /// </summary>
+    [HttpPost("accounts/commit")]
+    [Authorize(Roles = "Admin,Academic")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> CommitAccountImport(IFormFile file, CancellationToken cancellationToken)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("File không được để trống.");
+
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        var isCallerAdmin = User.IsInRole("Admin");
+
+        await using var stream = file.OpenReadStream();
+        var result = await _importService.CommitAccountImportAsync(stream, accountId, isCallerAdmin, cancellationToken);
+
+        if (result.Errors.Count > 0 && result.Imported == 0)
+            return BadRequest(result);
+
+        return Ok(result);
+    }
 }

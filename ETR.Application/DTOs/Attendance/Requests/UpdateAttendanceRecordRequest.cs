@@ -1,8 +1,9 @@
 using System.ComponentModel.DataAnnotations;
+using ETR.Domain.Enums;
 
 namespace ETR.Application.DTOs;
 
 public record UpdateAttendanceRecordRequest(
-    [Required, RegularExpression("^(Present|Absent)$", ErrorMessage = "Status must be one of: Present, Absent.")] string Status,
+    [Required] AttendanceStatus Status,
     [MaxLength(500)] string? Remarks
 );

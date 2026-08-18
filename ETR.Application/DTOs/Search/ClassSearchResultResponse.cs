@@ -1,3 +1,5 @@
+using ETR.Domain.Enums;
+
 namespace ETR.Application.DTOs;
 
 public record ClassSearchResultResponse(
@@ -6,4 +8,4 @@ public record ClassSearchResultResponse(
     string ClassName,
     string CourseCode,
     string CourseName,
-    string Status);
+    ClassStatus Status);

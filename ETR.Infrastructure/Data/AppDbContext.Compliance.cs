@@ -142,7 +142,7 @@ public partial class AppDbContext
                 .AsNoTracking()
                 .IgnoreQueryFilters()
                 .Where(e => enrollmentIds.Contains(e.EnrollmentId))
-                .Select(e => new { e.EnrollmentId, Context = new EtrRecordContext(e.ETRCourseRecordId, e.Status, e.IsLocked) })
+                .Select(e => new { e.EnrollmentId, Context = new EtrRecordContext(e.ETRCourseRecordId, e.Status.ToString(), e.IsLocked) })
                 .ToDictionaryAsync(e => e.EnrollmentId, e => e.Context, cancellationToken);
         }
 
@@ -159,7 +159,7 @@ public partial class AppDbContext
                 {
                     EntityName = entityName,
                     Action = action,
-                    OriginalEtrStatus = entry.Property(nameof(ETRCourseRecord.Status)).OriginalValue as string,
+                    OriginalEtrStatus = ((EtrStatus?)entry.Property(nameof(ETRCourseRecord.Status)).OriginalValue)?.ToString(),
                     OriginalEtrIsLocked = entry.Property(nameof(ETRCourseRecord.IsLocked)).OriginalValue as bool?,
                     // Status is allowed to change ONLY as part of the Reopen transition itself
                     // (Completed -> Verified, see EtrService.UnlockEtrAsync) — any other status change
@@ -168,8 +168,8 @@ public partial class AppDbContext
                         && entry.Property(nameof(ETRCourseRecord.IsLocked)).OriginalValue is true
                         && entry.Property(nameof(ETRCourseRecord.IsLocked)).CurrentValue is false
                         && (!entry.Property(nameof(ETRCourseRecord.Status)).IsModified
-                            || (entry.Property(nameof(ETRCourseRecord.Status)).OriginalValue as string == "Completed"
-                                && entry.Property(nameof(ETRCourseRecord.Status)).CurrentValue as string == "Verified"))
+                            || ((EtrStatus?)entry.Property(nameof(ETRCourseRecord.Status)).OriginalValue == EtrStatus.Completed
+                                && (EtrStatus?)entry.Property(nameof(ETRCourseRecord.Status)).CurrentValue == EtrStatus.Verified))
                         && !entry.Property(nameof(ETRCourseRecord.SubmittedAt)).IsModified
                         && !entry.Property(nameof(ETRCourseRecord.VerifiedAt)).IsModified
                         && !entry.Property(nameof(ETRCourseRecord.CompletedAt)).IsModified

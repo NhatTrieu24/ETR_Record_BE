@@ -55,6 +55,25 @@ public partial class AppDbContext : DbContext
         ConfigureDecimalPrecision(modelBuilder);
         ConfigureRelationships(modelBuilder);
         ConfigureSoftDeleteFilters(modelBuilder);
+        ConfigureEnumConversions(modelBuilder);
+    }
+
+    // Every Status-like field that used to be a raw string is now a C# enum for type safety, but the
+    // DB column stays nvarchar (HasConversion<string>()) — no migration, no data rewrite, existing rows
+    // (and hand-written SQL in Deploy_ETR_System.sql / raw queries) keep reading/writing the same text.
+    private static void ConfigureEnumConversions(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Course>().Property(c => c.Status).HasConversion<string>();
+        modelBuilder.Entity<Subject>().Property(s => s.Status).HasConversion<string>();
+        modelBuilder.Entity<Class>().Property(c => c.Status).HasConversion<string>();
+        modelBuilder.Entity<Account>().Property(a => a.Status).HasConversion<string>();
+        modelBuilder.Entity<ETRCourseRecord>().Property(e => e.Status).HasConversion<string>();
+        modelBuilder.Entity<CourseEnrollment>().Property(e => e.Status).HasConversion<string>();
+        modelBuilder.Entity<SubjectResult>().Property(sr => sr.Status).HasConversion<string>();
+        modelBuilder.Entity<ExportJob>().Property(ej => ej.Status).HasConversion<string>();
+        modelBuilder.Entity<AttendanceRecord>().Property(ar => ar.Status).HasConversion<string>();
+        modelBuilder.Entity<AmendmentRequest>().Property(a => a.Status).HasConversion<string>();
+        modelBuilder.Entity<UserProfile>().Property(u => u.Status).HasConversion<string>();
     }
 
     private static void ConfigureKeys(ModelBuilder modelBuilder)

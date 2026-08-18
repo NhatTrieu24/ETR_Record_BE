@@ -2,6 +2,7 @@ using ETR.Application.Compliance;
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -47,7 +48,7 @@ public class AuthController : ControllerBase
 
         var passwordIsValid = BCrypt.Net.BCrypt.Verify(request.Password, account?.PasswordHash ?? DummyPasswordHash);
 
-        if (account == null || account.Status != "Active" || !passwordIsValid)
+        if (account == null || account.Status != AccountStatus.Active || !passwordIsValid)
         {
             return Unauthorized("Invalid credentials or account is inactive.");
         }

@@ -1,3 +1,5 @@
+using ETR.Domain.Enums;
+
 namespace ETR.Application.DTOs;
 
 public record ExportJobResponse(
@@ -6,7 +8,7 @@ public record ExportJobResponse(
     string ExportType,
     string FileName,
     string FilePath,
-    string Status,
+    ExportJobStatus Status,
     DateTime RequestedAt,
     DateTime? CompletedAt,
     DateTime? DownloadExpiredAt,

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using ETR.Domain.Enums;
 
 namespace ETR.Application.DTOs;
 
@@ -7,7 +8,7 @@ public record AccountResponse(
     string Username,
     int? RoleId,
     int? DepartmentId,
-    string Status,
+    AccountStatus Status,
     bool IsActive);
 
 public record CreateAccountRequest(
@@ -17,7 +18,7 @@ public record CreateAccountRequest(
     [Required] int DepartmentId);
 
 public record UpdateAccountStatusRequest(
-    [Required, MaxLength(20)] string Status);
+    [Required] AccountStatus Status);
 
 public record UpdateAccountRoleRequest(
     [Required] int RoleId);

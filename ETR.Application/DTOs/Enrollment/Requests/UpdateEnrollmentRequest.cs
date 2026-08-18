@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using ETR.Domain.Enums;
 
 namespace ETR.Application.DTOs;
 
@@ -6,5 +7,5 @@ public record UpdateEnrollmentRequest(
     int EnrollmentId,
     int LearnerId,
     int ClassId,
-    [Required, MaxLength(20)] string Status,
+    [Required] EnrollmentStatus Status,
     DateTime EnrolledAt);

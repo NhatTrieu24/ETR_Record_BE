@@ -3,6 +3,7 @@ using ETR.Application.Compliance;
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 using Microsoft.Extensions.Logging;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -27,7 +28,7 @@ public partial class ExportService : IExportService
         var etr = await _unitOfWork.ETRCourseRecordRepository.GetWithSubjectResultsAsync(etrCourseRecordId, cancellationToken)
             ?? throw new KeyNotFoundException("ETRCourseRecord not found.");
 
-        if (etr.Status != "Completed")
+        if (etr.Status != EtrStatus.Completed)
         {
             throw new BusinessRuleViolationException("Cannot export Training Package. ETR is not in Completed status.");
         }
@@ -157,7 +158,7 @@ public partial class ExportService : IExportService
             ETRCourseRecordId = etrCourseRecordId,
             FileName = zipFileName,
             FilePath = Path.Combine("uploads", "exports", zipFileName).Replace("\\", "/"),
-            Status = "Completed",
+            Status = ExportJobStatus.Completed,
             RequestedAt = DateTime.UtcNow,
             CompletedAt = DateTime.UtcNow,
             DownloadExpiredAt = DateTime.UtcNow.AddDays(7),
@@ -233,7 +234,7 @@ public partial class ExportService : IExportService
         AddInfoRow("Class Name", trainingClass.ClassName);
         AddInfoRow("Course Code", course.CourseCode);
         AddInfoRow("Course Name", course.CourseName);
-        AddInfoRow("Status", etr.Status);
+        AddInfoRow("Status", etr.Status.ToString());
         AddInfoRow("Submitted At", etr.SubmittedAt?.ToString("u") ?? "-");
         AddInfoRow("Verified At", etr.VerifiedAt?.ToString("u") ?? "-");
         AddInfoRow("Completed At", etr.CompletedAt?.ToString("u") ?? "-");
@@ -255,7 +256,7 @@ public partial class ExportService : IExportService
             var subject = subjects.GetValueOrDefault(sr.SubjectId);
             sheet.Cell(row, 1).Value = subject?.SubjectCode ?? sr.SubjectId.ToString();
             sheet.Cell(row, 2).Value = subject?.SubjectName ?? "-";
-            sheet.Cell(row, 3).Value = sr.Status;
+            sheet.Cell(row, 3).Value = sr.Status.ToString();
             sheet.Cell(row, 4).Value = sr.Score?.ToString("0.##") ?? "-";
             sheet.Cell(row, 5).Value = sr.AttendanceRate?.ToString("0.##") ?? "-";
             row++;
@@ -302,7 +303,7 @@ public partial class ExportService : IExportService
                         AddRow(table, "Student", studentProfile?.FullName ?? "(unknown)");
                         AddRow(table, "Student Code", studentProfile?.UserCode ?? "(unknown)");
                         AddRow(table, "Class", $"{trainingClass.ClassCode} — {trainingClass.ClassName}");
-                        AddRow(table, "Status", etr.Status);
+                        AddRow(table, "Status", etr.Status.ToString());
                         AddRow(table, "Submitted At", etr.SubmittedAt?.ToString("u") ?? "-");
                         AddRow(table, "Verified At", etr.VerifiedAt?.ToString("u") ?? "-");
                         AddRow(table, "Completed At", etr.CompletedAt?.ToString("u") ?? "-");

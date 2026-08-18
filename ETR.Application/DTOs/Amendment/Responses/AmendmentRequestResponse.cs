@@ -1,3 +1,5 @@
+using ETR.Domain.Enums;
+
 namespace ETR.Application.DTOs.Amendment;
 
 public record AmendmentRequestResponse(
@@ -7,7 +9,7 @@ public record AmendmentRequestResponse(
     string Reason,
     string OldValue,
     string? NewValue,
-    string Status,
+    AmendmentStatus Status,
     int? ApprovedByAccountId,
     DateTime? ApprovedAt,
     string? DecisionComment,

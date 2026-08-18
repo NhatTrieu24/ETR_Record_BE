@@ -1,3 +1,5 @@
+using ETR.Domain.Enums;
+
 namespace ETR.Domain.Entities;
 
 public class Course : BaseEntity
@@ -7,7 +9,7 @@ public class Course : BaseEntity
     public string CourseName { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public int DurationHours { get; set; }
-    public string Status { get; set; } = string.Empty;
+    public CourseStatus Status { get; set; }
     public int? ValidityMonths { get; set; }
     public string? CourseType { get; set; }
 

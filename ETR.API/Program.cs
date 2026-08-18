@@ -18,8 +18,32 @@ try
     var builder = WebApplication.CreateBuilder(args);
 
     // 1. Thêm cấu hình Controllers và Swagger/Endpoints
-    builder.Services.AddControllers();
+    // JsonStringEnumConverter: Status fields are now C# enums (see ETR.Domain.Enums) instead of raw
+    // strings — this keeps their JSON wire format as the enum's name ("Active", not 0) so the existing
+    // frontend contract is unaffected by the change.
+    builder.Services.AddControllers()
+        .AddJsonOptions(options =>
+        {
+            options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+        });
     builder.Services.AddEndpointsApiExplorer();
+
+    // Model-binding/DataAnnotations validation errors (auto-triggered by [ApiController] before an action
+    // even runs) go through the same 422 "validation" contract as GlobalExceptionHandler's ValidationException
+    // arm, instead of the framework's default 400 — one consistent status code for every validation failure.
+    builder.Services.Configure<Microsoft.AspNetCore.Mvc.ApiBehaviorOptions>(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var problemDetails = new Microsoft.AspNetCore.Mvc.ValidationProblemDetails(context.ModelState)
+            {
+                Status = StatusCodes.Status422UnprocessableEntity,
+                Title = "Validation failed",
+                Instance = context.HttpContext.Request.Path
+            };
+            return new Microsoft.AspNetCore.Mvc.UnprocessableEntityObjectResult(problemDetails);
+        };
+    });
 
     // Cấu hình Swagger để hỗ trợ JWT Authentication
     builder.Services.AddSwaggerGen(c =>

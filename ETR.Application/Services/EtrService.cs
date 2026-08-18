@@ -192,7 +192,7 @@ public class EtrService : IEtrService
         foreach (var cs in courseSubjects)
         {
             var sr = etr.SubjectResults?.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
-            if (sr == null || (sr.Status != "Passed" && sr.Status != "Exempted"))
+            if (sr == null || (sr.Status != SubjectResultStatus.Passed && sr.Status != SubjectResultStatus.Exempted))
             {
                 throw new BusinessRuleViolationException($"Cannot submit ETR. Mandatory subject (ID: {cs.SubjectId}) is not Passed or Exempted.");
             }
@@ -257,7 +257,7 @@ public class EtrService : IEtrService
                     foreach (var cs in courseSubjects)
                     {
                         var sr = etr.SubjectResults?.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
-                        if (sr == null || (sr.Status != "Passed" && sr.Status != "Exempted"))
+                        if (sr == null || (sr.Status != SubjectResultStatus.Passed && sr.Status != SubjectResultStatus.Exempted))
                         {
                             throw new BusinessRuleViolationException($"Cannot submit ETR. Completion requirement '{requirement.RequirementName}' not met: not all mandatory subjects are Passed or Exempted.");
                         }
@@ -291,13 +291,13 @@ public class EtrService : IEtrService
             ActionType = AuditActionType.SUBMIT.ToString(),
             EntityName = nameof(ETRCourseRecord),
             RecordId = etrCourseRecordId,
-            OldValue = etr.Status,
+            OldValue = etr.Status.ToString(),
             NewValue = "Submitted",
             Description = $"ETR #{etrCourseRecordId} submitted for QA verification"
         };
         await _unitOfWork.AuditLogRepository.AddAsync(auditLog, cancellationToken);
 
-        etr.Status = "Submitted";
+        etr.Status = EtrStatus.Submitted;
         etr.SubmittedAt = DateTime.UtcNow;
         etr.UpdatedAt = DateTime.UtcNow;
         etr.UpdatedByAccountId = accountId;
@@ -332,8 +332,8 @@ public class EtrService : IEtrService
         {
             var sr = etr.SubjectResults?.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
             var subjectName = subjects.GetValueOrDefault(cs.SubjectId)?.SubjectName ?? $"Subject #{cs.SubjectId}";
-            var isMet = sr != null && (sr.Status == "Passed" || sr.Status == "Exempted");
-            checks.Add(new CompletionCheckItem($"Subject Passed/Exempted: {subjectName}", true, isMet, sr?.Status ?? "(no result yet)"));
+            var isMet = sr != null && (sr.Status == SubjectResultStatus.Passed || sr.Status == SubjectResultStatus.Exempted);
+            checks.Add(new CompletionCheckItem($"Subject Passed/Exempted: {subjectName}", true, isMet, sr?.Status.ToString() ?? "(no result yet)"));
         }
 
         // 2. Attendance rate >= minimum threshold (one check per subject result)
@@ -382,7 +382,7 @@ public class EtrService : IEtrService
                     isMet = courseSubjects.All(cs =>
                     {
                         var sr = etr.SubjectResults?.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
-                        return sr != null && (sr.Status == "Passed" || sr.Status == "Exempted");
+                        return sr != null && (sr.Status == SubjectResultStatus.Passed || sr.Status == SubjectResultStatus.Exempted);
                     });
                     break;
 
@@ -415,7 +415,7 @@ public class EtrService : IEtrService
         var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(etrCourseRecordId, cancellationToken)
             ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
 
-        if (etr.Status != "Submitted")
+        if (etr.Status != EtrStatus.Submitted)
             throw new BusinessRuleViolationException("Cannot verify ETR that is not in Submitted status.");
 
         // === AUDIT LOG ===
@@ -426,13 +426,13 @@ public class EtrService : IEtrService
             ActionType = AuditActionType.VERIFY.ToString(),
             EntityName = nameof(ETRCourseRecord),
             RecordId = etrCourseRecordId,
-            OldValue = etr.Status,
+            OldValue = etr.Status.ToString(),
             NewValue = "Verified",
             Description = $"ETR #{etrCourseRecordId} verified by QA"
         };
         await _unitOfWork.AuditLogRepository.AddAsync(auditLog, cancellationToken);
 
-        etr.Status = "Verified";
+        etr.Status = EtrStatus.Verified;
         etr.VerifiedAt = DateTime.UtcNow;
         etr.UpdatedAt = DateTime.UtcNow;
         etr.UpdatedByAccountId = accountId;
@@ -448,7 +448,7 @@ public class EtrService : IEtrService
         var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(etrCourseRecordId, cancellationToken)
             ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
 
-        if (etr.Status != "Submitted")
+        if (etr.Status != EtrStatus.Submitted)
             throw new BusinessRuleViolationException("Cannot return ETR that is not in Submitted status.");
 
         if (string.IsNullOrWhiteSpace(comment))
@@ -462,13 +462,13 @@ public class EtrService : IEtrService
             ActionType = AuditActionType.RETURN.ToString(),
             EntityName = nameof(ETRCourseRecord),
             RecordId = etrCourseRecordId,
-            OldValue = etr.Status,
+            OldValue = etr.Status.ToString(),
             NewValue = "ReturnedForCorrection",
             Description = $"ETR #{etrCourseRecordId} returned for correction by QA. Comment: {comment ?? "N/A"}"
         };
         await _unitOfWork.AuditLogRepository.AddAsync(auditLog, cancellationToken);
 
-        etr.Status = "ReturnedForCorrection";
+        etr.Status = EtrStatus.ReturnedForCorrection;
         etr.UpdatedAt = DateTime.UtcNow;
         etr.UpdatedByAccountId = accountId;
 
@@ -483,7 +483,7 @@ public class EtrService : IEtrService
         var etr = await _unitOfWork.ETRCourseRecordRepository.GetWithSubjectResultsAsync(etrCourseRecordId, cancellationToken)
             ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
 
-        if (etr.Status != "Verified")
+        if (etr.Status != EtrStatus.Verified)
             throw new BusinessRuleViolationException("Cannot complete ETR that is not in Verified status.");
 
         var enrollment = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(etr.EnrollmentId, cancellationToken);
@@ -501,7 +501,7 @@ public class EtrService : IEtrService
         foreach (var cs in courseSubjects)
         {
             var sr = etr.SubjectResults.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
-            if (sr == null || (sr.Status != "Passed" && sr.Status != "Exempted"))
+            if (sr == null || (sr.Status != SubjectResultStatus.Passed && sr.Status != SubjectResultStatus.Exempted))
             {
                 throw new BusinessRuleViolationException($"Cannot complete ETR. Mandatory subject (ID: {cs.SubjectId}) is not Passed or Exempted.");
             }
@@ -527,7 +527,7 @@ public class EtrService : IEtrService
             ActionType = AuditActionType.APPROVE.ToString(),
             EntityName = nameof(ETRCourseRecord),
             RecordId = etrCourseRecordId,
-            OldValue = etr.Status,
+            OldValue = etr.Status.ToString(),
             NewValue = "Completed",
             Description = $"ETR #{etrCourseRecordId} completed and locked by Training Manager"
         };
@@ -535,7 +535,7 @@ public class EtrService : IEtrService
 
         var course = await _unitOfWork.CourseRepository.GetByIdAsync(trainingClass.CourseId, cancellationToken);
 
-        etr.Status = "Completed";
+        etr.Status = EtrStatus.Completed;
         etr.CompletedAt = DateTime.UtcNow;
         etr.IsLocked = true;
         etr.IssuedDate = DateTime.UtcNow;
@@ -598,8 +598,8 @@ public class EtrService : IEtrService
                     ActionType = AuditActionType.UPDATE.ToString(),
                     EntityName = nameof(UserProfile),
                     RecordId = learnerProfile.AccountId,
-                    OldValue = LearnerStatus.Grounded,
-                    NewValue = LearnerStatus.Active,
+                    OldValue = LearnerStatus.Grounded.ToString(),
+                    NewValue = LearnerStatus.Active.ToString(),
                     Description = $"UserProfile for Account #{learnerProfile.AccountId} auto-cleared from Grounded: ETR #{etrCourseRecordId} just Completed and no other course has an expired completed ETR."
                 }, cancellationToken);
 
@@ -658,7 +658,7 @@ public class EtrService : IEtrService
         // Re-opening a Completed/Locked ETR is the FRD's explicitly-named exception to absolute
         // immutability — it must always leave a full audit trail, since it's the one path that lets
         // previously-frozen data become editable again.
-        var wasCompleted = etr.Status == "Completed";
+        var wasCompleted = etr.Status == EtrStatus.Completed;
 
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
         {
@@ -685,7 +685,7 @@ public class EtrService : IEtrService
         etr.IsLocked = false;
         if (wasCompleted)
         {
-            etr.Status = "Verified";
+            etr.Status = EtrStatus.Verified;
         }
         etr.UpdatedAt = DateTime.UtcNow;
         etr.UpdatedByAccountId = accountId;
@@ -870,8 +870,8 @@ public class EtrService : IEtrService
                     ActionType = AuditActionType.UPDATE.ToString(),
                     EntityName = nameof(UserProfile),
                     RecordId = profile.AccountId,
-                    OldValue = profile.Status,
-                    NewValue = LearnerStatus.Grounded,
+                    OldValue = profile.Status.ToString(),
+                    NewValue = LearnerStatus.Grounded.ToString(),
                     Description = $"UserProfile for Account #{profile.AccountId} auto-grounded: a completed ETR has an expired certificate and no newer enrollment/ETR covers that course."
                 }, cancellationToken);
 
@@ -889,8 +889,8 @@ public class EtrService : IEtrService
                     ActionType = AuditActionType.UPDATE.ToString(),
                     EntityName = nameof(UserProfile),
                     RecordId = profile.AccountId,
-                    OldValue = profile.Status,
-                    NewValue = LearnerStatus.Active,
+                    OldValue = profile.Status.ToString(),
+                    NewValue = LearnerStatus.Active.ToString(),
                     Description = $"UserProfile for Account #{profile.AccountId} auto-cleared from Grounded: no course has an expired completed ETR anymore."
                 }, cancellationToken);
 

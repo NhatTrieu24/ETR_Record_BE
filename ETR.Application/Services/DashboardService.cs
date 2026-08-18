@@ -1,5 +1,6 @@
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
+using ETR.Domain.Enums;
 
 namespace ETR.Application.Services;
 
@@ -112,7 +113,7 @@ public class DashboardService : IDashboardService
 
             case "QA":
                 var etrs = await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken);
-                pendingVerificationEtrIds = etrs.Where(e => e.Status == "Submitted").Select(e => e.ETRCourseRecordId).ToList();
+                pendingVerificationEtrIds = etrs.Where(e => e.Status == EtrStatus.Submitted).Select(e => e.ETRCourseRecordId).ToList();
                 actionItems = await DashboardKpiCalculator.ComputeActionItemsAsync(_unitOfWork, cancellationToken);
                 evidenceSummary = await DashboardKpiCalculator.ComputeEvidenceSummaryAsync(_unitOfWork, cancellationToken);
                 reviewedToday = await ComputeReviewedTodayCountAsync(cancellationToken);
@@ -235,7 +236,7 @@ public class DashboardService : IDashboardService
         var myEtrIds = etrs.Where(e => myEnrollmentIds.Contains(e.EnrollmentId)).Select(e => e.ETRCourseRecordId).ToHashSet();
 
         var subjectResults = (await _unitOfWork.SubjectResultRepository.GetAllAsync(cancellationToken))
-            .Where(sr => myEtrIds.Contains(sr.EtrId) && !string.IsNullOrEmpty(sr.Status)
+            .Where(sr => myEtrIds.Contains(sr.EtrId)
                 && assignedSubjectIds.Any(a => a.SubjectId == sr.SubjectId))
             .ToList();
 
@@ -371,7 +372,7 @@ public class DashboardService : IDashboardService
     // separate entity — reuses the Expired/ExpiringSoon threshold already computed for MyEtrs.
     private static CertificateSummary ComputeCertificateSummary(IEnumerable<StudentEtrSummary> myEtrs)
     {
-        var completed = myEtrs.Where(e => e.Status == "Completed").ToList();
+        var completed = myEtrs.Where(e => e.Status == EtrStatus.Completed).ToList();
         var now = DateTime.UtcNow;
 
         var valid = completed.Count(e => !e.ExpiryDate.HasValue || e.ExpiryDate.Value >= now.AddDays(ExpiringSoonDaysThreshold));

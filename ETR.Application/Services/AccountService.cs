@@ -23,7 +23,7 @@ public class AccountService : IAccountService
             .Where(cs => cs.InstructorAccountId == instructorAccountId)
             .Select(cs => cs.ClassId)
             .ToHashSet();
-        
+
         var enrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken);
         return enrollments.Where(e => instructorClassIds.Contains(e.ClassId)).Select(e => e.AccountId).ToHashSet();
     }
@@ -31,7 +31,7 @@ public class AccountService : IAccountService
     public async Task<IEnumerable<AccountResponse>> GetAllAccountsAsync(CancellationToken cancellationToken = default)
     {
         var accounts = await _unitOfWork.AccountRepository.GetAllAsync(cancellationToken);
-        
+
         if (_currentUserService.RoleName == "Instructor" && _currentUserService.AccountId.HasValue)
         {
             var studentIds = await GetInstructorStudentIdsAsync(_currentUserService.AccountId.Value, cancellationToken);
@@ -45,7 +45,7 @@ public class AccountService : IAccountService
     {
         var account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken)
             ?? throw new KeyNotFoundException($"Account {accountId} not found.");
-            
+
         if (_currentUserService.RoleName == "Instructor" && _currentUserService.AccountId.HasValue)
         {
             var studentIds = await GetInstructorStudentIdsAsync(_currentUserService.AccountId.Value, cancellationToken);
@@ -83,7 +83,7 @@ public class AccountService : IAccountService
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             RoleId = request.RoleId,
             DepartmentId = request.DepartmentId,
-            Status = "Active",
+            Status = AccountStatus.Active,
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
             CreatedByAccountId = createdByAccountId
@@ -95,7 +95,7 @@ public class AccountService : IAccountService
         return new AccountResponse(account.AccountId, account.Username, account.RoleId, account.DepartmentId, account.Status, account.IsActive);
     }
 
-    public async Task UpdateAccountStatusAsync(int accountId, string status, int updatedByAccountId, CancellationToken cancellationToken = default)
+    public async Task UpdateAccountStatusAsync(int accountId, AccountStatus status, int updatedByAccountId, CancellationToken cancellationToken = default)
     {
         if (accountId == updatedByAccountId && (string.Equals(status, "Inactive", StringComparison.OrdinalIgnoreCase) || string.Equals(status, "Disabled", StringComparison.OrdinalIgnoreCase)))
         {
@@ -111,8 +111,8 @@ public class AccountService : IAccountService
             ActionType = AuditActionType.UPDATE.ToString(),
             EntityName = nameof(Account),
             RecordId = accountId,
-            OldValue = account.Status,
-            NewValue = status,
+            OldValue = account.Status.ToString(),
+            NewValue = status.ToString(),
             Description = $"Account #{accountId} status changed from '{account.Status}' to '{status}'"
         }, cancellationToken);
 
@@ -182,7 +182,7 @@ public class AccountService : IAccountService
     {
         if (accountId == deletedByAccountId)
         {
-            throw new BusinessRuleViolationException("Không thể tự xóa tài khoản của chính mình (cả xóa mềm lẫn xóa cứng).");
+            throw new BusinessRuleViolationException("You cannot delete your own account.");
         }
 
         var account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken)
@@ -194,15 +194,13 @@ public class AccountService : IAccountService
             ActionType = AuditActionType.DELETE.ToString(),
             EntityName = nameof(Account),
             RecordId = accountId,
-            OldValue = account.Status,
-            NewValue = "Inactive",
+            OldValue = account.Status.ToString(),
+            NewValue = AccountStatus.Inactive.ToString(),
             Description = $"Account #{accountId} deactivated (soft delete)"
         }, cancellationToken);
 
         account.IsActive = false;
-        account.Status = "Inactive";
-        account.IsDeleted = true;
-        account.DeletedAt = DateTime.UtcNow;
+        account.Status = AccountStatus.Inactive;
         account.UpdatedAt = DateTime.UtcNow;
         account.UpdatedByAccountId = deletedByAccountId;
 

@@ -1,5 +1,6 @@
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
+using ETR.Domain.Enums;
 
 namespace ETR.Application.Services;
 
@@ -32,7 +33,7 @@ public static class DashboardKpiCalculator
         var subjectResults = await unitOfWork.SubjectResultRepository.GetAllAsync(cancellationToken);
 
         var pendingApprovalEtrIds = etrs
-            .Where(e => e.Status == "Submitted" || e.Status == "Verified")
+            .Where(e => e.Status == EtrStatus.Submitted || e.Status == EtrStatus.Verified)
             .Select(e => e.ETRCourseRecordId)
             .ToList();
 
@@ -43,7 +44,7 @@ public static class DashboardKpiCalculator
             .ToList();
 
         var returnedForCorrectionEtrIds = etrs
-            .Where(e => e.Status == "ReturnedForCorrection")
+            .Where(e => e.Status == EtrStatus.ReturnedForCorrection)
             .Select(e => e.ETRCourseRecordId)
             .ToList();
 
@@ -52,7 +53,7 @@ public static class DashboardKpiCalculator
             .Select(sr => sr.EtrId)
             .ToHashSet();
         var missingEvidenceEtrIds = etrs
-            .Where(e => e.Status != "Completed" && etrIdsMissingEvidence.Contains(e.ETRCourseRecordId))
+            .Where(e => e.Status != EtrStatus.Completed && etrIdsMissingEvidence.Contains(e.ETRCourseRecordId))
             .Select(e => e.ETRCourseRecordId)
             .ToList();
 
@@ -65,16 +66,16 @@ public static class DashboardKpiCalculator
     public static async Task<DashboardStatusFunnel> ComputeStatusFunnelAsync(IUnitOfWork unitOfWork, CancellationToken cancellationToken)
     {
         var etrs = (await unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken)).ToList();
-        int Count(string status) => etrs.Count(e => e.Status == status);
+        int Count(EtrStatus status) => etrs.Count(e => e.Status == status);
 
         return new DashboardStatusFunnel(
-            Count("Draft"),
-            Count("InProgress"),
-            Count("Submitted"),
-            Count("Verified"),
-            Count("Completed"),
-            Count("ReturnedForCorrection"),
-            Count("Cancelled"));
+            Count(EtrStatus.Draft),
+            Count(EtrStatus.InProgress),
+            Count(EtrStatus.Submitted),
+            Count(EtrStatus.Verified),
+            Count(EtrStatus.Completed),
+            Count(EtrStatus.ReturnedForCorrection),
+            Count(EtrStatus.Cancelled));
     }
 
     public static async Task<DashboardKpis> ComputeAsync(IUnitOfWork unitOfWork, CancellationToken cancellationToken)
@@ -85,16 +86,16 @@ public static class DashboardKpiCalculator
         var subjectResults = await unitOfWork.SubjectResultRepository.GetAllAsync(cancellationToken);
 
         var totalEtrs = etrs.Count;
-        var completedCount = etrs.Count(e => e.Status == "Completed");
-        var pendingApprovalCount = etrs.Count(e => e.Status == "Submitted" || e.Status == "Verified");
-        var returnedForCorrectionCount = etrs.Count(e => e.Status == "ReturnedForCorrection");
+        var completedCount = etrs.Count(e => e.Status == EtrStatus.Completed);
+        var pendingApprovalCount = etrs.Count(e => e.Status == EtrStatus.Submitted || e.Status == EtrStatus.Verified);
+        var returnedForCorrectionCount = etrs.Count(e => e.Status == EtrStatus.ReturnedForCorrection);
         var rejectedCount = approvalRequests.Count(a => a.CurrentStatus == "Rejected");
 
         var etrIdsMissingEvidence = subjectResults
             .Where(sr => !evidenceFiles.Any(e => e.SubjectResultId == sr.SubjectResultId && e.VerificationStatus == "Verified"))
             .Select(sr => sr.EtrId)
             .ToHashSet();
-        var missingEvidenceCount = etrs.Count(e => e.Status != "Completed" && etrIdsMissingEvidence.Contains(e.ETRCourseRecordId));
+        var missingEvidenceCount = etrs.Count(e => e.Status != EtrStatus.Completed && etrIdsMissingEvidence.Contains(e.ETRCourseRecordId));
 
         return new DashboardKpis(
             totalEtrs,
