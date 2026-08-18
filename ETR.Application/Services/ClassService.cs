@@ -94,59 +94,58 @@ public class ClassService : IClassService
                 var classSubjects = new List<ClassSubject>();
                 var sessions = new List<Session>();
 
-                if (request.InstructorAssignments != null && request.InstructorAssignments.Any())
-                {
-                    var courseSubjects = await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct);
-                    
-                    foreach (var assignment in request.InstructorAssignments)
-                    {
-                        var cs = courseSubjects.FirstOrDefault(x => x.CourseId == request.CourseId && x.SubjectId == assignment.SubjectId)
-                            ?? throw new BusinessRuleViolationException($"Subject {assignment.SubjectId} is not part of Course {request.CourseId}.");
-                        
-                        if (assignment.InstructorAccountId.HasValue)
-                        {
-                            await EnsureAccountHasInstructorRoleAsync(assignment.InstructorAccountId.Value, ct);
-                        }
+                // Lấy toàn bộ môn học thuộc khóa học (CourseSubjects)
+                var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct))
+                    .Where(x => x.CourseId == request.CourseId).ToList();
 
-                        var classSubject = new ClassSubject
+                var assignmentDict = request.InstructorAssignments?
+                    .Where(a => a.InstructorAccountId.HasValue)
+                    .ToDictionary(a => a.SubjectId, a => a.InstructorAccountId) ?? new Dictionary<int, int?>();
+
+                // 1. Tạo ClassSubject cho tất cả các môn trong khóa học
+                foreach (var cs in courseSubjects)
+                {
+                    int? instructorId = assignmentDict.TryGetValue(cs.SubjectId, out var id) ? id : null;
+                    if (instructorId.HasValue)
+                    {
+                        await EnsureAccountHasInstructorRoleAsync(instructorId.Value, ct);
+                    }
+
+                    var classSubject = new ClassSubject
+                    {
+                        ClassId = cls.ClassId,
+                        SubjectId = cs.SubjectId,
+                        InstructorAccountId = instructorId
+                    };
+                    classSubjects.Add(classSubject);
+                    await _unitOfWork.ClassSubjectRepository.AddAsync(classSubject, ct);
+                }
+                await _unitOfWork.SaveAsync(ct);
+
+                // 2. Tự động tạo sẵn danh sách Sessions (Buổi học) cho từng môn học
+                foreach (var cs in courseSubjects)
+                {
+                    // Nếu RequiredSessions chưa set hoặc <= 0, mặc định tạo ít nhất 1 buổi
+                    int sessionCount = cs.RequiredSessions > 0 ? cs.RequiredSessions : 1;
+
+                    for (int i = 1; i <= sessionCount; i++)
+                    {
+                        var session = new Session
                         {
                             ClassId = cls.ClassId,
-                            SubjectId = assignment.SubjectId,
-                            InstructorAccountId = assignment.InstructorAccountId
+                            SubjectId = cs.SubjectId,
+                            SessionTitle = $"Buổi {i}",
+                            SessionDate = null, // Giảng viên sẽ lên lịch hoặc điểm danh sau
+                            Location = request.Location,
+                            IsConfirmed = false
                         };
-                        
-                        classSubjects.Add(classSubject);
+                        await _unitOfWork.SessionRepository.AddAsync(session, ct);
+                        sessions.Add(session);
                     }
-                    
-                    foreach (var classSubject in classSubjects)
-                    {
-                        await _unitOfWork.ClassSubjectRepository.AddAsync(classSubject, ct);
-                    }
-                    await _unitOfWork.SaveAsync(ct);
-                    
-                    // Auto-provision sessions
-                    foreach (var classSubject in classSubjects)
-                    {
-                        var cs = courseSubjects.First(x => x.CourseId == request.CourseId && x.SubjectId == classSubject.SubjectId);
-                        for (int i = 1; i <= cs.RequiredSessions; i++)
-                        {
-                            var session = new Session
-                            {
-                                ClassId = cls.ClassId,
-                                SubjectId = classSubject.SubjectId,
-                                SessionTitle = $"Buổi {i}",
-                                SessionDate = null, // Will be filled by Instructor later
-                                Location = request.Location, // Inherit from class by default
-                                IsConfirmed = false
-                            };
-                            await _unitOfWork.SessionRepository.AddAsync(session, ct);
-                            sessions.Add(session);
-                        }
-                    }
-                    await _unitOfWork.SaveAsync(ct);
-
-                    assignments = classSubjects.Select(x => new InstructorAssignmentResponse(x.ClassSubjectId, x.SubjectId, x.InstructorAccountId)).ToList();
                 }
+                await _unitOfWork.SaveAsync(ct);
+
+                assignments = classSubjects.Select(x => new InstructorAssignmentResponse(x.ClassSubjectId, x.SubjectId, x.InstructorAccountId)).ToList();
 
                 await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                 {

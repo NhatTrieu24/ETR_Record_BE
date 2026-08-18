@@ -97,26 +97,26 @@ public static class DataSeeder
     {
         if (!await context.Courses.AnyAsync())
         {
-            context.Courses.Add(new Course { CourseCode = "AMT-101", CourseName = "Aircraft Maintenance Technician", DurationHours = 120, Status = "Active" });
-            context.Courses.Add(new Course { CourseCode = "B737-TR", CourseName = "B737 Type Rating", DurationHours = 160, Status = "Active" });
-            context.Courses.Add(new Course { CourseCode = "A320-FAM", CourseName = "A320 Familiarization", DurationHours = 40, Status = "Active" });
-            context.Courses.Add(new Course { CourseCode = "ENG-101", CourseName = "Aviation English", DurationHours = 60, Status = "Active" });
-            context.Courses.Add(new Course { CourseCode = "SMS-101", CourseName = "Safety Management Systems", DurationHours = 20, Status = "Active" });
-            context.Courses.Add(new Course { CourseCode = "HF-101", CourseName = "Human Factors", DurationHours = 15, Status = "Active" });
-            context.Courses.Add(new Course { CourseCode = "A350-TR", CourseName = "A350 Type Rating", DurationHours = 160, Status = "Active" });
-            context.Courses.Add(new Course { CourseCode = "B787-TR", CourseName = "B787 Type Rating", DurationHours = 160, Status = "Active" });
-            context.Courses.Add(new Course { CourseCode = "DGR-101", CourseName = "Dangerous Goods Regulations", DurationHours = 10, Status = "Active" });
-            context.Courses.Add(new Course { CourseCode = "SEC-101", CourseName = "Aviation Security", DurationHours = 10, Status = "Active" });
+            context.Courses.Add(new Course { CourseCode = "AMT-101", CourseName = "Aircraft Maintenance Technician", DurationHours = 120, ValidityMonths = 24, CourseType = "Initial", Status = "Active" });
+            context.Courses.Add(new Course { CourseCode = "B737-TR", CourseName = "B737 Type Rating", DurationHours = 160, ValidityMonths = 24, CourseType = "TypeRating", Status = "Active" });
+            context.Courses.Add(new Course { CourseCode = "A320-FAM", CourseName = "A320 Familiarization", DurationHours = 40, ValidityMonths = 36, CourseType = "TypeRating", Status = "Active" });
+            context.Courses.Add(new Course { CourseCode = "ENG-101", CourseName = "Aviation English", DurationHours = 60, ValidityMonths = 36, CourseType = "Language", Status = "Active" });
+            context.Courses.Add(new Course { CourseCode = "SMS-101", CourseName = "Safety Management Systems", DurationHours = 20, ValidityMonths = 12, CourseType = "Recurrent", Status = "Active" });
+            context.Courses.Add(new Course { CourseCode = "HF-101", CourseName = "Human Factors", DurationHours = 15, ValidityMonths = 12, CourseType = "Recurrent", Status = "Active" });
+            context.Courses.Add(new Course { CourseCode = "A350-TR", CourseName = "A350 Type Rating", DurationHours = 160, ValidityMonths = 24, CourseType = "TypeRating", Status = "Active" });
+            context.Courses.Add(new Course { CourseCode = "B787-TR", CourseName = "B787 Type Rating", DurationHours = 160, ValidityMonths = 24, CourseType = "TypeRating", Status = "Active" });
+            context.Courses.Add(new Course { CourseCode = "DGR-101", CourseName = "Dangerous Goods Regulations", DurationHours = 10, ValidityMonths = 24, CourseType = "Specialized", Status = "Active" });
+            context.Courses.Add(new Course { CourseCode = "SEC-101", CourseName = "Aviation Security", DurationHours = 10, ValidityMonths = 12, CourseType = "Specialized", Status = "Active" });
             await context.SaveChangesAsync();
         }
         
         if (!await context.Subjects.AnyAsync())
         {
-            context.Subjects.Add(new Subject { SubjectCode = "SJ-REG", SubjectName = "Aviation Regulations", SubjectType = "Theory", Status = "Active" });
-            context.Subjects.Add(new Subject { SubjectCode = "SJ-SYS", SubjectName = "Aircraft Systems", SubjectType = "Theory", Status = "Active" });
-            context.Subjects.Add(new Subject { SubjectCode = "SJ-PRA", SubjectName = "Practical Maintenance", SubjectType = "Practical", Status = "Active" });
-            context.Subjects.Add(new Subject { SubjectCode = "SJ-SAF", SubjectName = "Safety & Human Factors", SubjectType = "Theory", Status = "Active" });
-            context.Subjects.Add(new Subject { SubjectCode = "SJ-ENG", SubjectName = "Technical English", SubjectType = "Theory", Status = "Active" });
+            context.Subjects.Add(new Subject { SubjectCode = "SJ-REG", SubjectName = "Aviation Regulations", SubjectType = "Theory", MinSessions = 2, MaxSessions = 10, Status = "Active" });
+            context.Subjects.Add(new Subject { SubjectCode = "SJ-SYS", SubjectName = "Aircraft Systems", SubjectType = "Theory", MinSessions = 2, MaxSessions = 10, Status = "Active" });
+            context.Subjects.Add(new Subject { SubjectCode = "SJ-PRA", SubjectName = "Practical Maintenance", SubjectType = "Practical", MinSessions = 2, MaxSessions = 10, Status = "Active" });
+            context.Subjects.Add(new Subject { SubjectCode = "SJ-SAF", SubjectName = "Safety & Human Factors", SubjectType = "Theory", MinSessions = 2, MaxSessions = 10, Status = "Active" });
+            context.Subjects.Add(new Subject { SubjectCode = "SJ-ENG", SubjectName = "Technical English", SubjectType = "Theory", MinSessions = 2, MaxSessions = 10, Status = "Active" });
             await context.SaveChangesAsync();
         }
 
@@ -124,20 +124,20 @@ public static class DataSeeder
         {
             var courses = await context.Courses.ToDictionaryAsync(c => c.CourseCode, c => c.CourseId);
             var subjects = await context.Subjects.ToDictionaryAsync(s => s.SubjectCode, s => s.SubjectId);
-            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["AMT-101"], SubjectId = subjects["SJ-REG"], SequenceNo = 1, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
-            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["AMT-101"], SubjectId = subjects["SJ-SYS"], SequenceNo = 2, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
-            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["AMT-101"], SubjectId = subjects["SJ-PRA"], SequenceNo = 3, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
-            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["AMT-101"], SubjectId = subjects["SJ-SAF"], SequenceNo = 4, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
-            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["AMT-101"], SubjectId = subjects["SJ-ENG"], SequenceNo = 5, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
-            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["B737-TR"], SubjectId = subjects["SJ-REG"], SequenceNo = 1, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
-            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["B737-TR"], SubjectId = subjects["SJ-SYS"], SequenceNo = 2, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
-            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["B737-TR"], SubjectId = subjects["SJ-PRA"], SequenceNo = 3, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
-            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["B737-TR"], SubjectId = subjects["SJ-SAF"], SequenceNo = 4, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
-            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["B737-TR"], SubjectId = subjects["SJ-ENG"], SequenceNo = 5, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
-            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["A320-FAM"], SubjectId = subjects["SJ-REG"], SequenceNo = 1, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
-            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["A320-FAM"], SubjectId = subjects["SJ-SYS"], SequenceNo = 2, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
-            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["A320-FAM"], SubjectId = subjects["SJ-PRA"], SequenceNo = 3, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
-            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["A320-FAM"], SubjectId = subjects["SJ-SAF"], SequenceNo = 4, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["AMT-101"], SubjectId = subjects["SJ-REG"], SequenceNo = 1, RequiredHours = 10, RequiredSessions = 3, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["AMT-101"], SubjectId = subjects["SJ-SYS"], SequenceNo = 2, RequiredHours = 10, RequiredSessions = 3, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["AMT-101"], SubjectId = subjects["SJ-PRA"], SequenceNo = 3, RequiredHours = 10, RequiredSessions = 3, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["AMT-101"], SubjectId = subjects["SJ-SAF"], SequenceNo = 4, RequiredHours = 10, RequiredSessions = 2, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["AMT-101"], SubjectId = subjects["SJ-ENG"], SequenceNo = 5, RequiredHours = 10, RequiredSessions = 2, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["B737-TR"], SubjectId = subjects["SJ-REG"], SequenceNo = 1, RequiredHours = 10, RequiredSessions = 3, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["B737-TR"], SubjectId = subjects["SJ-SYS"], SequenceNo = 2, RequiredHours = 10, RequiredSessions = 3, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["B737-TR"], SubjectId = subjects["SJ-PRA"], SequenceNo = 3, RequiredHours = 10, RequiredSessions = 3, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["B737-TR"], SubjectId = subjects["SJ-SAF"], SequenceNo = 4, RequiredHours = 10, RequiredSessions = 2, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["B737-TR"], SubjectId = subjects["SJ-ENG"], SequenceNo = 5, RequiredHours = 10, RequiredSessions = 2, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["A320-FAM"], SubjectId = subjects["SJ-REG"], SequenceNo = 1, RequiredHours = 10, RequiredSessions = 2, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["A320-FAM"], SubjectId = subjects["SJ-SYS"], SequenceNo = 2, RequiredHours = 10, RequiredSessions = 2, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["A320-FAM"], SubjectId = subjects["SJ-PRA"], SequenceNo = 3, RequiredHours = 10, RequiredSessions = 2, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
+            context.CourseSubjects.Add(new CourseSubject { CourseId = courses["A320-FAM"], SubjectId = subjects["SJ-SAF"], SequenceNo = 4, RequiredHours = 10, RequiredSessions = 2, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
             context.CourseSubjects.Add(new CourseSubject { CourseId = courses["A320-FAM"], SubjectId = subjects["SJ-ENG"], SequenceNo = 5, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
             context.CourseSubjects.Add(new CourseSubject { CourseId = courses["ENG-101"], SubjectId = subjects["SJ-ENG"], SequenceNo = 1, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
             context.CourseSubjects.Add(new CourseSubject { CourseId = courses["SMS-101"], SubjectId = subjects["SJ-REG"], SequenceNo = 1, RequiredHours = 10, PassingScore = 70, IsMandatory = true, SubjectVersion = "1.0" });
