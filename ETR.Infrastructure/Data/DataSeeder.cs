@@ -69,23 +69,23 @@ public static class DataSeeder
 
             var accounts = new List<Account>
             {
-                new Account { Username = AdminUsername, PasswordHash = pwd, RoleId = roleIds["Admin"], DepartmentId = deptIds["Administration"], Status = "Active", Profile = new UserProfile { UserCode = "ADM-01", FullName = "System Admin", Email = AdminUsername } },
-                new Account { Username = InstructorUsername, PasswordHash = pwd, RoleId = roleIds["Instructor"], DepartmentId = deptIds["Training"], Status = "Active", Profile = new UserProfile { UserCode = "INS-01", FullName = "Senior Instructor", Email = InstructorUsername } },
-                new Account { Username = QaUsername, PasswordHash = pwd, RoleId = roleIds["QA"], DepartmentId = deptIds["Administration"], Status = "Active", Profile = new UserProfile { UserCode = "QA-01", FullName = "QA Specialist", Email = QaUsername } },
-                new Account { Username = ManagerUsername, PasswordHash = pwd, RoleId = roleIds["TrainingManager"], DepartmentId = deptIds["Training"], Status = "Active", Profile = new UserProfile { UserCode = "MGR-01", FullName = "Training Manager", Email = ManagerUsername } },
-                new Account { Username = StudentUsername, PasswordHash = pwd, RoleId = roleIds["Student"], DepartmentId = deptIds["Training"], Status = "Active", Profile = new UserProfile { UserCode = "STU-01", FullName = "Jane Student", Email = StudentUsername } },
-                new Account { Username = ManagementViewerUsername, PasswordHash = pwd, RoleId = roleIds["ManagementViewer"], DepartmentId = deptIds["Administration"], Status = "Active", Profile = new UserProfile { UserCode = "MGV-01", FullName = "Management Viewer", Email = ManagementViewerUsername } },
-                new Account { Username = "academic@etr.com", PasswordHash = pwd, RoleId = roleIds["Academic"], DepartmentId = deptIds["Administration"], Status = "Active", Profile = new UserProfile { UserCode = "ACA-01", FullName = "Academic Staff", Email = "academic@etr.com" } },
-                new Account { Username = "audit@etr.com", PasswordHash = pwd, RoleId = roleIds["Audit"], DepartmentId = deptIds["Administration"], Status = "Active", Profile = new UserProfile { UserCode = "AUD-01", FullName = "Audit Staff", Email = "audit@etr.com" } }
+                new Account { Username = AdminUsername, PasswordHash = pwd, RoleId = roleIds["Admin"], DepartmentId = deptIds["Administration"], Status = AccountStatus.Active, Profile = new UserProfile { UserCode = "ADM-01", FullName = "System Admin", Email = AdminUsername } },
+                new Account { Username = InstructorUsername, PasswordHash = pwd, RoleId = roleIds["Instructor"], DepartmentId = deptIds["Training"], Status = AccountStatus.Active, Profile = new UserProfile { UserCode = "INS-01", FullName = "Senior Instructor", Email = InstructorUsername } },
+                new Account { Username = QaUsername, PasswordHash = pwd, RoleId = roleIds["QA"], DepartmentId = deptIds["Administration"], Status = AccountStatus.Active, Profile = new UserProfile { UserCode = "QA-01", FullName = "QA Specialist", Email = QaUsername } },
+                new Account { Username = ManagerUsername, PasswordHash = pwd, RoleId = roleIds["TrainingManager"], DepartmentId = deptIds["Training"], Status = AccountStatus.Active, Profile = new UserProfile { UserCode = "MGR-01", FullName = "Training Manager", Email = ManagerUsername } },
+                new Account { Username = StudentUsername, PasswordHash = pwd, RoleId = roleIds["Student"], DepartmentId = deptIds["Training"], Status = AccountStatus.Active, Profile = new UserProfile { UserCode = "STU-01", FullName = "Jane Student", Email = StudentUsername } },
+                new Account { Username = ManagementViewerUsername, PasswordHash = pwd, RoleId = roleIds["ManagementViewer"], DepartmentId = deptIds["Administration"], Status = AccountStatus.Active, Profile = new UserProfile { UserCode = "MGV-01", FullName = "Management Viewer", Email = ManagementViewerUsername } },
+                new Account { Username = "academic@etr.com", PasswordHash = pwd, RoleId = roleIds["Academic"], DepartmentId = deptIds["Administration"], Status = AccountStatus.Active, Profile = new UserProfile { UserCode = "ACA-01", FullName = "Academic Staff", Email = "academic@etr.com" } },
+                new Account { Username = "audit@etr.com", PasswordHash = pwd, RoleId = roleIds["Audit"], DepartmentId = deptIds["Administration"], Status = AccountStatus.Active, Profile = new UserProfile { UserCode = "AUD-01", FullName = "Audit Staff", Email = "audit@etr.com" } }
             };
 
             // Mass seed students
             for(int i=2; i<=30; i++) {
-                accounts.Add(new Account { Username = $"student{i}@etr.com", PasswordHash = pwd, RoleId = roleIds["Student"], DepartmentId = deptIds["Training"], Status = "Active", Profile = new UserProfile { UserCode = $"STU-{i:00}", FullName = $"Student {i}", Email = $"student{i}@etr.com" } });
+                accounts.Add(new Account { Username = $"student{i}@etr.com", PasswordHash = pwd, RoleId = roleIds["Student"], DepartmentId = deptIds["Training"], Status = AccountStatus.Active, Profile = new UserProfile { UserCode = $"STU-{i:00}", FullName = $"Student {i}", Email = $"student{i}@etr.com" } });
             }
             // Mass seed instructors
             for(int i=2; i<=10; i++) {
-                accounts.Add(new Account { Username = $"instructor{i}@etr.com", PasswordHash = pwd, RoleId = roleIds["Instructor"], DepartmentId = deptIds["Training"], Status = "Active", Profile = new UserProfile { UserCode = $"INS-{i:00}", FullName = $"Instructor {i}", Email = $"instructor{i}@etr.com" } });
+                accounts.Add(new Account { Username = $"instructor{i}@etr.com", PasswordHash = pwd, RoleId = roleIds["Instructor"], DepartmentId = deptIds["Training"], Status = AccountStatus.Active, Profile = new UserProfile { UserCode = $"INS-{i:00}", FullName = $"Instructor {i}", Email = $"instructor{i}@etr.com" } });
             }
 
             context.Accounts.AddRange(accounts);
@@ -97,26 +97,26 @@ public static class DataSeeder
     {
         if (!await context.Courses.AnyAsync())
         {
-            context.Courses.Add(new Course { CourseCode = "AMT-101", CourseName = "Aircraft Maintenance Technician", DurationHours = 120, Status = "Active" });
-            context.Courses.Add(new Course { CourseCode = "B737-TR", CourseName = "B737 Type Rating", DurationHours = 160, Status = "Active" });
-            context.Courses.Add(new Course { CourseCode = "A320-FAM", CourseName = "A320 Familiarization", DurationHours = 40, Status = "Active" });
-            context.Courses.Add(new Course { CourseCode = "ENG-101", CourseName = "Aviation English", DurationHours = 60, Status = "Active" });
-            context.Courses.Add(new Course { CourseCode = "SMS-101", CourseName = "Safety Management Systems", DurationHours = 20, Status = "Active" });
-            context.Courses.Add(new Course { CourseCode = "HF-101", CourseName = "Human Factors", DurationHours = 15, Status = "Active" });
-            context.Courses.Add(new Course { CourseCode = "A350-TR", CourseName = "A350 Type Rating", DurationHours = 160, Status = "Active" });
-            context.Courses.Add(new Course { CourseCode = "B787-TR", CourseName = "B787 Type Rating", DurationHours = 160, Status = "Active" });
-            context.Courses.Add(new Course { CourseCode = "DGR-101", CourseName = "Dangerous Goods Regulations", DurationHours = 10, Status = "Active" });
-            context.Courses.Add(new Course { CourseCode = "SEC-101", CourseName = "Aviation Security", DurationHours = 10, Status = "Active" });
+            context.Courses.Add(new Course { CourseCode = "AMT-101", CourseName = "Aircraft Maintenance Technician", DurationHours = 120, Status = CourseStatus.Active });
+            context.Courses.Add(new Course { CourseCode = "B737-TR", CourseName = "B737 Type Rating", DurationHours = 160, Status = CourseStatus.Active });
+            context.Courses.Add(new Course { CourseCode = "A320-FAM", CourseName = "A320 Familiarization", DurationHours = 40, Status = CourseStatus.Active });
+            context.Courses.Add(new Course { CourseCode = "ENG-101", CourseName = "Aviation English", DurationHours = 60, Status = CourseStatus.Active });
+            context.Courses.Add(new Course { CourseCode = "SMS-101", CourseName = "Safety Management Systems", DurationHours = 20, Status = CourseStatus.Active });
+            context.Courses.Add(new Course { CourseCode = "HF-101", CourseName = "Human Factors", DurationHours = 15, Status = CourseStatus.Active });
+            context.Courses.Add(new Course { CourseCode = "A350-TR", CourseName = "A350 Type Rating", DurationHours = 160, Status = CourseStatus.Active });
+            context.Courses.Add(new Course { CourseCode = "B787-TR", CourseName = "B787 Type Rating", DurationHours = 160, Status = CourseStatus.Active });
+            context.Courses.Add(new Course { CourseCode = "DGR-101", CourseName = "Dangerous Goods Regulations", DurationHours = 10, Status = CourseStatus.Active });
+            context.Courses.Add(new Course { CourseCode = "SEC-101", CourseName = "Aviation Security", DurationHours = 10, Status = CourseStatus.Active });
             await context.SaveChangesAsync();
         }
         
         if (!await context.Subjects.AnyAsync())
         {
-            context.Subjects.Add(new Subject { SubjectCode = "SJ-REG", SubjectName = "Aviation Regulations", SubjectType = "Theory", Status = "Active" });
-            context.Subjects.Add(new Subject { SubjectCode = "SJ-SYS", SubjectName = "Aircraft Systems", SubjectType = "Theory", Status = "Active" });
-            context.Subjects.Add(new Subject { SubjectCode = "SJ-PRA", SubjectName = "Practical Maintenance", SubjectType = "Practical", Status = "Active" });
-            context.Subjects.Add(new Subject { SubjectCode = "SJ-SAF", SubjectName = "Safety & Human Factors", SubjectType = "Theory", Status = "Active" });
-            context.Subjects.Add(new Subject { SubjectCode = "SJ-ENG", SubjectName = "Technical English", SubjectType = "Theory", Status = "Active" });
+            context.Subjects.Add(new Subject { SubjectCode = "SJ-REG", SubjectName = "Aviation Regulations", SubjectType = "Theory", Status = SubjectStatus.Active });
+            context.Subjects.Add(new Subject { SubjectCode = "SJ-SYS", SubjectName = "Aircraft Systems", SubjectType = "Theory", Status = SubjectStatus.Active });
+            context.Subjects.Add(new Subject { SubjectCode = "SJ-PRA", SubjectName = "Practical Maintenance", SubjectType = "Practical", Status = SubjectStatus.Active });
+            context.Subjects.Add(new Subject { SubjectCode = "SJ-SAF", SubjectName = "Safety & Human Factors", SubjectType = "Theory", Status = SubjectStatus.Active });
+            context.Subjects.Add(new Subject { SubjectCode = "SJ-ENG", SubjectName = "Technical English", SubjectType = "Theory", Status = SubjectStatus.Active });
             await context.SaveChangesAsync();
         }
 
@@ -292,36 +292,36 @@ public static class DataSeeder
         if (!await context.Classes.AnyAsync())
         {
             var courses = await context.Courses.ToDictionaryAsync(c => c.CourseCode, c => c.CourseId);
-            context.Classes.Add(new Class { ClassCode = "AMT-101-C1", ClassName = "Aircraft Maintenance Technician Batch 1", CourseId = courses["AMT-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Completed" });
-            context.Classes.Add(new Class { ClassCode = "AMT-101-C2", ClassName = "Aircraft Maintenance Technician Batch 2", CourseId = courses["AMT-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Scheduled" });
-            context.Classes.Add(new Class { ClassCode = "AMT-101-C3", ClassName = "Aircraft Maintenance Technician Batch 3", CourseId = courses["AMT-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Planned" });
-            context.Classes.Add(new Class { ClassCode = "B737-TR-C1", ClassName = "B737 Type Rating Batch 1", CourseId = courses["B737-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Completed" });
-            context.Classes.Add(new Class { ClassCode = "B737-TR-C2", ClassName = "B737 Type Rating Batch 2", CourseId = courses["B737-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Scheduled" });
-            context.Classes.Add(new Class { ClassCode = "B737-TR-C3", ClassName = "B737 Type Rating Batch 3", CourseId = courses["B737-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Planned" });
-            context.Classes.Add(new Class { ClassCode = "A320-FAM-C1", ClassName = "A320 Familiarization Batch 1", CourseId = courses["A320-FAM"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Completed" });
-            context.Classes.Add(new Class { ClassCode = "A320-FAM-C2", ClassName = "A320 Familiarization Batch 2", CourseId = courses["A320-FAM"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Scheduled" });
-            context.Classes.Add(new Class { ClassCode = "A320-FAM-C3", ClassName = "A320 Familiarization Batch 3", CourseId = courses["A320-FAM"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Planned" });
-            context.Classes.Add(new Class { ClassCode = "ENG-101-C1", ClassName = "Aviation English Batch 1", CourseId = courses["ENG-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Completed" });
-            context.Classes.Add(new Class { ClassCode = "ENG-101-C2", ClassName = "Aviation English Batch 2", CourseId = courses["ENG-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Scheduled" });
-            context.Classes.Add(new Class { ClassCode = "ENG-101-C3", ClassName = "Aviation English Batch 3", CourseId = courses["ENG-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Planned" });
-            context.Classes.Add(new Class { ClassCode = "SMS-101-C1", ClassName = "Safety Management Systems Batch 1", CourseId = courses["SMS-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Completed" });
-            context.Classes.Add(new Class { ClassCode = "SMS-101-C2", ClassName = "Safety Management Systems Batch 2", CourseId = courses["SMS-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Scheduled" });
-            context.Classes.Add(new Class { ClassCode = "SMS-101-C3", ClassName = "Safety Management Systems Batch 3", CourseId = courses["SMS-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Planned" });
-            context.Classes.Add(new Class { ClassCode = "HF-101-C1", ClassName = "Human Factors Batch 1", CourseId = courses["HF-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Completed" });
-            context.Classes.Add(new Class { ClassCode = "HF-101-C2", ClassName = "Human Factors Batch 2", CourseId = courses["HF-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Scheduled" });
-            context.Classes.Add(new Class { ClassCode = "HF-101-C3", ClassName = "Human Factors Batch 3", CourseId = courses["HF-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Planned" });
-            context.Classes.Add(new Class { ClassCode = "A350-TR-C1", ClassName = "A350 Type Rating Batch 1", CourseId = courses["A350-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Completed" });
-            context.Classes.Add(new Class { ClassCode = "A350-TR-C2", ClassName = "A350 Type Rating Batch 2", CourseId = courses["A350-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Scheduled" });
-            context.Classes.Add(new Class { ClassCode = "A350-TR-C3", ClassName = "A350 Type Rating Batch 3", CourseId = courses["A350-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Planned" });
-            context.Classes.Add(new Class { ClassCode = "B787-TR-C1", ClassName = "B787 Type Rating Batch 1", CourseId = courses["B787-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Completed" });
-            context.Classes.Add(new Class { ClassCode = "B787-TR-C2", ClassName = "B787 Type Rating Batch 2", CourseId = courses["B787-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Scheduled" });
-            context.Classes.Add(new Class { ClassCode = "B787-TR-C3", ClassName = "B787 Type Rating Batch 3", CourseId = courses["B787-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Planned" });
-            context.Classes.Add(new Class { ClassCode = "DGR-101-C1", ClassName = "Dangerous Goods Regulations Batch 1", CourseId = courses["DGR-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Completed" });
-            context.Classes.Add(new Class { ClassCode = "DGR-101-C2", ClassName = "Dangerous Goods Regulations Batch 2", CourseId = courses["DGR-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Scheduled" });
-            context.Classes.Add(new Class { ClassCode = "DGR-101-C3", ClassName = "Dangerous Goods Regulations Batch 3", CourseId = courses["DGR-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Planned" });
-            context.Classes.Add(new Class { ClassCode = "SEC-101-C1", ClassName = "Aviation Security Batch 1", CourseId = courses["SEC-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Completed" });
-            context.Classes.Add(new Class { ClassCode = "SEC-101-C2", ClassName = "Aviation Security Batch 2", CourseId = courses["SEC-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Scheduled" });
-            context.Classes.Add(new Class { ClassCode = "SEC-101-C3", ClassName = "Aviation Security Batch 3", CourseId = courses["SEC-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = "Planned" });
+            context.Classes.Add(new Class { ClassCode = "AMT-101-C1", ClassName = "Aircraft Maintenance Technician Batch 1", CourseId = courses["AMT-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Completed });
+            context.Classes.Add(new Class { ClassCode = "AMT-101-C2", ClassName = "Aircraft Maintenance Technician Batch 2", CourseId = courses["AMT-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Scheduled });
+            context.Classes.Add(new Class { ClassCode = "AMT-101-C3", ClassName = "Aircraft Maintenance Technician Batch 3", CourseId = courses["AMT-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Planned });
+            context.Classes.Add(new Class { ClassCode = "B737-TR-C1", ClassName = "B737 Type Rating Batch 1", CourseId = courses["B737-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Completed });
+            context.Classes.Add(new Class { ClassCode = "B737-TR-C2", ClassName = "B737 Type Rating Batch 2", CourseId = courses["B737-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Scheduled });
+            context.Classes.Add(new Class { ClassCode = "B737-TR-C3", ClassName = "B737 Type Rating Batch 3", CourseId = courses["B737-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Planned });
+            context.Classes.Add(new Class { ClassCode = "A320-FAM-C1", ClassName = "A320 Familiarization Batch 1", CourseId = courses["A320-FAM"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Completed });
+            context.Classes.Add(new Class { ClassCode = "A320-FAM-C2", ClassName = "A320 Familiarization Batch 2", CourseId = courses["A320-FAM"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Scheduled });
+            context.Classes.Add(new Class { ClassCode = "A320-FAM-C3", ClassName = "A320 Familiarization Batch 3", CourseId = courses["A320-FAM"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Planned });
+            context.Classes.Add(new Class { ClassCode = "ENG-101-C1", ClassName = "Aviation English Batch 1", CourseId = courses["ENG-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Completed });
+            context.Classes.Add(new Class { ClassCode = "ENG-101-C2", ClassName = "Aviation English Batch 2", CourseId = courses["ENG-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Scheduled });
+            context.Classes.Add(new Class { ClassCode = "ENG-101-C3", ClassName = "Aviation English Batch 3", CourseId = courses["ENG-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Planned });
+            context.Classes.Add(new Class { ClassCode = "SMS-101-C1", ClassName = "Safety Management Systems Batch 1", CourseId = courses["SMS-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Completed });
+            context.Classes.Add(new Class { ClassCode = "SMS-101-C2", ClassName = "Safety Management Systems Batch 2", CourseId = courses["SMS-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Scheduled });
+            context.Classes.Add(new Class { ClassCode = "SMS-101-C3", ClassName = "Safety Management Systems Batch 3", CourseId = courses["SMS-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Planned });
+            context.Classes.Add(new Class { ClassCode = "HF-101-C1", ClassName = "Human Factors Batch 1", CourseId = courses["HF-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Completed });
+            context.Classes.Add(new Class { ClassCode = "HF-101-C2", ClassName = "Human Factors Batch 2", CourseId = courses["HF-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Scheduled });
+            context.Classes.Add(new Class { ClassCode = "HF-101-C3", ClassName = "Human Factors Batch 3", CourseId = courses["HF-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Planned });
+            context.Classes.Add(new Class { ClassCode = "A350-TR-C1", ClassName = "A350 Type Rating Batch 1", CourseId = courses["A350-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Completed });
+            context.Classes.Add(new Class { ClassCode = "A350-TR-C2", ClassName = "A350 Type Rating Batch 2", CourseId = courses["A350-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Scheduled });
+            context.Classes.Add(new Class { ClassCode = "A350-TR-C3", ClassName = "A350 Type Rating Batch 3", CourseId = courses["A350-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Planned });
+            context.Classes.Add(new Class { ClassCode = "B787-TR-C1", ClassName = "B787 Type Rating Batch 1", CourseId = courses["B787-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Completed });
+            context.Classes.Add(new Class { ClassCode = "B787-TR-C2", ClassName = "B787 Type Rating Batch 2", CourseId = courses["B787-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Scheduled });
+            context.Classes.Add(new Class { ClassCode = "B787-TR-C3", ClassName = "B787 Type Rating Batch 3", CourseId = courses["B787-TR"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Planned });
+            context.Classes.Add(new Class { ClassCode = "DGR-101-C1", ClassName = "Dangerous Goods Regulations Batch 1", CourseId = courses["DGR-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Completed });
+            context.Classes.Add(new Class { ClassCode = "DGR-101-C2", ClassName = "Dangerous Goods Regulations Batch 2", CourseId = courses["DGR-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Scheduled });
+            context.Classes.Add(new Class { ClassCode = "DGR-101-C3", ClassName = "Dangerous Goods Regulations Batch 3", CourseId = courses["DGR-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Planned });
+            context.Classes.Add(new Class { ClassCode = "SEC-101-C1", ClassName = "Aviation Security Batch 1", CourseId = courses["SEC-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Completed });
+            context.Classes.Add(new Class { ClassCode = "SEC-101-C2", ClassName = "Aviation Security Batch 2", CourseId = courses["SEC-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Scheduled });
+            context.Classes.Add(new Class { ClassCode = "SEC-101-C3", ClassName = "Aviation Security Batch 3", CourseId = courses["SEC-101"], StartDate = DateTime.UtcNow.AddMonths(-2), EndDate = DateTime.UtcNow.AddMonths(1), Location = "Hangar", Capacity = 30, Status = ClassStatus.Planned });
             await context.SaveChangesAsync();
         }
 
@@ -393,7 +393,7 @@ public static class DataSeeder
                     {
                         AccountId = stu,
                         ClassId = cls.ClassId,
-                        Status = cls.Status == "Completed" ? "Completed" : "Enrolled",
+                        Status = cls.Status == ClassStatus.Completed ? EnrollmentStatus.Completed : EnrollmentStatus.Enrolled,
                         EnrolledAt = DateTime.UtcNow.AddMonths(-1)
                     });
                 }
@@ -410,19 +410,19 @@ public static class DataSeeder
             var rand = new Random(42);
             foreach(var enrollment in enrollments)
             {
-                var status = enrollment.Status == "Completed" ? "Completed" : "InProgress";
-                var etr = new ETRCourseRecord 
-                { 
-                    EnrollmentId = enrollment.EnrollmentId, 
-                    CourseVersionNo = 1, 
-                    Status = status 
+                var status = enrollment.Status == EnrollmentStatus.Completed ? EtrStatus.Completed : EtrStatus.InProgress;
+                var etr = new ETRCourseRecord
+                {
+                    EnrollmentId = enrollment.EnrollmentId,
+                    CourseVersionNo = 1,
+                    Status = status
                 };
-                
-                if (status != "Draft")
+
+                if (status != EtrStatus.Draft)
                 {
                     etr.SubmittedAt = DateTime.UtcNow.AddDays(-10);
                 }
-                if (status == "Approved" || status == "Completed" || status == "Verified")
+                if (status == EtrStatus.Completed || status == EtrStatus.Verified)
                 {
                     etr.VerifiedAt = DateTime.UtcNow.AddDays(-2);
                     etr.CompletedAt = DateTime.UtcNow.AddDays(-2);
@@ -455,7 +455,7 @@ public static class DataSeeder
                         SubjectId = sub.SubjectId,
                         AttendanceRate = 100m,
                         Score = 85m,
-                        Status = "Passed",
+                        Status = SubjectResultStatus.Passed,
                         EvaluatedByAccountId = sub.InstructorAccountId,
                         EvaluatedAt = DateTime.UtcNow.AddDays(-1)
                     });
@@ -484,7 +484,7 @@ public static class DataSeeder
                     {
                         SessionId = session.SessionId,
                         EnrollmentId = e.EnrollmentId,
-                        Status = rand.NextDouble() > 0.1 ? "Present" : "Absent",
+                        Status = rand.NextDouble() > 0.1 ? AttendanceStatus.Present : AttendanceStatus.Absent,
                         RecordedByAccountId = session.ConfirmedByAccountId ?? 1,
                         RecordedAt = DateTime.UtcNow
                     });
@@ -739,9 +739,9 @@ public static class DataSeeder
             var adminId = (await context.Accounts.FirstAsync(a => a.Username == AdminUsername)).AccountId;
             
             context.ExportJobs.AddRange(
-                new ExportJob { RequestedByAccountId = adminId, ExportType = "ComplianceReport", Status = "Completed", RequestedAt = DateTime.UtcNow, CompletedAt = DateTime.UtcNow, FileName = "report1.pdf", FilePath = "/exports/report1.pdf" },
-                new ExportJob { RequestedByAccountId = adminId, ExportType = "TrainingPackage", Status = "InProgress", RequestedAt = DateTime.UtcNow },
-                new ExportJob { RequestedByAccountId = adminId, ExportType = "TrainingPackage", Status = "Completed", RequestedAt = DateTime.UtcNow.AddDays(-1), CompletedAt = DateTime.UtcNow.AddDays(-1), FileName = "package1.zip", FilePath = "/exports/package1.zip" }
+                new ExportJob { RequestedByAccountId = adminId, ExportType = "ComplianceReport", Status = ExportJobStatus.Completed, RequestedAt = DateTime.UtcNow, CompletedAt = DateTime.UtcNow, FileName = "report1.pdf", FilePath = "/exports/report1.pdf" },
+                new ExportJob { RequestedByAccountId = adminId, ExportType = "TrainingPackage", Status = ExportJobStatus.InProgress, RequestedAt = DateTime.UtcNow },
+                new ExportJob { RequestedByAccountId = adminId, ExportType = "TrainingPackage", Status = ExportJobStatus.Completed, RequestedAt = DateTime.UtcNow.AddDays(-1), CompletedAt = DateTime.UtcNow.AddDays(-1), FileName = "package1.zip", FilePath = "/exports/package1.zip" }
             );
             await context.SaveChangesAsync();
         }

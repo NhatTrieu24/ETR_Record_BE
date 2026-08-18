@@ -1,8 +1,10 @@
+using ETR.Domain.Enums;
+
 namespace ETR.Application.DTOs;
 
 public record EtrSearchResultResponse(
     int ETRCourseRecordId,
-    string Status,
+    EtrStatus Status,
     string StudentName,
     string ClassCode,
     string ClassName,

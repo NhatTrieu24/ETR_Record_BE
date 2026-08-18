@@ -69,14 +69,14 @@ public class AmendmentService : IAmendmentService
         var isAdminForceUnlock = isAdmin && !isOriginalSigner;
 
         var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(subjectResult.EtrId, cancellationToken);
-        if (etr != null && (etr.IsLocked || string.Equals(etr.Status, "Completed", StringComparison.OrdinalIgnoreCase)))
+        if (etr != null && (etr.IsLocked || etr.Status == EtrStatus.Completed))
         {
             throw new BusinessRuleViolationException(
                 "The parent ETR is already Completed and locked. Use POST /api/etr/{id}/reopen instead — Amendment requests only apply before the ETR is Completed.");
         }
 
         var hasPendingRequest = (await _unitOfWork.AmendmentRequestRepository.GetAllAsync(cancellationToken))
-            .Any(a => a.SubjectResultId == subjectResultId && a.Status == "Pending");
+            .Any(a => a.SubjectResultId == subjectResultId && a.Status == AmendmentStatus.Pending);
         if (hasPendingRequest)
             throw new BusinessRuleViolationException("An amendment request for this SubjectResult is already Pending.");
 
@@ -85,8 +85,8 @@ public class AmendmentService : IAmendmentService
             SubjectResultId = subjectResultId,
             RequestedByAccountId = requestedByAccountId,
             Reason = request.Reason,
-            OldValue = subjectResult.Status,
-            Status = "Pending",
+            OldValue = subjectResult.Status.ToString(),
+            Status = AmendmentStatus.Pending,
             CreatedAt = DateTime.UtcNow,
             CreatedByAccountId = requestedByAccountId
         };
@@ -103,7 +103,7 @@ public class AmendmentService : IAmendmentService
                 ActionType = AuditActionType.ADMIN_FORCE_UNLOCK.ToString(),
                 EntityName = nameof(SubjectResult),
                 RecordId = subjectResultId,
-                OldValue = subjectResult.Status,
+                OldValue = subjectResult.Status.ToString(),
                 NewValue = "Pending amendment",
                 Description = $"[CẢNH BÁO] Admin (AccountId {requestedByAccountId}) can thiệp phá vỡ chữ ký của người khác — Force Unlock SubjectResult #{subjectResultId} vốn được ký bởi AccountId {currentSignoff.SignoffByAccountId}. Reason: {request.Reason}"
             }
@@ -113,7 +113,7 @@ public class AmendmentService : IAmendmentService
                 ActionType = AuditActionType.AMENDMENT_REQUEST.ToString(),
                 EntityName = nameof(SubjectResult),
                 RecordId = subjectResultId,
-                OldValue = subjectResult.Status,
+                OldValue = subjectResult.Status.ToString(),
                 NewValue = "Pending amendment",
                 Description = $"Amendment requested for SubjectResult #{subjectResultId}. Reason: {request.Reason}"
             }, cancellationToken);
@@ -138,7 +138,7 @@ public class AmendmentService : IAmendmentService
                 // Re-check at decision time, not just at request time — the parent ETR could have
                 // been Completed by someone else while this request sat Pending.
                 var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(subjectResult.EtrId, ct);
-                if (etr != null && (etr.IsLocked || string.Equals(etr.Status, "Completed", StringComparison.OrdinalIgnoreCase)))
+                if (etr != null && (etr.IsLocked || etr.Status == EtrStatus.Completed))
                 {
                     throw new BusinessRuleViolationException(
                         "The parent ETR has since become Completed and locked. Reopen it first via POST /api/etr/{id}/reopen before approving this amendment.");
@@ -147,7 +147,7 @@ public class AmendmentService : IAmendmentService
                 // Reset to the same status a freshly-created SubjectResult starts at (see
                 // EnrollmentService.CreateEnrollmentAsync) — the Instructor corrects the underlying
                 // data and signs off again, re-running the normal Passed/Failed evaluation.
-                const string reopenedStatus = "Pending";
+                const SubjectResultStatus reopenedStatus = SubjectResultStatus.Pending;
                 subjectResult.Status = reopenedStatus;
                 subjectResult.UpdatedAt = DateTime.UtcNow;
                 subjectResult.UpdatedByAccountId = approvedByAccountId;
@@ -168,8 +168,8 @@ public class AmendmentService : IAmendmentService
                     _unitOfWork.SubjectSignoffRepository.Update(signoff);
                 }
 
-                amendment.Status = "Approved";
-                amendment.NewValue = reopenedStatus;
+                amendment.Status = AmendmentStatus.Approved;
+                amendment.NewValue = reopenedStatus.ToString();
                 amendment.ApprovedByAccountId = approvedByAccountId;
                 amendment.ApprovedAt = DateTime.UtcNow;
                 amendment.DecisionComment = request.Comment;
@@ -184,7 +184,7 @@ public class AmendmentService : IAmendmentService
                     EntityName = nameof(SubjectResult),
                     RecordId = amendment.SubjectResultId,
                     OldValue = amendment.OldValue,
-                    NewValue = reopenedStatus,
+                    NewValue = reopenedStatus.ToString(),
                     Description = $"Amendment request #{id} approved — SubjectResult #{amendment.SubjectResultId} reopened for correction, {signoffs.Count} prior signoff(s) invalidated."
                 }, ct);
 
@@ -208,7 +208,7 @@ public class AmendmentService : IAmendmentService
 
         var amendment = await GetPendingOrThrowAsync(id, cancellationToken);
 
-        amendment.Status = "Rejected";
+        amendment.Status = AmendmentStatus.Rejected;
         amendment.ApprovedByAccountId = rejectedByAccountId;
         amendment.ApprovedAt = DateTime.UtcNow;
         amendment.DecisionComment = request.Comment;
@@ -237,8 +237,8 @@ public class AmendmentService : IAmendmentService
         var amendment = await _unitOfWork.AmendmentRequestRepository.GetByIdAsync(id, cancellationToken)
             ?? throw new KeyNotFoundException($"AmendmentRequest with ID {id} not found.");
 
-        if (amendment.Status != "Pending")
-            throw new BusinessRuleViolationException($"AmendmentRequest #{id} has already been {amendment.Status.ToLowerInvariant()}.");
+        if (amendment.Status != AmendmentStatus.Pending)
+            throw new BusinessRuleViolationException($"AmendmentRequest #{id} has already been {amendment.Status.ToString().ToLowerInvariant()}.");
 
         return amendment;
     }

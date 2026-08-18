@@ -1,3 +1,5 @@
+using ETR.Domain.Enums;
+
 namespace ETR.Domain.Entities;
 
 public class UserProfile : BaseEntity
@@ -13,7 +15,7 @@ public class UserProfile : BaseEntity
 
     /// <summary>Overall learner status (Active/Withdrawn/Graduated) — independent of any single
     /// Enrollment.Status, which tracks a specific class enrollment rather than the person overall.</summary>
-    public string Status { get; set; } = "Active";
+    public LearnerStatus Status { get; set; } = LearnerStatus.Active;
 
     public Account Account { get; set; } = null!;
 }

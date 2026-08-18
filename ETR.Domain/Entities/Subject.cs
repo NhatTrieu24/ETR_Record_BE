@@ -1,3 +1,5 @@
+using ETR.Domain.Enums;
+
 namespace ETR.Domain.Entities;
 
 public class Subject : BaseEntity
@@ -11,5 +13,5 @@ public class Subject : BaseEntity
     public string? Description { get; set; }
     public int MinSessions { get; set; }
     public int MaxSessions { get; set; }
-    public string Status { get; set; } = string.Empty;
+    public SubjectStatus Status { get; set; }
 }

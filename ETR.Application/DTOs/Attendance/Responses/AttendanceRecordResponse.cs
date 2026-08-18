@@ -1,10 +1,12 @@
+using ETR.Domain.Enums;
+
 namespace ETR.Application.DTOs;
 
 public record AttendanceRecordResponse(
     int AttendanceRecordId,
     int SessionId,
     int EnrollmentId,
-    string Status,
+    AttendanceStatus Status,
     string? Remarks,
     int RecordedByAccountId,
     DateTime RecordedAt);

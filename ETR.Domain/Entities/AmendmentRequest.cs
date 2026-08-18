@@ -1,3 +1,5 @@
+using ETR.Domain.Enums;
+
 namespace ETR.Domain.Entities;
 
 /// <summary>Structured request to reopen a single already-Signed-off SubjectResult for correction,
@@ -16,7 +18,7 @@ public class AmendmentRequest : BaseEntity
     /// <summary>SubjectResult.Status it was reset to on Approve; null while Pending/Rejected.</summary>
     public string? NewValue { get; set; }
 
-    public string Status { get; set; } = "Pending";
+    public AmendmentStatus Status { get; set; } = AmendmentStatus.Pending;
     public int? ApprovedByAccountId { get; set; }
     public DateTime? ApprovedAt { get; set; }
     public string? DecisionComment { get; set; }

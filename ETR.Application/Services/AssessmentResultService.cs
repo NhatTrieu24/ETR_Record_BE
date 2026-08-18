@@ -473,7 +473,7 @@ public class AssessmentResultService : IAssessmentResultService
             isPassable = false; // Score too low
         }
 
-        subjectResult.Status = isPassable ? "Passed" : "Failed";
+        subjectResult.Status = isPassable ? SubjectResultStatus.Passed : SubjectResultStatus.Failed;
         subjectResult.EvaluatedAt = DateTime.UtcNow;
         _unitOfWork.SubjectResultRepository.Update(subjectResult);
     }

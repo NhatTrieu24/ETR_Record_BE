@@ -195,8 +195,8 @@ public class AttendanceService : IAttendanceService
                         ActionType = AuditActionType.UPDATE.ToString(),
                         EntityName = "AttendanceRecord",
                         RecordId = id,
-                        OldValue = oldStatus,
-                        NewValue = request.Status,
+                        OldValue = oldStatus.ToString(),
+                        NewValue = request.Status.ToString(),
                         Description = $"Updated AttendanceRecord status from {oldStatus} to {request.Status}",
                         CreatedAt = DateTime.UtcNow
                     }, ct);
@@ -305,7 +305,7 @@ public class AttendanceService : IAttendanceService
         var confirmedSessionIds = confirmedSessions.Select(s => s.SessionId).ToList();
 
         var presentRecords = (await _unitOfWork.AttendanceRecordRepository.GetAllAsync(ct))
-            .Where(r => r.EnrollmentId == enrollmentId && r.Status == "Present" && confirmedSessionIds.Contains(r.SessionId)).ToList();
+            .Where(r => r.EnrollmentId == enrollmentId && r.Status == AttendanceStatus.Present && confirmedSessionIds.Contains(r.SessionId)).ToList();
 
         if (confirmedSessions.Count > 0)
         {

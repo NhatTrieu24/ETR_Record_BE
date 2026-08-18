@@ -83,7 +83,7 @@ public class AccountService : IAccountService
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             RoleId = request.RoleId,
             DepartmentId = request.DepartmentId,
-            Status = "Active",
+            Status = AccountStatus.Active,
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
             CreatedByAccountId = createdByAccountId
@@ -95,7 +95,7 @@ public class AccountService : IAccountService
         return new AccountResponse(account.AccountId, account.Username, account.RoleId, account.DepartmentId, account.Status, account.IsActive);
     }
 
-    public async Task UpdateAccountStatusAsync(int accountId, string status, int updatedByAccountId, CancellationToken cancellationToken = default)
+    public async Task UpdateAccountStatusAsync(int accountId, AccountStatus status, int updatedByAccountId, CancellationToken cancellationToken = default)
     {
         var account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken)
             ?? throw new KeyNotFoundException($"Account {accountId} not found.");
@@ -106,8 +106,8 @@ public class AccountService : IAccountService
             ActionType = AuditActionType.UPDATE.ToString(),
             EntityName = nameof(Account),
             RecordId = accountId,
-            OldValue = account.Status,
-            NewValue = status,
+            OldValue = account.Status.ToString(),
+            NewValue = status.ToString(),
             Description = $"Account #{accountId} status changed from '{account.Status}' to '{status}'"
         }, cancellationToken);
 
@@ -174,6 +174,11 @@ public class AccountService : IAccountService
 
     public async Task DeleteAccountAsync(int accountId, int deletedByAccountId, CancellationToken cancellationToken = default)
     {
+        if (accountId == deletedByAccountId)
+        {
+            throw new BusinessRuleViolationException("You cannot delete your own account.");
+        }
+
         var account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken)
             ?? throw new KeyNotFoundException($"Account {accountId} not found.");
 
@@ -183,13 +188,13 @@ public class AccountService : IAccountService
             ActionType = AuditActionType.DELETE.ToString(),
             EntityName = nameof(Account),
             RecordId = accountId,
-            OldValue = account.Status,
-            NewValue = "Inactive",
+            OldValue = account.Status.ToString(),
+            NewValue = AccountStatus.Inactive.ToString(),
             Description = $"Account #{accountId} deactivated (soft delete)"
         }, cancellationToken);
 
         account.IsActive = false;
-        account.Status = "Inactive";
+        account.Status = AccountStatus.Inactive;
         account.UpdatedAt = DateTime.UtcNow;
         account.UpdatedByAccountId = deletedByAccountId;
 

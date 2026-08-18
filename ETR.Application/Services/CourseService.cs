@@ -175,8 +175,8 @@ public class CourseService : ICourseService
                     ActionType = AuditActionType.UPDATE.ToString(),
                     EntityName = nameof(Course),
                     RecordId = course.CourseId,
-                    OldValue = oldStatus,
-                    NewValue = course.Status,
+                    OldValue = oldStatus.ToString(),
+                    NewValue = course.Status.ToString(),
                     Description = validityMonthsChanged
                         ? $"Course #{course.CourseId} ({course.CourseCode}) updated; ValidityMonths changed — VersionNo bumped to {course.VersionNo} so already-enrolled learners keep evaluating against the prior version"
                         : $"Course #{course.CourseId} ({course.CourseCode}) updated"
@@ -295,7 +295,7 @@ public class CourseService : ICourseService
             ActionType = AuditActionType.DELETE.ToString(),
             EntityName = nameof(Course),
             RecordId = course.CourseId,
-            OldValue = course.Status,
+            OldValue = course.Status.ToString(),
             NewValue = "Deleted",
             Description = $"Course #{course.CourseId} ({course.CourseCode}) deleted"
         }, cancellationToken);

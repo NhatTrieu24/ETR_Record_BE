@@ -1,9 +1,11 @@
+using ETR.Domain.Enums;
+
 namespace ETR.Application.DTOs;
 
 public record EtrDetailsResponse(
     int ETRCourseRecordId,
     int EnrollmentId,
-    string Status,
+    EtrStatus Status,
     bool IsLocked,
     DateTime? SubmittedAt,
     DateTime? VerifiedAt,
@@ -16,7 +18,7 @@ public record EtrDetailsResponse(
 public record EtrSubjectDetailResponse(
     int SubjectResultId,
     int SubjectId,
-    string Status,
+    SubjectResultStatus Status,
     DateTime CreatedAt,
     decimal? AttendanceRate,
     decimal? Score,

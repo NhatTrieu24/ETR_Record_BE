@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using ETR.Domain.Enums;
 
 namespace ETR.Application.DTOs;
 
@@ -10,7 +11,7 @@ public record CreateClassRequest(
     DateTime EndDate,
     [MaxLength(200), RegularExpression(@"^[^<>]+$", ErrorMessage = "Invalid characters in Location")] string? Location,
     [Range(1, int.MaxValue, ErrorMessage = "Capacity must be at least 1")] int Capacity,
-    [Required, MaxLength(20), RegularExpression("^(Planned|InProgress|Completed|Cancelled)$", ErrorMessage = "Invalid Status")] string Status,
+    [Required] ClassStatus Status,
     List<InstructorAssignmentRequest>? InstructorAssignments = null) : IValidatableObject
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)

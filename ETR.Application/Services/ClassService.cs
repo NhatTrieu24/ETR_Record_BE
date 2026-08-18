@@ -185,7 +185,7 @@ public class ClassService : IClassService
 
                 var oldStatus = cls.Status;
 
-                if (request.Status == "Completed" && oldStatus != "Completed")
+                if (request.Status == ClassStatus.Completed && oldStatus != ClassStatus.Completed)
                 {
                     var unconfirmedSessions = _unitOfWork.SessionRepository.GetQueryable()
                         .Any(s => s.ClassId == id && !s.IsConfirmed && !s.IsDeleted);
@@ -252,8 +252,8 @@ public class ClassService : IClassService
                     ActionType = AuditActionType.UPDATE.ToString(),
                     EntityName = nameof(Class),
                     RecordId = cls.ClassId,
-                    OldValue = oldStatus,
-                    NewValue = cls.Status,
+                    OldValue = oldStatus.ToString(),
+                    NewValue = cls.Status.ToString(),
                     Description = $"Class #{cls.ClassId} ({cls.ClassCode}) updated"
                 }, ct);
 
@@ -291,7 +291,7 @@ public class ClassService : IClassService
             ActionType = AuditActionType.DELETE.ToString(),
             EntityName = nameof(Class),
             RecordId = cls.ClassId,
-            OldValue = cls.Status,
+            OldValue = cls.Status.ToString(),
             NewValue = "Deleted",
             Description = $"Class #{cls.ClassId} ({cls.ClassCode}) deleted"
         }, cancellationToken);

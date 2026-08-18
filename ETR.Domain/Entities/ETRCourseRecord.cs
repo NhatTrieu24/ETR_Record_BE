@@ -1,10 +1,12 @@
+using ETR.Domain.Enums;
+
 namespace ETR.Domain.Entities;
 
 public class ETRCourseRecord : BaseEntity
 {
     public int ETRCourseRecordId { get; set; }
     public int EnrollmentId { get; set; }
-    public string Status { get; set; } = string.Empty;
+    public EtrStatus Status { get; set; }
     public DateTime? SubmittedAt { get; set; }
     public DateTime? VerifiedAt { get; set; }
     public DateTime? CompletedAt { get; set; }

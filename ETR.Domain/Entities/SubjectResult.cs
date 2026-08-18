@@ -1,3 +1,5 @@
+using ETR.Domain.Enums;
+
 namespace ETR.Domain.Entities;
 
 public class SubjectResult : BaseEntity
@@ -8,7 +10,7 @@ public class SubjectResult : BaseEntity
     public int SubjectId { get; set; }
     public decimal? AttendanceRate { get; set; }
     public decimal? Score { get; set; }
-    public string Status { get; set; } = string.Empty;
+    public SubjectResultStatus Status { get; set; }
     public int? EvaluatedByAccountId { get; set; }
     public DateTime? EvaluatedAt { get; set; }
 

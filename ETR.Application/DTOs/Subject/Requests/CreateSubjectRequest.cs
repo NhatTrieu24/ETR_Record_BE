@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using ETR.Domain.Enums;
 
 namespace ETR.Application.DTOs;
 
@@ -11,7 +12,7 @@ public record CreateSubjectRequest(
     [MaxLength(2000)] string? Description,
     [Required, Range(1, int.MaxValue)] int MinSessions,
     [Required, Range(1, int.MaxValue)] int MaxSessions,
-    [Required, MaxLength(20)] string Status) : IValidatableObject
+    [Required] SubjectStatus Status) : IValidatableObject
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {

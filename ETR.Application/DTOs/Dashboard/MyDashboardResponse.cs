@@ -1,4 +1,5 @@
 using ETR.Application.Services;
+using ETR.Domain.Enums;
 
 namespace ETR.Application.DTOs;
 
@@ -66,7 +67,7 @@ public record InstructorClassSummary(
 
 public record StudentEtrSummary(
     int ETRCourseRecordId,
-    string Status,
+    EtrStatus Status,
     decimal PercentComplete,
     DateTime? ExpiryDate);
 

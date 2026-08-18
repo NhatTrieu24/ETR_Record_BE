@@ -168,9 +168,9 @@ public class ApprovalService : IApprovalService
                     var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(request.ETRCourseRecordId, ct)
                         ?? throw new BusinessRuleViolationException("ETRCourseRecord not found.");
 
-                    if (etr.Status == "Submitted")
+                    if (etr.Status == EtrStatus.Submitted)
                     {
-                        etr.Status = "ReturnedForCorrection";
+                        etr.Status = EtrStatus.ReturnedForCorrection;
                         etr.UpdatedAt = DateTime.UtcNow;
                         etr.UpdatedByAccountId = actionByAccountId;
                         _unitOfWork.ETRCourseRecordRepository.Update(etr);

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using ETR.Domain.Enums;
 
 namespace ETR.Application.DTOs;
 
@@ -11,11 +12,12 @@ public record UserProfileResponse(
     DateTime DateOfBirth,
     string Gender,
     string? Organization,
-    string Status);
+    LearnerStatus Status);
 
+// Grounded is deliberately excluded here (see LearnerStatus enum docs — it is set/cleared only by
+// CertificateValidityCalculator consumers, never by a plain profile edit); the service rejects it.
 public record UpdateUserProfileStatusRequest(
-    [Required, RegularExpression("^(Active|Withdrawn|Graduated)$", ErrorMessage = "Status must be one of: Active, Withdrawn, Graduated.")]
-    string Status);
+    [Required] LearnerStatus Status);
 
 public record CreateUserProfileRequest(
     string? UserCode,
