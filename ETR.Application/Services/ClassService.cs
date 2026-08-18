@@ -216,34 +216,61 @@ public class ClassService : IClassService
                 await _unitOfWork.SaveAsync(ct); // Clear existing
 
                 var assignments = new List<InstructorAssignmentResponse>();
-                
-                if (request.InstructorAssignments != null && request.InstructorAssignments.Any())
+                var classSubjects = new List<ClassSubject>();
+                var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct))
+                    .Where(x => x.CourseId == request.CourseId).ToList();
+
+                var assignmentDict = request.InstructorAssignments?
+                    .Where(a => a.InstructorAccountId.HasValue)
+                    .ToDictionary(a => a.SubjectId, a => a.InstructorAccountId) ?? new Dictionary<int, int?>();
+
+                // 1. Gán lại ClassSubject cho tất cả môn học trong khóa
+                foreach (var cs in courseSubjects)
                 {
-                    var courseSubjects = await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct);
-
-                    foreach (var assignment in request.InstructorAssignments)
+                    int? instructorId = assignmentDict.TryGetValue(cs.SubjectId, out var idVal) ? idVal : null;
+                    if (instructorId.HasValue)
                     {
-                        var cs = courseSubjects.FirstOrDefault(x => x.CourseId == request.CourseId && x.SubjectId == assignment.SubjectId)
-                            ?? throw new BusinessRuleViolationException($"Subject {assignment.SubjectId} is not part of Course {request.CourseId}.");
-                        
-                        if (assignment.InstructorAccountId.HasValue)
-                        {
-                            await EnsureAccountHasInstructorRoleAsync(assignment.InstructorAccountId.Value, ct);
-                        }
-
-                        var classSubject = new ClassSubject
-                        {
-                            ClassId = cls.ClassId,
-                            SubjectId = assignment.SubjectId,
-                            InstructorAccountId = assignment.InstructorAccountId
-                        };
-                        
-                        await _unitOfWork.ClassSubjectRepository.AddAsync(classSubject, ct);
-                        await _unitOfWork.SaveAsync(ct);
-                        
-                        assignments.Add(new InstructorAssignmentResponse(classSubject.ClassSubjectId, classSubject.SubjectId, classSubject.InstructorAccountId));
+                        await EnsureAccountHasInstructorRoleAsync(instructorId.Value, ct);
                     }
+
+                    var classSubject = new ClassSubject
+                    {
+                        ClassId = cls.ClassId,
+                        SubjectId = cs.SubjectId,
+                        InstructorAccountId = instructorId
+                    };
+                    classSubjects.Add(classSubject);
+                    await _unitOfWork.ClassSubjectRepository.AddAsync(classSubject, ct);
                 }
+                await _unitOfWork.SaveAsync(ct);
+
+                // 2. Kiểm tra nếu lớp này chưa có Session nào thì tự động sinh Sessions
+                var existingSessions = (await _unitOfWork.SessionRepository.GetAllAsync(ct))
+                    .Where(s => s.ClassId == cls.ClassId && !s.IsDeleted).ToList();
+
+                if (!existingSessions.Any())
+                {
+                    foreach (var cs in courseSubjects)
+                    {
+                        int sessionCount = cs.RequiredSessions > 0 ? cs.RequiredSessions : 1;
+                        for (int i = 1; i <= sessionCount; i++)
+                        {
+                            var session = new Session
+                            {
+                                ClassId = cls.ClassId,
+                                SubjectId = cs.SubjectId,
+                                SessionTitle = $"Buổi {i}",
+                                SessionDate = null,
+                                Location = request.Location,
+                                IsConfirmed = false
+                            };
+                            await _unitOfWork.SessionRepository.AddAsync(session, ct);
+                        }
+                    }
+                    await _unitOfWork.SaveAsync(ct);
+                }
+
+                assignments = classSubjects.Select(x => new InstructorAssignmentResponse(x.ClassSubjectId, x.SubjectId, x.InstructorAccountId)).ToList();
 
                 await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                 {
