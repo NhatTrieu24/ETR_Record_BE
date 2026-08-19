@@ -45,6 +45,7 @@ public partial class AppDbContext : DbContext
     public DbSet<AmendmentRequest> AmendmentRequests => Set<AmendmentRequest>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<ExportJob> ExportJobs => Set<ExportJob>();
+    public DbSet<Attachment> Attachments => Set<Attachment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -107,6 +108,7 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<ApprovalHistory>().HasKey(e => e.ApprovalHistoryId);
         modelBuilder.Entity<AuditLog>().HasKey(e => e.AuditLogId);
         modelBuilder.Entity<ExportJob>().HasKey(e => e.ExportJobId);
+        modelBuilder.Entity<Attachment>().HasKey(e => e.AttachmentId);
     }
 
     private static void ConfigureUniqueConstraints(ModelBuilder modelBuilder)
@@ -151,6 +153,12 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<PracticalChecklistResult>()
             .HasIndex(pcr => new { pcr.SubjectResultId, pcr.PracticalChecklistId })
             .IsUnique();
+
+        // Non-unique — one owner can have more than one attachment (e.g. a future gallery-style
+        // owner type). No FK to any single table on purpose: OwnerType/OwnerId is a polymorphic
+        // association that can point at ANY entity, which EF Core cannot express as a real FK.
+        modelBuilder.Entity<Attachment>()
+            .HasIndex(a => new { a.OwnerType, a.OwnerId });
     }
 
     private static void ConfigureDecimalPrecision(ModelBuilder modelBuilder)

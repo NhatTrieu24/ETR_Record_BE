@@ -9,6 +9,7 @@ using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using System.IO.Compression;
+using System.Net.Http;
 
 namespace ETR.Application.Services;
 
@@ -16,11 +17,13 @@ public partial class ExportService : IExportService
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<ExportService> _logger;
+    private readonly IHttpClientFactory _httpClientFactory;
 
-    public ExportService(IUnitOfWork unitOfWork, ILogger<ExportService> logger)
+    public ExportService(IUnitOfWork unitOfWork, ILogger<ExportService> logger, IHttpClientFactory httpClientFactory)
     {
         _unitOfWork = unitOfWork;
         _logger = logger;
+        _httpClientFactory = httpClientFactory;
     }
 
     public async Task<ExportJobResponse> ExportTrainingPackageAsync(int etrCourseRecordId, int requestedByAccountId, string webRootPath, CancellationToken cancellationToken = default)
@@ -47,6 +50,9 @@ public partial class ExportService : IExportService
         var evidenceFiles = (await _unitOfWork.EvidenceFileRepository.GetAllAsync(cancellationToken))
             .Where(e => etr.SubjectResults.Select(sr => sr.SubjectResultId).Contains(e.SubjectResultId))
             .ToList();
+        var evidenceAttachments = (await _unitOfWork.AttachmentRepository.GetAllAsync(cancellationToken))
+            .Where(a => a.OwnerType == nameof(EvidenceFile) && evidenceFiles.Select(e => e.EvidenceFileId).Contains(a.OwnerId))
+            .ToDictionary(a => a.OwnerId);
 
         var approvalRequest = (await _unitOfWork.ApprovalRequestRepository.GetAllAsync(cancellationToken))
             .FirstOrDefault(a => a.ETRCourseRecordId == etrCourseRecordId);
@@ -116,21 +122,33 @@ public partial class ExportService : IExportService
                     await summaryExcelEntryStream.WriteAsync(summaryExcelBytes, cancellationToken);
                 }
 
+                var httpClient = _httpClientFactory.CreateClient();
                 foreach (var ef in evidenceFiles)
                 {
-                    var physicalPath = Path.Combine(webRootPath, ef.FilePath);
-                    if (!File.Exists(physicalPath))
+                    if (!evidenceAttachments.TryGetValue(ef.EvidenceFileId, out var attachment) || string.IsNullOrEmpty(attachment.Url))
                     {
                         _logger.LogWarning(
-                            "Evidence file {EvidenceFileId} ({FileName}) for ETR {EtrCourseRecordId} is missing on disk at {PhysicalPath} — skipped from Training Package export.",
-                            ef.EvidenceFileId, ef.FileName, etrCourseRecordId, physicalPath);
+                            "Evidence file {EvidenceFileId} for ETR {EtrCourseRecordId} has no attachment URL on record — skipped from Training Package export.",
+                            ef.EvidenceFileId, etrCourseRecordId);
                         continue;
                     }
 
-                    var entryName = $"Evidence/{ef.EvidenceFileId}_{SanitizeForFileName(ef.FileName)}";
+                    byte[] evidenceBytes;
+                    try
+                    {
+                        evidenceBytes = await httpClient.GetByteArrayAsync(attachment.Url, cancellationToken);
+                    }
+                    catch (HttpRequestException ex)
+                    {
+                        _logger.LogWarning(ex,
+                            "Evidence file {EvidenceFileId} ({FileName}) for ETR {EtrCourseRecordId} could not be fetched from {Url} — skipped from Training Package export.",
+                            ef.EvidenceFileId, attachment.FileName, etrCourseRecordId, attachment.Url);
+                        continue;
+                    }
+
+                    var entryName = $"Evidence/{ef.EvidenceFileId}_{SanitizeForFileName(attachment.FileName)}";
                     using var evidenceEntryStream = archive.CreateEntry(entryName, CompressionLevel.Optimal).Open();
-                    using var fileStream = File.OpenRead(physicalPath);
-                    await fileStream.CopyToAsync(evidenceEntryStream, cancellationToken);
+                    await evidenceEntryStream.WriteAsync(evidenceBytes, cancellationToken);
                     attachedEvidenceCount++;
                 }
             }

@@ -1,16 +1,18 @@
 using ETR.Application.Compliance;
 using ETR.Application.DTOs.Evidence;
 using ETR.Application.DTOs.Evidence.Requests;
-using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Application.Interfaces;
 using ETR.Domain.Enums;
 using System.ComponentModel.DataAnnotations;
-using System.IO;
 
 namespace ETR.Application.Services;
 
 public class EvidenceService : IEvidenceService
 {
+    // Validated against FileName/MimeType metadata handed back by the FE's Cloudinary upload — the
+    // backend never sees the actual bytes, so this is a defense-in-depth check on the metadata only,
+    // not a guarantee (Cloudinary's own upload preset is the real enforcement point for file content).
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf"
@@ -26,7 +28,7 @@ public class EvidenceService : IEvidenceService
         "Verified", "Rejected"
     };
 
-    private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
+    private const string OwnerType = nameof(EvidenceFile);
 
     private readonly IUnitOfWork _unitOfWork;
 
@@ -37,8 +39,9 @@ public class EvidenceService : IEvidenceService
 
     public async Task<IEnumerable<EvidenceResponse>> GetAllEvidencesAsync(CancellationToken cancellationToken = default)
     {
-        var evidences = await _unitOfWork.EvidenceFileRepository.GetAllAsync(cancellationToken);
-        return evidences.Select(MapToResponse).ToList();
+        var evidences = (await _unitOfWork.EvidenceFileRepository.GetAllAsync(cancellationToken)).ToList();
+        var attachments = await GetAttachmentsByOwnerIdsAsync(evidences.Select(e => e.EvidenceFileId), cancellationToken);
+        return evidences.Select(e => MapToResponse(e, attachments.GetValueOrDefault(e.EvidenceFileId))).ToList();
     }
 
     public async Task<EvidenceResponse> GetEvidenceByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -47,17 +50,14 @@ public class EvidenceService : IEvidenceService
         if (evidence == null)
             throw new KeyNotFoundException($"Evidence with ID {id} not found.");
 
-        return MapToResponse(evidence);
+        var attachment = await GetAttachmentAsync(id, cancellationToken);
+        return MapToResponse(evidence, attachment);
     }
 
-    public async Task<EvidenceResponse> UploadEvidenceAsync(UploadEvidenceRequest request, int uploadedByAccountId, string? uploadedByRoleName, string webRootPath, CancellationToken cancellationToken = default)
+    public async Task<EvidenceResponse> UploadEvidenceAsync(UploadEvidenceRequest request, int uploadedByAccountId, string? uploadedByRoleName, CancellationToken cancellationToken = default)
     {
-        if (request.File == null || request.File.Length == 0)
-            throw new ValidationException("File is empty or not provided.");
-
         // "Sân nhà ai nấy đá" — Instructor can only upload Evidence into a class they are actually
-        // assigned to (see ClassOwnershipValidator). Checked BEFORE writing the file to disk so a
-        // rejected request never leaves an orphaned upload behind.
+        // assigned to (see ClassOwnershipValidator).
         var subjectResultForEvidence = await _unitOfWork.SubjectResultRepository.GetByIdAsync(request.SubjectResultId, cancellationToken);
         var etrForEvidence = subjectResultForEvidence != null
             ? await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(subjectResultForEvidence.EtrId, cancellationToken)
@@ -68,44 +68,20 @@ public class EvidenceService : IEvidenceService
         var classForEvidence = enrollmentForEvidence != null
             ? await _unitOfWork.ClassRepository.GetByIdAsync(enrollmentForEvidence.ClassId, cancellationToken)
             : null;
-            
+
         var isAssigned = classForEvidence != null && subjectResultForEvidence != null && _unitOfWork.ClassSubjectRepository.GetQueryable()
             .Any(cs => cs.ClassId == classForEvidence.ClassId && cs.SubjectId == subjectResultForEvidence.SubjectId && cs.InstructorAccountId == uploadedByAccountId);
         ClassOwnershipValidator.EnsureInstructorOwnsSubject(uploadedByRoleName, isAssigned);
 
-        if (request.File.Length > MaxFileSizeBytes)
-            throw new ValidationException($"File exceeds the maximum allowed size of {MaxFileSizeBytes / (1024 * 1024)} MB.");
-
-        var fileExtension = Path.GetExtension(request.File.FileName);
+        var fileExtension = System.IO.Path.GetExtension(request.FileName);
         if (string.IsNullOrEmpty(fileExtension) || !AllowedExtensions.Contains(fileExtension))
             throw new ValidationException($"File extension '{fileExtension}' is not allowed. Allowed extensions: {string.Join(", ", AllowedExtensions)}.");
 
-        if (string.IsNullOrEmpty(request.File.ContentType) || !AllowedMimeTypes.Contains(request.File.ContentType))
-            throw new ValidationException($"File content type '{request.File.ContentType}' is not allowed.");
+        if (string.IsNullOrEmpty(request.MimeType) || !AllowedMimeTypes.Contains(request.MimeType))
+            throw new ValidationException($"File content type '{request.MimeType}' is not allowed.");
 
-        var uploadDir = Path.Combine(webRootPath, "uploads", "evidences");
-        var uniqueFileName = $"{Guid.NewGuid()}{fileExtension}";
-        var filePath = Path.Combine(uploadDir, uniqueFileName);
-
-        try
-        {
-            if (!Directory.Exists(uploadDir))
-                Directory.CreateDirectory(uploadDir);
-
-            using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await request.File.CopyToAsync(stream, cancellationToken);
-            }
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // System.IO throws the same UnauthorizedAccessException type as auth failures on OS-level
-            // permission denial — translate both IO failure modes to a domain error so the client sees
-            // a storage-specific message instead of a misleading 401 "Not authenticated".
-            throw new BusinessRuleViolationException("Could not save the uploaded file. Please retry or contact an administrator.");
-        }
-
-        var relativePath = Path.Combine("uploads", "evidences", uniqueFileName).Replace("\\", "/");
+        if (!Uri.TryCreate(request.FileUrl, UriKind.Absolute, out var parsedUrl) || parsedUrl.Scheme != Uri.UriSchemeHttps)
+            throw new ValidationException("FileUrl must be an absolute https URL.");
 
         // Treat 0 or negative as null for nullable FK fields to avoid FK violations
         var attendanceRecordId = request.AttendanceRecordId.HasValue && request.AttendanceRecordId.Value > 0
@@ -122,11 +98,6 @@ public class EvidenceService : IEvidenceService
             SubjectResultId = request.SubjectResultId,
             AttendanceRecordId = attendanceRecordId,
             AssessmentResultId = assessmentResultId,
-            FileName = request.File.FileName,
-            FilePath = relativePath,
-            FileExtension = fileExtension,
-            MimeType = request.File.ContentType,
-            FileSize = request.File.Length,
             VerificationStatus = "Pending", // Default value
             UploadedByAccountId = uploadedByAccountId,
             UploadedAt = DateTime.UtcNow,
@@ -137,7 +108,25 @@ public class EvidenceService : IEvidenceService
         await _unitOfWork.EvidenceFileRepository.AddAsync(evidence, cancellationToken);
         await _unitOfWork.SaveAsync(cancellationToken);
 
-        return MapToResponse(evidence);
+        var attachment = new Attachment
+        {
+            OwnerType = OwnerType,
+            OwnerId = evidence.EvidenceFileId,
+            Url = request.FileUrl,
+            PublicId = request.PublicId,
+            FileName = request.FileName,
+            MimeType = request.MimeType,
+            FileSize = request.FileSize,
+            UploadedByAccountId = uploadedByAccountId,
+            UploadedAt = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow,
+            CreatedByAccountId = uploadedByAccountId
+        };
+
+        await _unitOfWork.AttachmentRepository.AddAsync(attachment, cancellationToken);
+        await _unitOfWork.SaveAsync(cancellationToken);
+
+        return MapToResponse(evidence, attachment);
     }
 
     public async Task<EvidenceResponse> VerifyEvidenceAsync(int id, VerifyEvidenceRequest request, int verifiedByAccountId, CancellationToken cancellationToken = default)
@@ -243,7 +232,8 @@ public class EvidenceService : IEvidenceService
                 : $"EvidenceFile #{evidence.EvidenceFileId} {verificationStatus} by AccountId {verifiedByAccountId}. Comment: {verificationComment}"
         }, cancellationToken);
 
-        return MapToResponse(evidence);
+        var attachment = await GetAttachmentAsync(evidence.EvidenceFileId, cancellationToken);
+        return MapToResponse(evidence, attachment);
     }
 
     public async Task DeleteEvidenceAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default)
@@ -282,10 +272,35 @@ public class EvidenceService : IEvidenceService
         evidence.UpdatedByAccountId = deletedByAccountId;
 
         _unitOfWork.EvidenceFileRepository.Update(evidence);
+
+        var attachment = await GetAttachmentAsync(id, cancellationToken);
+        if (attachment != null)
+        {
+            attachment.IsDeleted = true;
+            attachment.DeletedAt = DateTime.UtcNow;
+            attachment.UpdatedAt = DateTime.UtcNow;
+            attachment.UpdatedByAccountId = deletedByAccountId;
+            _unitOfWork.AttachmentRepository.Update(attachment);
+        }
+
         await _unitOfWork.SaveAsync(cancellationToken);
     }
 
-    private EvidenceResponse MapToResponse(EvidenceFile file)
+    private async Task<Attachment?> GetAttachmentAsync(int evidenceFileId, CancellationToken cancellationToken)
+    {
+        return (await _unitOfWork.AttachmentRepository.GetAllAsync(cancellationToken))
+            .FirstOrDefault(a => a.OwnerType == OwnerType && a.OwnerId == evidenceFileId);
+    }
+
+    private async Task<Dictionary<int, Attachment>> GetAttachmentsByOwnerIdsAsync(IEnumerable<int> evidenceFileIds, CancellationToken cancellationToken)
+    {
+        var ids = evidenceFileIds.ToHashSet();
+        return (await _unitOfWork.AttachmentRepository.GetAllAsync(cancellationToken))
+            .Where(a => a.OwnerType == OwnerType && ids.Contains(a.OwnerId))
+            .ToDictionary(a => a.OwnerId);
+    }
+
+    private static EvidenceResponse MapToResponse(EvidenceFile file, Attachment? attachment)
     {
         return new EvidenceResponse
         {
@@ -296,11 +311,10 @@ public class EvidenceService : IEvidenceService
             SubjectResultId = file.SubjectResultId,
             AttendanceRecordId = file.AttendanceRecordId,
             AssessmentResultId = file.AssessmentResultId,
-            FileName = file.FileName,
-            FilePath = file.FilePath,
-            FileExtension = file.FileExtension,
-            MimeType = file.MimeType,
-            FileSize = file.FileSize,
+            FileName = attachment?.FileName ?? string.Empty,
+            FileUrl = attachment?.Url ?? string.Empty,
+            MimeType = attachment?.MimeType,
+            FileSize = attachment?.FileSize,
             VerificationStatus = file.VerificationStatus,
             VerifiedByAccountId = file.VerifiedByAccountId,
             VerifiedAt = file.VerifiedAt,

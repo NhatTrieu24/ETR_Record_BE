@@ -1,15 +1,13 @@
 using ETR.Application.DTOs.Evidence.Requests;
 using ETR.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
-using System.IO;
 
 namespace ETR.API.Controllers;
 
 /// <summary>
 /// [Module/Flow]: Document Management
-/// [Core Responsibility]: Manages uploaded evidence files for practical checklists and assessments.
+/// [Core Responsibility]: Manages evidence file references (Cloudinary URLs) for practical checklists and assessments.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
@@ -18,13 +16,11 @@ public class EvidencesController : ControllerBase
 {
     private readonly IEvidenceService _evidenceService;
     private readonly ICurrentUserService _currentUserService;
-    private readonly IWebHostEnvironment _env;
 
-    public EvidencesController(IEvidenceService evidenceService, ICurrentUserService currentUserService, IWebHostEnvironment env)
+    public EvidencesController(IEvidenceService evidenceService, ICurrentUserService currentUserService)
     {
         _evidenceService = evidenceService;
         _currentUserService = currentUserService;
-        _env = env;
     }
 
     /// <summary>
@@ -50,43 +46,31 @@ public class EvidencesController : ControllerBase
     }
 
     /// <summary>
-    /// Tải xuống tệp bằng chứng vật lý theo ID.
+    /// Chuyển hướng (302) đến URL Cloudinary của tệp bằng chứng — file được lưu trữ ngoài server,
+    /// backend chỉ giữ URL tham chiếu (xem EvidenceService/Attachment).
     /// </summary>
     [HttpGet("{id}/download")]
     [Authorize(Roles = "Instructor,QA,Admin,Academic,Audit")]
     public async Task<IActionResult> Download(int id, CancellationToken cancellationToken)
     {
         var file = await _evidenceService.GetEvidenceByIdAsync(id, cancellationToken);
-        
-        if (string.IsNullOrEmpty(file.FilePath))
-            return NotFound("File path is empty.");
 
-        var physicalPath = Path.Combine(_env.WebRootPath, file.FilePath);
-        
-        if (!System.IO.File.Exists(physicalPath))
-            return NotFound("Physical file not found on disk.");
+        if (string.IsNullOrEmpty(file.FileUrl))
+            return NotFound("Evidence file has no URL on record.");
 
-        var mimeType = file.MimeType ?? "application/octet-stream";
-        var fileName = file.FileName ?? Path.GetFileName(physicalPath);
-
-        return PhysicalFile(physicalPath, mimeType, fileName);
+        return Redirect(file.FileUrl);
     }
 
     /// <summary>
-    /// Tải lên một bản ghi tệp bằng chứng mới.
+    /// Đăng ký một tệp bằng chứng đã được FE upload thẳng lên Cloudinary — request chỉ chứa URL +
+    /// metadata, không có file byte nào được gửi lên backend.
     /// </summary>
     [HttpPost("upload")]
     [Authorize(Roles = "Instructor,Admin,Academic")]
-    public async Task<IActionResult> UploadEvidence([FromForm] UploadEvidenceRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> UploadEvidence([FromBody] UploadEvidenceRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
-        var webRootPath = _env.WebRootPath;
-        if (string.IsNullOrEmpty(webRootPath))
-        {
-            webRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-        }
-
-        var response = await _evidenceService.UploadEvidenceAsync(request, accountId, _currentUserService.RoleName, webRootPath, cancellationToken);
+        var response = await _evidenceService.UploadEvidenceAsync(request, accountId, _currentUserService.RoleName, cancellationToken);
         return CreatedAtAction(nameof(GetById), new { id = response.EvidenceFileId }, response);
     }
 

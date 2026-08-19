@@ -21,4 +21,11 @@ public class SubjectResult : BaseEntity
     /// in force when the learner enrolled, even if CourseSubject.PassingScore changes afterwards.
     /// Null for records created before this field existed — those fall back to the live value.</summary>
     public decimal? PassingScoreSnapshot { get; set; }
+
+    /// <summary>Set when this SubjectResult was carried over unchanged from a prior enrollment
+    /// attempt at Enroll time (see EnrollmentService.CreateEnrollmentAsync) because the learner had
+    /// already Passed/Exempted this subject — points at the SOURCE SubjectResult from the previous
+    /// ETRCourseRecord (see ETRCourseRecord.PreviousRecordId). Null means this subject is being
+    /// taken fresh this attempt (first time, or a retake because it was previously Failed/Pending).</summary>
+    public int? CarriedOverFromSubjectResultId { get; set; }
 }

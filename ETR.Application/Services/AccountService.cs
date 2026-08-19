@@ -3,6 +3,7 @@ using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
 using ETR.Domain.Enums;
+using Microsoft.Extensions.Logging;
 
 namespace ETR.Application.Services;
 
@@ -10,11 +11,19 @@ public class AccountService : IAccountService
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IEmailService _emailService;
+    private readonly ILogger<AccountService> _logger;
 
-    public AccountService(IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
+    public AccountService(
+        IUnitOfWork unitOfWork,
+        ICurrentUserService currentUserService,
+        IEmailService emailService,
+        ILogger<AccountService> logger)
     {
         _unitOfWork = unitOfWork;
         _currentUserService = currentUserService;
+        _emailService = emailService;
+        _logger = logger;
     }
 
     private async Task<HashSet<int>> GetInstructorStudentIdsAsync(int instructorAccountId, CancellationToken cancellationToken)
@@ -92,12 +101,34 @@ public class AccountService : IAccountService
         await _unitOfWork.AccountRepository.AddAsync(account, cancellationToken);
         await _unitOfWork.SaveAsync(cancellationToken);
 
+        // Username doubles as the login email (validated [EmailAddress] on CreateAccountRequest) —
+        // notification failure must never roll back or fail an account that was already created.
+        try
+        {
+            await _emailService.SendTemplatedEmailAsync(
+                account.Username,
+                account.Username,
+                "AccountCreated.html",
+                "Tài khoản ETR Management của bạn đã được tạo",
+                new Dictionary<string, string>
+                {
+                    ["FullName"] = account.Username,
+                    ["Username"] = account.Username,
+                    ["TemporaryPassword"] = request.Password
+                },
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Gửi email thông báo tạo tài khoản thất bại cho AccountId {AccountId}.", account.AccountId);
+        }
+
         return new AccountResponse(account.AccountId, account.Username, account.RoleId, account.DepartmentId, account.Status, account.IsActive);
     }
 
     public async Task UpdateAccountStatusAsync(int accountId, AccountStatus status, int updatedByAccountId, CancellationToken cancellationToken = default)
     {
-        if (accountId == updatedByAccountId && (string.Equals(status, "Inactive", StringComparison.OrdinalIgnoreCase) || string.Equals(status, "Disabled", StringComparison.OrdinalIgnoreCase)))
+        if (accountId == updatedByAccountId && status == AccountStatus.Inactive)
         {
             throw new BusinessRuleViolationException("Không thể tự vô hiệu hóa tài khoản của chính mình.");
         }
@@ -117,7 +148,7 @@ public class AccountService : IAccountService
         }, cancellationToken);
 
         account.Status = status;
-        account.IsActive = string.Equals(status, "Active", StringComparison.OrdinalIgnoreCase);
+        account.IsActive = status == AccountStatus.Active;
         account.UpdatedAt = DateTime.UtcNow;
         account.UpdatedByAccountId = updatedByAccountId;
 

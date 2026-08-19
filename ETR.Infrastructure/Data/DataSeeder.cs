@@ -591,27 +591,10 @@ public static class DataSeeder
             var qaId = (await context.Accounts.FirstAsync(a => a.Username == QaUsername)).AccountId;
             var rand = new Random(42);
 
-            // Create physical directory
-            var uploadDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "evidences");
-            if (!Directory.Exists(uploadDir))
-                Directory.CreateDirectory(uploadDir);
-
-            // Generate two dummy files
-            var dummyPdfPath = Path.Combine(uploadDir, "dummy_evidence.pdf");
-            if (!File.Exists(dummyPdfPath)) {
-                // A very basic valid PDF structure
-                string pdfContent = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 4 0 R >> >> /MediaBox [0 0 612 792] /Contents 5 0 R >>\nendobj\n4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n5 0 obj\n<< /Length 44 >>\nstream\nBT /F1 24 Tf 100 700 Td (Dummy Evidence File) Tj ET\nendstream\nendobj\nxref\n0 6\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \n0000000219 00000 n \n0000000307 00000 n \ntrailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n402\n%%EOF";
-                File.WriteAllText(dummyPdfPath, pdfContent);
-            }
-
-            var dummyImgPath = Path.Combine(uploadDir, "dummy_evidence.jpg");
-            if (!File.Exists(dummyImgPath)) {
-                // Minimal 1x1 valid JPEG
-                byte[] jpegContent = new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x01, 0x00, 0x48, 0x00, 0x48, 0x00, 0x00, 0xFF, 0xDB, 0x00, 0x43, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xC0, 0x00, 0x0B, 0x08, 0x00, 0x01, 0x00, 0x01, 0x01, 0x01, 0x11, 0x00, 0xFF, 0xC4, 0x00, 0x14, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xC4, 0x00, 0x14, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00, 0x37, 0xFF, 0xD9 };
-                File.WriteAllBytes(dummyImgPath, jpegContent);
-            }
-
-            // Take just a sample of SubjectResults to avoid inserting thousands of evidences which slows down EF
+            // Evidence files no longer store bytes/paths on this server — the FE uploads straight to
+            // Cloudinary and the backend only keeps the URL (see Attachment.cs). Seed data below
+            // points at Cloudinary's own public sample assets so the dummy rows still resolve to a
+            // real, viewable file.
             var sampleResults = subjectResults.OrderBy(x => rand.Next()).Take(50).ToList();
 
             foreach(var sr in sampleResults)
@@ -619,37 +602,53 @@ public static class DataSeeder
                 var etr = await context.ETRCourseRecords.FirstAsync(e => e.ETRCourseRecordId == sr.EtrId);
                 var enrollment = await context.CourseEnrollments.FirstAsync(e => e.EnrollmentId == etr.EnrollmentId);
 
-                context.EvidenceFiles.Add(new EvidenceFile
+                var photoEvidence = new EvidenceFile
                 {
                     EvidenceTypeId = evidenceTypes[0].EvidenceTypeId, // Photo
                     UploadedByAccountId = sr.EvaluatedByAccountId ?? 1,
                     AccountId = enrollment.AccountId,
                     SubjectResultId = sr.SubjectResultId,
-                    FileName = "dummy_evidence.jpg",
-                    FilePath = "uploads/evidences/dummy_evidence.jpg",
-                    FileExtension = ".jpg",
-                    MimeType = "image/jpeg",
-                    FileSize = 135,
                     VerificationStatus = "Verified",
                     VerifiedByAccountId = qaId,
                     VerifiedAt = DateTime.UtcNow,
                     UploadedAt = DateTime.UtcNow
+                };
+                context.EvidenceFiles.Add(photoEvidence);
+                await context.SaveChangesAsync();
+                context.Attachments.Add(new Attachment
+                {
+                    OwnerType = nameof(EvidenceFile),
+                    OwnerId = photoEvidence.EvidenceFileId,
+                    Url = "https://res.cloudinary.com/demo/image/upload/sample.jpg",
+                    FileName = "dummy_evidence.jpg",
+                    MimeType = "image/jpeg",
+                    FileSize = 135,
+                    UploadedByAccountId = photoEvidence.UploadedByAccountId,
+                    UploadedAt = DateTime.UtcNow
                 });
 
-                context.EvidenceFiles.Add(new EvidenceFile
+                var pdfEvidence = new EvidenceFile
                 {
                     EvidenceTypeId = evidenceTypes[2].EvidenceTypeId, // PDF
                     UploadedByAccountId = sr.EvaluatedByAccountId ?? 1,
                     AccountId = enrollment.AccountId,
                     SubjectResultId = sr.SubjectResultId,
-                    FileName = "dummy_evidence.pdf",
-                    FilePath = "uploads/evidences/dummy_evidence.pdf",
-                    FileExtension = ".pdf",
-                    MimeType = "application/pdf",
-                    FileSize = 402,
                     VerificationStatus = "Verified",
                     VerifiedByAccountId = qaId,
                     VerifiedAt = DateTime.UtcNow,
+                    UploadedAt = DateTime.UtcNow
+                };
+                context.EvidenceFiles.Add(pdfEvidence);
+                await context.SaveChangesAsync();
+                context.Attachments.Add(new Attachment
+                {
+                    OwnerType = nameof(EvidenceFile),
+                    OwnerId = pdfEvidence.EvidenceFileId,
+                    Url = "https://res.cloudinary.com/demo/image/upload/sample.pdf",
+                    FileName = "dummy_evidence.pdf",
+                    MimeType = "application/pdf",
+                    FileSize = 402,
+                    UploadedByAccountId = pdfEvidence.UploadedByAccountId,
                     UploadedAt = DateTime.UtcNow
                 });
             }

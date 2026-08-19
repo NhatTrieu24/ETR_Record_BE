@@ -25,7 +25,10 @@ public record EtrSubjectDetailResponse(
     bool IsSignedOff,
     DateTime? SignedOffAt,
     IEnumerable<EtrAssessmentResultResponse> AssessmentResults,
-    IEnumerable<EtrPracticalChecklistResultResponse> PracticalChecklistResults
+    IEnumerable<EtrPracticalChecklistResultResponse> PracticalChecklistResults,
+    // Retake tracking (mục 1.2): true khi subject này được giữ nguyên từ lần enroll trước (đã
+    // Passed/Exempted) thay vì phải học/thi lại — xem SubjectResult.CarriedOverFromSubjectResultId.
+    bool IsCarriedOver
 );
 
 public record EtrAssessmentResultResponse(
@@ -56,7 +59,7 @@ public record EtrApprovalHistoryResponse(
 public record EtrEvidenceFileResponse(
     int EvidenceFileId,
     string FileName,
-    string FilePath,
+    string FileUrl,
     string FileType,
     int UploadedByAccountId,
     DateTime UploadedAt

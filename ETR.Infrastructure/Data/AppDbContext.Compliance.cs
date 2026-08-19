@@ -79,8 +79,7 @@ public partial class AppDbContext
             if (entry.State == EntityState.Modified)
             {
                 if (entry.Property(nameof(Account.Status)).IsModified
-                    && (string.Equals(entry.Entity.Status, "Inactive", StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(entry.Entity.Status, "Disabled", StringComparison.OrdinalIgnoreCase)))
+                    && entry.Entity.Status == AccountStatus.Inactive)
                 {
                     throw new BusinessRuleViolationException("Không thể tự vô hiệu hóa tài khoản của chính mình.");
                 }

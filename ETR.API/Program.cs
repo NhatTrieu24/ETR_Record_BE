@@ -106,6 +106,7 @@ try
 
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
+    builder.Services.AddHostedService<ETR.API.BackgroundJobs.CertificateExpiryReminderJob>();
 
     // Explicitly add Authorization (critical for [Authorize] attributes to map policies)
     builder.Services.AddAuthorization();
