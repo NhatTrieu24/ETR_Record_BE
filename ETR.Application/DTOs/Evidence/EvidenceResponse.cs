@@ -10,10 +10,9 @@ public class EvidenceResponse
     public int? AttendanceRecordId { get; set; }
     public int? AssessmentResultId { get; set; }
     public string FileName { get; set; } = string.Empty;
-    public string FilePath { get; set; } = string.Empty;
-    public string? FileExtension { get; set; }
+    public string FileUrl { get; set; } = string.Empty;
     public string? MimeType { get; set; }
-    public long FileSize { get; set; }
+    public long? FileSize { get; set; }
     public string VerificationStatus { get; set; } = string.Empty;
     public int? VerifiedByAccountId { get; set; }
     public DateTime? VerifiedAt { get; set; }

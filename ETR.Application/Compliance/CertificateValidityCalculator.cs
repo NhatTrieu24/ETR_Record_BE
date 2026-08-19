@@ -1,4 +1,5 @@
 using ETR.Application.Interfaces;
+using ETR.Domain.Enums;
 
 namespace ETR.Application.Compliance;
 
@@ -41,5 +42,49 @@ public static class CertificateValidityCalculator
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// For every (Account, Course) pair, looks at only the most recently issued Completed
+    /// ETRCourseRecord (same "latest wins" rule as <see cref="HasAnyExpiredCompletedEtrAsync"/>) and
+    /// returns it if its ExpiryDate is exactly N days away, where N is one of <paramref name="thresholdDays"/>.
+    /// Used by the certificate-expiry reminder job — each record fires at most once per threshold per
+    /// day the job runs, since "days until expiry" only equals a given threshold on one calendar day.
+    /// </summary>
+    public static async Task<IReadOnlyList<CertificateExpiryCandidate>> GetCertificatesNearingExpiryAsync(
+        IUnitOfWork unitOfWork,
+        IReadOnlyCollection<int> thresholdDays,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        var enrollments = await unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken);
+        var classes = await unitOfWork.ClassRepository.GetAllAsync(cancellationToken);
+        var etrs = await unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken);
+
+        var joined = enrollments
+            .Join(classes, e => e.ClassId, c => c.ClassId, (e, c) => new { e.AccountId, e.EnrollmentId, c.CourseId })
+            .Join(etrs, ec => ec.EnrollmentId, etr => etr.EnrollmentId, (ec, etr) => new { ec.AccountId, ec.CourseId, Etr = etr });
+
+        var results = new List<CertificateExpiryCandidate>();
+
+        foreach (var group in joined.GroupBy(x => new { x.AccountId, x.CourseId }))
+        {
+            var latest = group.OrderByDescending(x => x.Etr.IssuedDate ?? x.Etr.CreatedAt).First();
+            var etr = latest.Etr;
+
+            if (etr.Status != EtrStatus.Completed || !etr.ExpiryDate.HasValue)
+            {
+                continue;
+            }
+
+            var daysUntilExpiry = (etr.ExpiryDate.Value.Date - nowUtc.Date).Days;
+            if (thresholdDays.Contains(daysUntilExpiry))
+            {
+                results.Add(new CertificateExpiryCandidate(
+                    latest.AccountId, latest.CourseId, etr.ETRCourseRecordId, etr.ExpiryDate.Value, daysUntilExpiry));
+            }
+        }
+
+        return results;
     }
 }

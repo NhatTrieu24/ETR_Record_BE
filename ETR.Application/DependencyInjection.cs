@@ -8,6 +8,10 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
+        // IHttpClientFactory — used by ExportService to fetch evidence file bytes from their
+        // Cloudinary URL when assembling a Training Package ZIP (see ExportService.cs).
+        services.AddHttpClient();
+
         services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<IUserProfileService, UserProfileService>();
         services.AddScoped<IEnrollmentService, EnrollmentService>();
@@ -30,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<IExportService, ExportService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IImportService, ImportService>();
+        services.AddScoped<ICertificateExpiryNotificationService, CertificateExpiryNotificationService>();
 
         return services;
     }

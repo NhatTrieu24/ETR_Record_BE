@@ -42,6 +42,7 @@ public class UnitOfWork : IUnitOfWork
         ApprovalHistoryRepository = new GenericRepository<ApprovalHistory>(_context);
         AuditLogRepository = new AuditLogRepository(_context);
         ExportJobRepository = new GenericRepository<ExportJob>(_context);
+        AttachmentRepository = new GenericRepository<Attachment>(_context);
     }
 
     public IGenericRepository<Account> AccountRepository { get; }
@@ -72,6 +73,7 @@ public class UnitOfWork : IUnitOfWork
     public IGenericRepository<ApprovalHistory> ApprovalHistoryRepository { get; }
     public IAuditLogRepository AuditLogRepository { get; }
     public IGenericRepository<ExportJob> ExportJobRepository { get; }
+    public IGenericRepository<Attachment> AttachmentRepository { get; }
 
     public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
     {

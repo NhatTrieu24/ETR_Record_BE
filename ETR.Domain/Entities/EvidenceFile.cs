@@ -9,11 +9,9 @@ public class EvidenceFile : BaseEntity
     public int SubjectResultId { get; set; }
     public int? AttendanceRecordId { get; set; }
     public int? AssessmentResultId { get; set; }
-    public string FileName { get; set; } = string.Empty;
-    public string FilePath { get; set; } = string.Empty;
-    public string? FileExtension { get; set; }
-    public string? MimeType { get; set; }
-    public long FileSize { get; set; }
+
+    // File metadata (Url/FileName/MimeType/FileSize) lives on the polymorphic Attachment table now
+    // (OwnerType = nameof(EvidenceFile), OwnerId = EvidenceFileId) — see Attachment.cs.
     public string VerificationStatus { get; set; } = string.Empty;
     public int? VerifiedByAccountId { get; set; }
     public DateTime? VerifiedAt { get; set; }

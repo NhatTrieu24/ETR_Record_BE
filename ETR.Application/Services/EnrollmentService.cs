@@ -177,14 +177,46 @@ public class EnrollmentService : IEnrollmentService
                 var allChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(ct))
                     .Where(p => p.CourseId == trainingClass.CourseId).ToList();
 
+                // Retake-only-failed-subjects (mục 1.2): a subject the learner already Passed/Exempted
+                // on the previous attempt is carried over unchanged instead of being reset to Pending —
+                // only subjects that were NOT passed require retaking. Also carries over the underlying
+                // AssessmentResult/PracticalChecklistResult rows so EtrService.SubmitEtrAsync/
+                // GetCompletionProgressAsync (which check "all assessments/checklists passed" against
+                // THIS ETR's own child rows) see the carried-over subject as already satisfied, without
+                // needing any change to that validation logic.
+                var previousSubjectResults = previousEtr != null
+                    ? (await _unitOfWork.SubjectResultRepository.GetAllAsync(ct))
+                        .Where(sr => sr.EtrId == previousEtr.ETRCourseRecordId)
+                        .ToList()
+                    : new List<SubjectResult>();
+                var previousAssessmentResults = previousEtr != null
+                    ? (await _unitOfWork.AssessmentResultRepository.GetAllAsync(ct))
+                        .Where(ar => previousSubjectResults.Select(sr => sr.SubjectResultId).Contains(ar.SubjectResultId))
+                        .ToList()
+                    : new List<AssessmentResult>();
+                var previousChecklistResults = previousEtr != null
+                    ? (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(ct))
+                        .Where(pr => previousSubjectResults.Select(sr => sr.SubjectResultId).Contains(pr.SubjectResultId))
+                        .ToList()
+                    : new List<PracticalChecklistResult>();
+
                 foreach (var cs in courseSubjects)
                 {
+                    var previousSubjectResult = previousSubjectResults.FirstOrDefault(sr => sr.SubjectId == cs.SubjectId);
+                    var isCarriedOver = previousSubjectResult != null
+                        && (previousSubjectResult.Status == SubjectResultStatus.Passed || previousSubjectResult.Status == SubjectResultStatus.Exempted);
+
                     var subjectResult = new SubjectResult
                     {
                         EtrId = etrRecord.ETRCourseRecordId,
                         CourseId = cs.CourseId,
                         SubjectId = cs.SubjectId,
-                        Status = SubjectResultStatus.Pending,
+                        Status = isCarriedOver ? previousSubjectResult!.Status : SubjectResultStatus.Pending,
+                        AttendanceRate = isCarriedOver ? previousSubjectResult!.AttendanceRate : null,
+                        Score = isCarriedOver ? previousSubjectResult!.Score : null,
+                        EvaluatedByAccountId = isCarriedOver ? previousSubjectResult!.EvaluatedByAccountId : null,
+                        EvaluatedAt = isCarriedOver ? previousSubjectResult!.EvaluatedAt : null,
+                        CarriedOverFromSubjectResultId = isCarriedOver ? previousSubjectResult!.SubjectResultId : null,
                         PassingScoreSnapshot = cs.PassingScore,
                         CreatedAt = DateTime.UtcNow,
                         CreatedByAccountId = createdByAccountId
@@ -195,16 +227,20 @@ public class EnrollmentService : IEnrollmentService
                     var subjectAssessments = allAssessments.Where(a => a.SubjectId == cs.SubjectId).ToList();
                     foreach (var assessment in subjectAssessments)
                     {
+                        var previousAssessmentResult = isCarriedOver
+                            ? previousAssessmentResults.FirstOrDefault(ar => ar.AssessmentId == assessment.AssessmentId && ar.SubjectResultId == previousSubjectResult!.SubjectResultId)
+                            : null;
+
                         var assessmentResult = new AssessmentResult
                         {
                             AssessmentId = assessment.AssessmentId,
                             AccountId = accountId,
                             SubjectResultId = subjectResult.SubjectResultId,
-                            Score = 0,
-                            ResultStatus = "Pending",
+                            Score = previousAssessmentResult?.Score ?? 0,
+                            ResultStatus = previousAssessmentResult?.ResultStatus ?? "Pending",
                             GradedByAccountId = createdByAccountId,
                             RecordedAt = DateTime.UtcNow,
-                            IsPublished = false,
+                            IsPublished = previousAssessmentResult?.IsPublished ?? false,
                             AttemptNo = 1,
                             PassingScoreSnapshot = assessment.PassingScore,
                             WeightSnapshot = assessment.Weight
@@ -215,13 +251,17 @@ public class EnrollmentService : IEnrollmentService
                     var subjectChecklists = allChecklists.Where(p => p.SubjectId == cs.SubjectId).ToList();
                     foreach (var checklist in subjectChecklists)
                     {
+                        var previousChecklistResult = isCarriedOver
+                            ? previousChecklistResults.FirstOrDefault(pr => pr.PracticalChecklistId == checklist.PracticalChecklistId && pr.SubjectResultId == previousSubjectResult!.SubjectResultId)
+                            : null;
+
                         var checklistResult = new PracticalChecklistResult
                         {
                             SubjectResultId = subjectResult.SubjectResultId,
                             PracticalChecklistId = checklist.PracticalChecklistId,
-                            Score = 0,
-                            ResultStatus = "Pending",
-                            IsPublished = false
+                            Score = previousChecklistResult?.Score ?? 0,
+                            ResultStatus = previousChecklistResult?.ResultStatus ?? "Pending",
+                            IsPublished = previousChecklistResult?.IsPublished ?? false
                         };
                         await _unitOfWork.PracticalChecklistResultRepository.AddAsync(checklistResult, ct);
                     }

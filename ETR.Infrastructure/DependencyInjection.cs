@@ -1,5 +1,6 @@
 using ETR.Application.Interfaces;
 using ETR.Infrastructure.Data;
+using ETR.Infrastructure.Email;
 using ETR.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -31,6 +32,8 @@ public static class DependencyInjection
         services.Configure<ETR.Infrastructure.Identity.JwtOptions>(
             configuration.GetSection(ETR.Infrastructure.Identity.JwtOptions.SectionName));
         services.AddScoped<ITokenService, ETR.Infrastructure.Identity.TokenService>();
+
+        services.AddEmailModule(configuration);
 
         return services;
     }

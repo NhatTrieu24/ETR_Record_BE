@@ -1,5 +1,6 @@
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
+using ETR.Domain.Entities;
 using ETR.Domain.Enums;
 
 namespace ETR.Application.Services;
@@ -347,11 +348,14 @@ public class DashboardService : IDashboardService
         if (evidenceFiles.Count == 0) return [];
 
         var profiles = (await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken)).ToList();
+        var attachments = (await _unitOfWork.AttachmentRepository.GetAllAsync(cancellationToken))
+            .Where(a => a.OwnerType == nameof(EvidenceFile) && evidenceFiles.Select(e => e.EvidenceFileId).Contains(a.OwnerId))
+            .ToDictionary(a => a.OwnerId);
 
         return evidenceFiles
             .Select(e => new RecentEvidenceFileSummary(
                 e.EvidenceFileId,
-                e.FileName,
+                attachments.GetValueOrDefault(e.EvidenceFileId)?.FileName ?? string.Empty,
                 profiles.FirstOrDefault(p => p.AccountId == e.AccountId)?.FullName ?? "-",
                 e.VerificationStatus,
                 e.UploadedAt))

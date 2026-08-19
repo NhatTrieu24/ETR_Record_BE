@@ -114,6 +114,9 @@ public class EtrService : IEtrService
 
         var allEvidences = await _unitOfWork.EvidenceFileRepository.GetAllAsync(cancellationToken);
         var evidences = allEvidences.Where(ev => subjectResultIds.Contains(ev.SubjectResultId) && !ev.IsDeleted).ToList();
+        var evidenceAttachments = (await _unitOfWork.AttachmentRepository.GetAllAsync(cancellationToken))
+            .Where(a => a.OwnerType == nameof(EvidenceFile) && evidences.Select(ev => ev.EvidenceFileId).Contains(a.OwnerId))
+            .ToDictionary(a => a.OwnerId);
 
         var subjectResultResponses = e.SubjectResults?.Select(sr => {
             var signoff = signoffs.FirstOrDefault(s => s.SubjectResultId == sr.SubjectResultId);
@@ -131,7 +134,8 @@ public class EtrService : IEtrService
                 )).ToList(),
                 practicalResults.Where(pr => pr.SubjectResultId == sr.SubjectResultId).Select(pr => new EtrPracticalChecklistResultResponse(
                     pr.PracticalChecklistResultId, pr.PracticalChecklistId, pr.ResultStatus, pr.IsPublished
-                )).ToList()
+                )).ToList(),
+                sr.CarriedOverFromSubjectResultId.HasValue
             );
         }).ToList() ?? new List<EtrSubjectDetailResponse>();
 
@@ -139,9 +143,13 @@ public class EtrService : IEtrService
             ah.ApprovalHistoryId, ah.ApprovalRequestId, ah.ActionType, ah.Comments, ah.ActionByAccountId, ah.ActionAt
         )).ToList();
 
-        var evidenceResponses = evidences.Select(ev => new EtrEvidenceFileResponse(
-            ev.EvidenceFileId, ev.FileName, ev.FilePath, ev.MimeType ?? "unknown", ev.UploadedByAccountId, ev.UploadedAt
-        )).ToList();
+        var evidenceResponses = evidences.Select(ev => {
+            var attachment = evidenceAttachments.GetValueOrDefault(ev.EvidenceFileId);
+            return new EtrEvidenceFileResponse(
+                ev.EvidenceFileId, attachment?.FileName ?? string.Empty, attachment?.Url ?? string.Empty,
+                attachment?.MimeType ?? "unknown", ev.UploadedByAccountId, ev.UploadedAt
+            );
+        }).ToList();
 
         return new EtrDetailsResponse(
             e.ETRCourseRecordId,
