@@ -19,7 +19,7 @@ public partial class AppDbContext : DbContext
     public DbSet<Department> Departments => Set<Department>();
     public DbSet<Course> Courses => Set<Course>();
     public DbSet<EvidenceType> EvidenceTypes => Set<EvidenceType>();
-    
+
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
 
@@ -83,7 +83,7 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<Department>().HasKey(e => e.DepartmentId);
         modelBuilder.Entity<Course>().HasKey(e => e.CourseId);
         modelBuilder.Entity<EvidenceType>().HasKey(e => e.EvidenceTypeId);
-        
+
         modelBuilder.Entity<Account>().HasKey(e => e.AccountId);
         modelBuilder.Entity<UserProfile>().HasKey(e => e.AccountId);
 
@@ -113,46 +113,55 @@ public partial class AppDbContext : DbContext
 
     private static void ConfigureUniqueConstraints(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<Role>().HasIndex(r => r.RoleName).IsUnique();
-        modelBuilder.Entity<Department>().HasIndex(d => d.DepartmentName).IsUnique();
-        modelBuilder.Entity<EvidenceType>().HasIndex(et => et.TypeName).IsUnique();
-        modelBuilder.Entity<Course>().HasIndex(c => c.CourseCode).IsUnique();
-        modelBuilder.Entity<Subject>().HasIndex(s => s.SubjectCode).IsUnique();
-        modelBuilder.Entity<Class>().HasIndex(tc => tc.ClassCode).IsUnique();
-        
-        modelBuilder.Entity<Account>().HasIndex(u => u.Username).IsUnique();
-        modelBuilder.Entity<UserProfile>().HasIndex(u => u.Email).IsUnique().HasFilter("[Email] IS NOT NULL AND [Email] <> ''");
+        // Filtered WHERE IsDeleted = 0 on every unique index below: BaseEntity soft-delete is
+        // global (ConfigureSoftDeleteFilters), so a raw unique index would still block reusing a
+        // key after the row is soft-deleted. Filtering keeps uniqueness scoped to active rows only.
+        modelBuilder.Entity<Role>().HasIndex(r => r.RoleName).IsUnique().HasFilter("[IsDeleted] = 0");
+        modelBuilder.Entity<Department>().HasIndex(d => d.DepartmentName).IsUnique().HasFilter("[IsDeleted] = 0");
+        modelBuilder.Entity<EvidenceType>().HasIndex(et => et.TypeName).IsUnique().HasFilter("[IsDeleted] = 0");
+        modelBuilder.Entity<Course>().HasIndex(c => c.CourseCode).IsUnique().HasFilter("[IsDeleted] = 0");
+        modelBuilder.Entity<Subject>().HasIndex(s => s.SubjectCode).IsUnique().HasFilter("[IsDeleted] = 0");
+        modelBuilder.Entity<Class>().HasIndex(tc => tc.ClassCode).IsUnique().HasFilter("[IsDeleted] = 0");
+
+        modelBuilder.Entity<Account>().HasIndex(u => u.Username).IsUnique().HasFilter("[IsDeleted] = 0");
+        modelBuilder.Entity<UserProfile>().HasIndex(u => u.Email).IsUnique().HasFilter("[Email] IS NOT NULL AND [Email] <> '' AND [IsDeleted] = 0");
 
         modelBuilder.Entity<CourseEnrollment>()
             .HasIndex(e => new { e.AccountId, e.ClassId })
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("[IsDeleted] = 0");
 
         modelBuilder.Entity<ETRCourseRecord>()
             .HasIndex(e => e.EnrollmentId)
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("[IsDeleted] = 0");
 
         modelBuilder.Entity<SubjectResult>()
             .HasIndex(sr => new { sr.EtrId, sr.CourseId, sr.SubjectId })
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("[IsDeleted] = 0");
 
         modelBuilder.Entity<ClassSubject>()
             .HasIndex(cs => new { cs.ClassId, cs.SubjectId })
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("[IsDeleted] = 0");
 
         modelBuilder.Entity<AttendanceRecord>()
             .HasIndex(ar => new { ar.SessionId, ar.EnrollmentId })
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("[IsDeleted] = 0");
 
         // AttemptNo trong khoá unique — cho phép mỗi lần retake tạo 1 dòng mới (giữ lịch sử điểm),
         // thay vì ghi đè dòng cũ; vẫn chặn 2 dòng cùng tuyên bố cùng 1 attempt number.
         modelBuilder.Entity<AssessmentResult>()
             .HasIndex(ar => new { ar.AssessmentId, ar.AccountId, ar.SessionId, ar.AttemptNo })
             .IsUnique()
-            .HasFilter("[SessionId] IS NOT NULL");
-            
+            .HasFilter("[SessionId] IS NOT NULL AND [IsDeleted] = 0");
+
         modelBuilder.Entity<PracticalChecklistResult>()
             .HasIndex(pcr => new { pcr.SubjectResultId, pcr.PracticalChecklistId })
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("[IsDeleted] = 0");
 
         // Non-unique — one owner can have more than one attachment (e.g. a future gallery-style
         // owner type). No FK to any single table on purpose: OwnerType/OwnerId is a polymorphic
@@ -199,7 +208,7 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<ClassSubject>().HasOne<Class>().WithMany().HasForeignKey(cs => cs.ClassId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<ClassSubject>().HasOne<Subject>().WithMany().HasForeignKey(cs => cs.SubjectId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<ClassSubject>().HasOne<Account>().WithMany().HasForeignKey(cs => cs.InstructorAccountId).OnDelete(cascadeDeleteConfig);
-        
+
         // Enrollment
         modelBuilder.Entity<CourseEnrollment>().HasOne<Account>().WithMany().HasForeignKey(e => e.AccountId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<CourseEnrollment>().HasOne<Class>().WithMany().HasForeignKey(e => e.ClassId).OnDelete(cascadeDeleteConfig);
@@ -237,7 +246,7 @@ public partial class AppDbContext : DbContext
         // Signoff & Retake Setup
         modelBuilder.Entity<SubjectSignoff>().HasOne<SubjectResult>().WithMany().HasForeignKey(ss => ss.SubjectResultId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<SubjectSignoff>().HasOne<Account>().WithMany().HasForeignKey(ss => ss.SignoffByAccountId).OnDelete(cascadeDeleteConfig);
-        
+
         modelBuilder.Entity<RetakeHistory>().HasOne<SubjectResult>().WithMany().HasForeignKey(rh => rh.SubjectResultId).OnDelete(cascadeDeleteConfig);
 
         // Evidence Setup
@@ -253,7 +262,7 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<ApprovalRequest>().HasOne<ETRCourseRecord>().WithMany().HasForeignKey(ar => ar.ETRCourseRecordId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<ApprovalHistory>().HasOne<ApprovalRequest>().WithMany().HasForeignKey(ah => ah.ApprovalRequestId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<ApprovalHistory>().HasOne<Account>().WithMany().HasForeignKey(ah => ah.ActionByAccountId).OnDelete(cascadeDeleteConfig);
-        
+
         // ExportJob
         modelBuilder.Entity<ExportJob>().HasOne<Account>().WithMany().HasForeignKey(ej => ej.RequestedByAccountId).OnDelete(cascadeDeleteConfig);
     }

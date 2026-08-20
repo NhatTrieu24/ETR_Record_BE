@@ -1,3 +1,4 @@
+using ETR.Application.Compliance;
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
@@ -32,6 +33,12 @@ public class SubjectService : ISubjectService
 
     public async Task<SubjectResponse> CreateSubjectAsync(CreateSubjectRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
     {
+        var existingSubjects = await _unitOfWork.SubjectRepository.GetAllAsync(cancellationToken);
+        if (existingSubjects.Any(s => s.SubjectCode == request.SubjectCode))
+        {
+            throw new BusinessRuleViolationException($"A subject with code '{request.SubjectCode}' already exists.");
+        }
+
         var subject = new Subject
         {
             SubjectCode = request.SubjectCode,
@@ -57,6 +64,12 @@ public class SubjectService : ISubjectService
             ?? throw new KeyNotFoundException("Subject not found.");
 
         if (subject.IsDeleted) throw new KeyNotFoundException("Subject not found.");
+
+        var existingSubjects = await _unitOfWork.SubjectRepository.GetAllAsync(cancellationToken);
+        if (existingSubjects.Any(s => s.SubjectId != id && s.SubjectCode == request.SubjectCode))
+        {
+            throw new BusinessRuleViolationException($"A subject with code '{request.SubjectCode}' already exists.");
+        }
 
         subject.SubjectCode = request.SubjectCode;
         subject.SubjectName = request.SubjectName;

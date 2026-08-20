@@ -86,6 +86,13 @@ public class AccountService : IAccountService
                 throw new UnauthorizedAccessException("Academic staff can only create Student accounts.");
             }
         }
+
+        var existingAccounts = await _unitOfWork.AccountRepository.GetAllAsync(cancellationToken);
+        if (existingAccounts.Any(a => a.Username == request.Username))
+        {
+            throw new BusinessRuleViolationException($"An account with username '{request.Username}' already exists.");
+        }
+
         var account = new Account
         {
             Username = request.Username,

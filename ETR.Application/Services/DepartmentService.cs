@@ -1,3 +1,4 @@
+using ETR.Application.Compliance;
 using ETR.Application.DTOs.Department;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
@@ -39,6 +40,12 @@ public class DepartmentService : IDepartmentService
 
     public async Task<DepartmentResponse> CreateDepartmentAsync(CreateDepartmentRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
     {
+        var existingDepartments = await _unitOfWork.DepartmentRepository.GetAllAsync(cancellationToken);
+        if (existingDepartments.Any(d => d.DepartmentName == request.DepartmentName))
+        {
+            throw new BusinessRuleViolationException($"A department named '{request.DepartmentName}' already exists.");
+        }
+
         var department = new Department
         {
             DepartmentName = request.DepartmentName,
@@ -62,6 +69,12 @@ public class DepartmentService : IDepartmentService
     {
         var department = await _unitOfWork.DepartmentRepository.GetByIdAsync(id, cancellationToken);
         if (department == null) throw new KeyNotFoundException("Department not found.");
+
+        var existingDepartments = await _unitOfWork.DepartmentRepository.GetAllAsync(cancellationToken);
+        if (existingDepartments.Any(d => d.DepartmentId != id && d.DepartmentName == request.DepartmentName))
+        {
+            throw new BusinessRuleViolationException($"A department named '{request.DepartmentName}' already exists.");
+        }
 
         department.DepartmentName = request.DepartmentName;
         department.Description = request.Description;

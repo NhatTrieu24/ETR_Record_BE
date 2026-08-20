@@ -73,6 +73,12 @@ public class ClassService : IClassService
                 var course = await _unitOfWork.CourseRepository.GetByIdAsync(request.CourseId, ct)
                     ?? throw new BusinessRuleViolationException("Course not found.");
 
+                var existingClasses = await _unitOfWork.ClassRepository.GetAllAsync(ct);
+                if (existingClasses.Any(c => c.ClassCode == request.ClassCode))
+                {
+                    throw new BusinessRuleViolationException($"A class with code '{request.ClassCode}' already exists.");
+                }
+
                 var cls = new Class
                 {
                     ClassCode = request.ClassCode,
@@ -181,6 +187,12 @@ public class ClassService : IClassService
                     ?? throw new KeyNotFoundException("Class not found.");
 
                 if (cls.IsDeleted) throw new KeyNotFoundException("Class not found.");
+
+                var existingClasses = await _unitOfWork.ClassRepository.GetAllAsync(ct);
+                if (existingClasses.Any(c => c.ClassId != id && c.ClassCode == request.ClassCode))
+                {
+                    throw new BusinessRuleViolationException($"A class with code '{request.ClassCode}' already exists.");
+                }
 
                 var oldStatus = cls.Status;
 

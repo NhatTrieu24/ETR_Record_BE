@@ -110,6 +110,15 @@ public class UserProfileService : IUserProfileService
             }
         }
 
+        if (!string.IsNullOrWhiteSpace(request.Email))
+        {
+            var existingProfiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
+            if (existingProfiles.Any(p => p.Email == request.Email))
+            {
+                throw new BusinessRuleViolationException($"A profile with email '{request.Email}' already exists.");
+            }
+        }
+
         var profile = new UserProfile
         {
             AccountId = accountId, // Link to the created account
@@ -135,6 +144,12 @@ public class UserProfileService : IUserProfileService
         var profiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
         var profile = profiles.FirstOrDefault(p => p.AccountId == accountId)
             ?? throw new KeyNotFoundException($"UserProfile for Account {accountId} not found.");
+
+        if (!string.IsNullOrWhiteSpace(request.Email) &&
+            profiles.Any(p => p.AccountId != accountId && p.Email == request.Email))
+        {
+            throw new BusinessRuleViolationException($"A profile with email '{request.Email}' already exists.");
+        }
 
         profile.FullName = request.FullName;
         profile.Email = request.Email;

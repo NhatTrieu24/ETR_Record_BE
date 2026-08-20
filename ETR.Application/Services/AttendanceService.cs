@@ -74,6 +74,12 @@ public class AttendanceService : IAttendanceService
                 if (enrollment == null || enrollment.ClassId != session.ClassId)
                     throw new BusinessRuleViolationException("Student is not enrolled in this class.");
 
+                var existingRecords = await _unitOfWork.AttendanceRecordRepository.GetAllAsync(ct);
+                if (existingRecords.Any(r => r.SessionId == request.SessionId && r.EnrollmentId == request.EnrollmentId))
+                {
+                    throw new BusinessRuleViolationException("An attendance record for this session and enrollment already exists.");
+                }
+
                 var record = new AttendanceRecord
                 {
                     SessionId = request.SessionId,

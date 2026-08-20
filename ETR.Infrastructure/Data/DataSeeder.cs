@@ -56,7 +56,7 @@ public static class DataSeeder
         };
         foreach (var dept in defaultDepartments)
         {
-            if (!await context.Departments.AnyAsync(d => d.DepartmentName == dept.DepartmentName))
+            if (!await context.Departments.IgnoreQueryFilters().AnyAsync(d => d.DepartmentName == dept.DepartmentName))
                 context.Departments.Add(dept);
         }
         await context.SaveChangesAsync();
