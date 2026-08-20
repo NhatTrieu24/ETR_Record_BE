@@ -113,6 +113,12 @@ public class PracticalChecklistResultService : IPracticalChecklistResultService
                 $"No PracticalChecklist configured for CourseId={subjectResult.CourseId}, SubjectId={subjectResult.SubjectId}. Configure one via PracticalChecklistsController before recording a result.");
         }
 
+        var existingResults = await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(cancellationToken);
+        if (existingResults.Any(r => r.SubjectResultId == request.SubjectResultId && r.PracticalChecklistId == checklist.PracticalChecklistId))
+        {
+            throw new BusinessRuleViolationException("A practical checklist result for this subject result and checklist already exists.");
+        }
+
         var passingScore = await GetPassingScoreAsync(subjectResult, cancellationToken);
 
         var result = new PracticalChecklistResult

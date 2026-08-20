@@ -1,3 +1,4 @@
+using ETR.Application.Compliance;
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
@@ -43,6 +44,12 @@ public class CourseService : ICourseService
         if (request.Subjects == null || !request.Subjects.Any())
         {
             throw new ArgumentException("A course must have at least one subject configured upon creation.");
+        }
+
+        var existingCourses = await _unitOfWork.CourseRepository.GetAllAsync(cancellationToken);
+        if (existingCourses.Any(c => c.CourseCode == request.CourseCode))
+        {
+            throw new BusinessRuleViolationException($"A course with code '{request.CourseCode}' already exists.");
         }
 
         return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
@@ -140,6 +147,12 @@ public class CourseService : ICourseService
                     ?? throw new KeyNotFoundException("Course not found.");
 
                 if (course.IsDeleted) throw new KeyNotFoundException("Course not found.");
+
+                var existingCourses = await _unitOfWork.CourseRepository.GetAllAsync(ct);
+                if (existingCourses.Any(c => c.CourseId != id && c.CourseCode == request.CourseCode))
+                {
+                    throw new BusinessRuleViolationException($"A course with code '{request.CourseCode}' already exists.");
+                }
 
                 var oldStatus = course.Status;
 

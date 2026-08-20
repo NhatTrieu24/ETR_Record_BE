@@ -1,3 +1,4 @@
+using ETR.Application.Compliance;
 using ETR.Application.DTOs.EvidenceType;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
@@ -39,6 +40,12 @@ public class EvidenceTypeService : IEvidenceTypeService
 
     public async Task<EvidenceTypeResponse> CreateEvidenceTypeAsync(CreateEvidenceTypeRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
     {
+        var existingTypes = await _unitOfWork.EvidenceTypeRepository.GetAllAsync(cancellationToken);
+        if (existingTypes.Any(t => t.TypeName == request.TypeName))
+        {
+            throw new BusinessRuleViolationException($"An evidence type named '{request.TypeName}' already exists.");
+        }
+
         var evidenceType = new EvidenceType
         {
             TypeName = request.TypeName,
@@ -62,6 +69,12 @@ public class EvidenceTypeService : IEvidenceTypeService
     {
         var evidenceType = await _unitOfWork.EvidenceTypeRepository.GetByIdAsync(id, cancellationToken);
         if (evidenceType == null) throw new KeyNotFoundException("EvidenceType not found.");
+
+        var existingTypes = await _unitOfWork.EvidenceTypeRepository.GetAllAsync(cancellationToken);
+        if (existingTypes.Any(t => t.EvidenceTypeId != id && t.TypeName == request.TypeName))
+        {
+            throw new BusinessRuleViolationException($"An evidence type named '{request.TypeName}' already exists.");
+        }
 
         evidenceType.TypeName = request.TypeName;
         evidenceType.Description = request.Description;
