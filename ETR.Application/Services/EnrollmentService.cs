@@ -96,11 +96,31 @@ public class EnrollmentService : IEnrollmentService
 
             try
             {
-                var userProfile = await _unitOfWork.UserProfileRepository.GetByIdAsync(accountId, ct);
-                if (userProfile == null)
-                {
-                    throw new BusinessRuleViolationException($"Cannot enroll. Learner (Account ID: {accountId}) does not have a complete user profile.");
-                }
+                var result = await CreateEnrollmentCoreAsync(accountId, classId, createdByAccountId, ct);
+                await _unitOfWork.CommitTransactionAsync(ct);
+                return result;
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync(ct);
+                throw;
+            }
+        }, cancellationToken);
+    }
+
+    public async Task<CreateEnrollmentResponse> CreateEnrollmentCoreAsync(
+        int accountId,
+        int classId,
+        int createdByAccountId,
+        CancellationToken cancellationToken = default)
+    {
+        var ct = cancellationToken;
+
+        var userProfile = await _unitOfWork.UserProfileRepository.GetByIdAsync(accountId, ct);
+        if (userProfile == null)
+        {
+            throw new BusinessRuleViolationException($"Cannot enroll. Learner (Account ID: {accountId}) does not have a complete user profile.");
+        }
 
                 var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(classId, ct);
                 if (trainingClass == null) throw new BusinessRuleViolationException("Class not found.");
@@ -267,25 +287,17 @@ public class EnrollmentService : IEnrollmentService
                     }
                 }
 
-                await _unitOfWork.SaveAsync(ct);
-                await _unitOfWork.CommitTransactionAsync(ct);
+        await _unitOfWork.SaveAsync(ct);
 
-                return new CreateEnrollmentResponse(
-                    enrollment.EnrollmentId,
-                    enrollment.AccountId,
-                    enrollment.ClassId,
-                    enrollment.Status,
-                    enrollment.EnrolledAt,
-                    etrRecord.ETRCourseRecordId,
-                    etrRecord.Status,
-                    etrRecord.IsLocked);
-            }
-            catch
-            {
-                await _unitOfWork.RollbackTransactionAsync(ct);
-                throw;
-            }
-        }, cancellationToken);
+        return new CreateEnrollmentResponse(
+            enrollment.EnrollmentId,
+            enrollment.AccountId,
+            enrollment.ClassId,
+            enrollment.Status,
+            enrollment.EnrolledAt,
+            etrRecord.ETRCourseRecordId,
+            etrRecord.Status,
+            etrRecord.IsLocked);
     }
 
     public async Task<EnrollmentResponse> UpdateEnrollmentAsync(int id, UpdateEnrollmentRequest request, int updatedByAccountId, CancellationToken cancellationToken = default)
