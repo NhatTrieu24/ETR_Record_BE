@@ -70,103 +70,9 @@ public class ClassService : IClassService
             await _unitOfWork.BeginTransactionAsync(ct);
             try
             {
-                var course = await _unitOfWork.CourseRepository.GetByIdAsync(request.CourseId, ct)
-                    ?? throw new BusinessRuleViolationException("Course not found.");
-
-                var existingClasses = await _unitOfWork.ClassRepository.GetAllAsync(ct);
-                if (existingClasses.Any(c => c.ClassCode == request.ClassCode))
-                {
-                    throw new BusinessRuleViolationException($"A class with code '{request.ClassCode}' already exists.");
-                }
-
-                var cls = new Class
-                {
-                    ClassCode = request.ClassCode,
-                    ClassName = request.ClassName,
-                    CourseId = request.CourseId,
-                    StartDate = request.StartDate,
-                    EndDate = request.EndDate,
-                    Location = request.Location,
-                    Capacity = request.Capacity,
-                    Status = request.Status,
-                    CreatedAt = DateTime.UtcNow,
-                    CreatedByAccountId = createdByAccountId
-                };
-
-                await _unitOfWork.ClassRepository.AddAsync(cls, ct);
-                await _unitOfWork.SaveAsync(ct);
-
-                var assignments = new List<InstructorAssignmentResponse>();
-                var classSubjects = new List<ClassSubject>();
-                var sessions = new List<Session>();
-
-                // Lấy toàn bộ môn học thuộc khóa học (CourseSubjects)
-                var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct))
-                    .Where(x => x.CourseId == request.CourseId).ToList();
-
-                var assignmentDict = request.InstructorAssignments?
-                    .Where(a => a.InstructorAccountId.HasValue)
-                    .ToDictionary(a => a.SubjectId, a => a.InstructorAccountId) ?? new Dictionary<int, int?>();
-
-                // 1. Tạo ClassSubject cho tất cả các môn trong khóa học
-                foreach (var cs in courseSubjects)
-                {
-                    int? instructorId = assignmentDict.TryGetValue(cs.SubjectId, out var id) ? id : null;
-                    if (instructorId.HasValue)
-                    {
-                        await EnsureAccountHasInstructorRoleAsync(instructorId.Value, ct);
-                    }
-
-                    var classSubject = new ClassSubject
-                    {
-                        ClassId = cls.ClassId,
-                        SubjectId = cs.SubjectId,
-                        InstructorAccountId = instructorId
-                    };
-                    classSubjects.Add(classSubject);
-                    await _unitOfWork.ClassSubjectRepository.AddAsync(classSubject, ct);
-                }
-                await _unitOfWork.SaveAsync(ct);
-
-                // 2. Tự động tạo sẵn danh sách Sessions (Buổi học) cho từng môn học
-                foreach (var cs in courseSubjects)
-                {
-                    // Nếu RequiredSessions chưa set hoặc <= 0, mặc định tạo ít nhất 1 buổi
-                    int sessionCount = cs.RequiredSessions > 0 ? cs.RequiredSessions : 1;
-
-                    for (int i = 1; i <= sessionCount; i++)
-                    {
-                        var session = new Session
-                        {
-                            ClassId = cls.ClassId,
-                            SubjectId = cs.SubjectId,
-                            SessionTitle = $"Buổi {i}",
-                            SessionDate = null, // Giảng viên sẽ lên lịch hoặc điểm danh sau
-                            Location = request.Location,
-                            IsConfirmed = false
-                        };
-                        await _unitOfWork.SessionRepository.AddAsync(session, ct);
-                        sessions.Add(session);
-                    }
-                }
-                await _unitOfWork.SaveAsync(ct);
-
-                assignments = classSubjects.Select(x => new InstructorAssignmentResponse(x.ClassSubjectId, x.SubjectId, x.InstructorAccountId)).ToList();
-
-                await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
-                {
-                    AccountId = createdByAccountId,
-                    ActionType = AuditActionType.INSERT.ToString(),
-                    EntityName = nameof(Class),
-                    RecordId = cls.ClassId,
-                    NewValue = cls.ClassCode,
-                    Description = $"Class #{cls.ClassId} ({cls.ClassCode}) created with {classSubjects.Count} subjects and {sessions.Count} sessions"
-                }, ct);
-                
-                await _unitOfWork.SaveAsync(ct);
+                var result = await CreateClassCoreAsync(request, createdByAccountId, ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
-
-                return new TrainingClassResponse(cls.ClassId, cls.ClassCode, cls.ClassName, cls.CourseId, cls.StartDate, cls.EndDate, cls.Location, cls.Capacity, cls.Status, assignments);
+                return result;
             }
             catch
             {
@@ -174,6 +80,108 @@ public class ClassService : IClassService
                 throw;
             }
         }, cancellationToken);
+    }
+
+    public async Task<TrainingClassResponse> CreateClassCoreAsync(CreateClassRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
+    {
+        var ct = cancellationToken;
+
+        var course = await _unitOfWork.CourseRepository.GetByIdAsync(request.CourseId, ct)
+            ?? throw new BusinessRuleViolationException("Course not found.");
+
+        var existingClasses = await _unitOfWork.ClassRepository.GetAllAsync(ct);
+        if (existingClasses.Any(c => c.ClassCode == request.ClassCode))
+        {
+            throw new BusinessRuleViolationException($"A class with code '{request.ClassCode}' already exists.");
+        }
+
+        var cls = new Class
+        {
+            ClassCode = request.ClassCode,
+            ClassName = request.ClassName,
+            CourseId = request.CourseId,
+            StartDate = request.StartDate,
+            EndDate = request.EndDate,
+            Location = request.Location,
+            Capacity = request.Capacity,
+            Status = request.Status,
+            CreatedAt = DateTime.UtcNow,
+            CreatedByAccountId = createdByAccountId
+        };
+
+        await _unitOfWork.ClassRepository.AddAsync(cls, ct);
+        await _unitOfWork.SaveAsync(ct);
+
+        var assignments = new List<InstructorAssignmentResponse>();
+        var classSubjects = new List<ClassSubject>();
+        var sessions = new List<Session>();
+
+        // Lấy toàn bộ môn học thuộc khóa học (CourseSubjects)
+        var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct))
+            .Where(x => x.CourseId == request.CourseId).ToList();
+
+        var assignmentDict = request.InstructorAssignments?
+            .Where(a => a.InstructorAccountId.HasValue)
+            .ToDictionary(a => a.SubjectId, a => a.InstructorAccountId) ?? new Dictionary<int, int?>();
+
+        // 1. Tạo ClassSubject cho tất cả các môn trong khóa học
+        foreach (var cs in courseSubjects)
+        {
+            int? instructorId = assignmentDict.TryGetValue(cs.SubjectId, out var id) ? id : null;
+            if (instructorId.HasValue)
+            {
+                await EnsureAccountHasInstructorRoleAsync(instructorId.Value, ct);
+            }
+
+            var classSubject = new ClassSubject
+            {
+                ClassId = cls.ClassId,
+                SubjectId = cs.SubjectId,
+                InstructorAccountId = instructorId
+            };
+            classSubjects.Add(classSubject);
+            await _unitOfWork.ClassSubjectRepository.AddAsync(classSubject, ct);
+        }
+        await _unitOfWork.SaveAsync(ct);
+
+        // 2. Tự động tạo sẵn danh sách Sessions (Buổi học) cho từng môn học
+        foreach (var cs in courseSubjects)
+        {
+            // Nếu RequiredSessions chưa set hoặc <= 0, mặc định tạo ít nhất 1 buổi
+            int sessionCount = cs.RequiredSessions > 0 ? cs.RequiredSessions : 1;
+
+            for (int i = 1; i <= sessionCount; i++)
+            {
+                var session = new Session
+                {
+                    ClassId = cls.ClassId,
+                    SubjectId = cs.SubjectId,
+                    SessionTitle = $"Buổi {i}",
+                    SessionDate = null, // Giảng viên sẽ lên lịch hoặc điểm danh sau
+                    Location = request.Location,
+                    IsConfirmed = false
+                };
+                await _unitOfWork.SessionRepository.AddAsync(session, ct);
+                sessions.Add(session);
+            }
+        }
+        await _unitOfWork.SaveAsync(ct);
+
+        assignments = classSubjects.Select(x => new InstructorAssignmentResponse(x.ClassSubjectId, x.SubjectId, x.InstructorAccountId)).ToList();
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = createdByAccountId,
+            ActionType = AuditActionType.INSERT.ToString(),
+            EntityName = nameof(Class),
+            RecordId = cls.ClassId,
+            NewValue = cls.ClassCode,
+            Description = $"Class #{cls.ClassId} ({cls.ClassCode}) created with {classSubjects.Count} subjects and {sessions.Count} sessions"
+        }, ct);
+
+        await _unitOfWork.SaveAsync(ct);
+
+        return new TrainingClassResponse(cls.ClassId, cls.ClassCode, cls.ClassName, cls.CourseId, cls.StartDate, cls.EndDate, cls.Location, cls.Capacity, cls.Status, assignments);
     }
 
     public async Task<TrainingClassResponse> UpdateClassAsync(int id, UpdateClassRequest request, int updatedByAccountId, CancellationToken cancellationToken = default)

@@ -1,5 +1,6 @@
 using ClosedXML.Excel;
 using ETR.Application.Compliance;
+using ETR.Application.DTOs;
 using ETR.Application.DTOs.Import;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
@@ -10,6 +11,8 @@ namespace ETR.Application.Services;
 public class ImportService : IImportService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IClassService _classService;
+    private readonly IEnrollmentService _enrollmentService;
 
     // Column indices (1-based, matches Excel columns A=1, B=2 …)
     private const int AttColEnrollmentId = 1;
@@ -35,9 +38,27 @@ public class ImportService : IImportService
     private const int AccColDepartmentName = 4;
     private const int AccDataStartRow      = 3; // row 1 is title, row 2 is header
 
-    public ImportService(IUnitOfWork unitOfWork)
+    // Classes & Roster — sheet "Classes"
+    private const int ClsColClassCode  = 1;
+    private const int ClsColClassName  = 2;
+    private const int ClsColCourseCode = 3;
+    private const int ClsColStartDate  = 4;
+    private const int ClsColEndDate    = 5;
+    private const int ClsColLocation   = 6;
+    private const int ClsColCapacity   = 7;
+    private const int ClsColStatus     = 8;
+    private const int ClsDataStartRow  = 3; // row 1 is title, row 2 is header
+
+    // Classes & Roster — sheet "Students"
+    private const int StuColClassCode = 1;
+    private const int StuColUsername  = 2;
+    private const int StuDataStartRow = 3; // row 1 is title, row 2 is header
+
+    public ImportService(IUnitOfWork unitOfWork, IClassService classService, IEnrollmentService enrollmentService)
     {
         _unitOfWork = unitOfWork;
+        _classService = classService;
+        _enrollmentService = enrollmentService;
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -826,6 +847,329 @@ public class ImportService : IImportService
 
             if (!seenInFile.Add(row.Username))
                 errors.Add(new ImportRowError(row.RowNumber, "Username", $"Username '{row.Username}' bị trùng lặp trong file."));
+        }
+
+        return errors;
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  CLASSES & ROSTER (bulk class creation + student enrollment)
+    // ════════════════════════════════════════════════════════════════════════
+
+    public async Task<byte[]> GenerateClassRosterImportTemplateAsync(CancellationToken ct = default)
+    {
+        var courseCodes = (await _unitOfWork.CourseRepository.GetAllAsync(ct))
+            .Where(c => !c.IsDeleted).Select(c => c.CourseCode).OrderBy(c => c).ToList();
+        var statuses = Enum.GetNames<ClassStatus>();
+
+        using var workbook = new XLWorkbook();
+        const int maxTemplateRows = 500;
+
+        // ── Sheet 1: Classes ────────────────────────────────────────────────
+        var wsClasses = workbook.Worksheets.Add("Classes");
+
+        wsClasses.Cell(1, 1).Value = "DANH SÁCH LỚP HỌC (tạo mới)";
+        wsClasses.Range(1, 1, 1, ClsColStatus).Merge().Style
+            .Font.SetBold(true)
+            .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+
+        wsClasses.Cell(2, ClsColClassCode).Value  = "Mã lớp (ClassCode)*";
+        wsClasses.Cell(2, ClsColClassName).Value  = "Tên lớp (ClassName)*";
+        wsClasses.Cell(2, ClsColCourseCode).Value = "Mã khóa học (CourseCode)*";
+        wsClasses.Cell(2, ClsColStartDate).Value  = "Ngày bắt đầu (dd/MM/yyyy)*";
+        wsClasses.Cell(2, ClsColEndDate).Value    = "Ngày kết thúc (dd/MM/yyyy)*";
+        wsClasses.Cell(2, ClsColLocation).Value   = "Địa điểm";
+        wsClasses.Cell(2, ClsColCapacity).Value   = "Sĩ số tối đa (Capacity)*";
+        wsClasses.Cell(2, ClsColStatus).Value     = "Trạng thái (Status)*";
+        wsClasses.Row(2).Style.Font.SetBold(true)
+            .Fill.SetBackgroundColor(XLColor.LightSteelBlue);
+        wsClasses.Columns().AdjustToContents();
+
+        var courseRange = wsClasses.Range(ClsDataStartRow, ClsColCourseCode, ClsDataStartRow + maxTemplateRows, ClsColCourseCode);
+        courseRange.CreateDataValidation().List($"\"{string.Join(",", courseCodes)}\"", true);
+        var statusRange = wsClasses.Range(ClsDataStartRow, ClsColStatus, ClsDataStartRow + maxTemplateRows, ClsColStatus);
+        statusRange.CreateDataValidation().List($"\"{string.Join(",", statuses)}\"", true);
+
+        // ── Sheet 2: Students ───────────────────────────────────────────────
+        var wsStudents = workbook.Worksheets.Add("Students");
+
+        wsStudents.Cell(1, 1).Value = "DANH SÁCH HỌC VIÊN THEO LỚP (gán vào lớp ở sheet Classes hoặc lớp đã có sẵn trong hệ thống)";
+        wsStudents.Range(1, 1, 1, StuColUsername).Merge().Style
+            .Font.SetBold(true)
+            .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+
+        wsStudents.Cell(2, StuColClassCode).Value = "Mã lớp (ClassCode)*";
+        wsStudents.Cell(2, StuColUsername).Value  = "Username học viên đã có tài khoản (email)*";
+        wsStudents.Row(2).Style.Font.SetBold(true)
+            .Fill.SetBackgroundColor(XLColor.LightSteelBlue);
+        wsStudents.Columns().AdjustToContents();
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return stream.ToArray();
+    }
+
+    public async Task<ImportValidationResult> ValidateClassRosterImportAsync(Stream fileStream, CancellationToken ct = default)
+    {
+        var (classRows, studentRows) = ParseClassRosterWorkbook(fileStream);
+        var (classErrors, courseCodeToId) = await ValidateClassRosterRowsAsync(classRows, ct);
+        var studentErrors = await ValidateStudentRosterRowsAsync(studentRows, classRows, courseCodeToId, ct);
+        var errors = classErrors.Concat(studentErrors).ToList();
+
+        var totalRows = classRows.Count + studentRows.Count;
+        var errorRowKeys = errors.Select(e => e.Column.Split('.')[0] + ":" + e.Row).Distinct().Count();
+
+        return new ImportValidationResult(
+            TotalRows: totalRows,
+            ValidRows: totalRows - errorRowKeys,
+            ErrorRows: errorRowKeys,
+            CanCommit: errors.Count == 0,
+            Errors: errors);
+    }
+
+    public async Task<ImportCommitResult> CommitClassRosterImportAsync(Stream fileStream, int createdByAccountId, CancellationToken ct = default)
+    {
+        var (classRows, studentRows) = ParseClassRosterWorkbook(fileStream);
+        var (classErrors, courseCodeToId) = await ValidateClassRosterRowsAsync(classRows, ct);
+        var studentErrors = await ValidateStudentRosterRowsAsync(studentRows, classRows, courseCodeToId, ct);
+        var errors = classErrors.Concat(studentErrors).ToList();
+
+        if (errors.Count > 0)
+            return new ImportCommitResult(Imported: 0, Skipped: classRows.Count + studentRows.Count, Errors: errors);
+
+        return await _unitOfWork.ExecuteInStrategyAsync(async (innerCt) =>
+        {
+            await _unitOfWork.BeginTransactionAsync(innerCt);
+            try
+            {
+                var newClassCodeToId = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                foreach (var row in classRows)
+                {
+                    var request = new CreateClassRequest(
+                        row.ClassCode, row.ClassName, courseCodeToId[row.CourseCode],
+                        row.StartDate!.Value, row.EndDate!.Value, row.Location, row.Capacity,
+                        Enum.Parse<ClassStatus>(row.Status, ignoreCase: true));
+
+                    var created = await _classService.CreateClassCoreAsync(request, createdByAccountId, innerCt);
+                    newClassCodeToId[row.ClassCode] = created.ClassId;
+                }
+
+                var existingClassIds = (await _unitOfWork.ClassRepository.GetAllAsync(innerCt))
+                    .Where(c => !c.IsDeleted)
+                    .ToDictionary(c => c.ClassCode, c => c.ClassId, StringComparer.OrdinalIgnoreCase);
+
+                var accountIds = (await _unitOfWork.AccountRepository.GetAllAsync(innerCt))
+                    .ToDictionary(a => a.Username, a => a.AccountId, StringComparer.OrdinalIgnoreCase);
+
+                foreach (var row in studentRows)
+                {
+                    var classId = newClassCodeToId.TryGetValue(row.ClassCode, out var newId) ? newId : existingClassIds[row.ClassCode];
+                    var accountId = accountIds[row.Username];
+                    await _enrollmentService.CreateEnrollmentCoreAsync(accountId, classId, createdByAccountId, innerCt);
+                }
+
+                await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                {
+                    AccountId = createdByAccountId,
+                    ActionType = AuditActionType.IMPORT_CLASS_ROSTER.ToString(),
+                    EntityName = "Class",
+                    Description = $"Bulk import: created {classRows.Count} classes and enrolled {studentRows.Count} students via Excel.",
+                    CreatedAt = DateTime.UtcNow
+                }, innerCt);
+
+                await _unitOfWork.SaveAsync(innerCt);
+                await _unitOfWork.CommitTransactionAsync(innerCt);
+
+                return new ImportCommitResult(Imported: classRows.Count + studentRows.Count, Skipped: 0, Errors: []);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync(innerCt);
+                throw;
+            }
+        }, ct);
+    }
+
+    private static (List<ClassImportRow> ClassRows, List<StudentRosterImportRow> StudentRows) ParseClassRosterWorkbook(Stream fileStream)
+    {
+        using var workbook = new XLWorkbook(fileStream);
+        var wsClasses = workbook.Worksheet(1);
+        var wsStudents = workbook.Worksheet(2);
+
+        var classRows = new List<ClassImportRow>();
+        int lastClassRow = wsClasses.LastRowUsed()?.RowNumber() ?? ClsDataStartRow - 1;
+        for (int r = ClsDataStartRow; r <= lastClassRow; r++)
+        {
+            var classCode = wsClasses.Cell(r, ClsColClassCode).GetString().Trim();
+            if (string.IsNullOrEmpty(classCode)) continue;
+
+            var className = wsClasses.Cell(r, ClsColClassName).GetString().Trim();
+            var courseCode = wsClasses.Cell(r, ClsColCourseCode).GetString().Trim();
+            var startDate = ParseExcelDate(wsClasses.Cell(r, ClsColStartDate));
+            var endDate = ParseExcelDate(wsClasses.Cell(r, ClsColEndDate));
+            var location = wsClasses.Cell(r, ClsColLocation).GetString().Trim();
+            int.TryParse(wsClasses.Cell(r, ClsColCapacity).GetString().Trim(), out var capacity);
+            var status = wsClasses.Cell(r, ClsColStatus).GetString().Trim();
+
+            classRows.Add(new ClassImportRow(r, classCode, className, courseCode, startDate, endDate,
+                string.IsNullOrEmpty(location) ? null : location, capacity, status));
+        }
+
+        var studentRows = new List<StudentRosterImportRow>();
+        int lastStudentRow = wsStudents.LastRowUsed()?.RowNumber() ?? StuDataStartRow - 1;
+        for (int r = StuDataStartRow; r <= lastStudentRow; r++)
+        {
+            var classCode = wsStudents.Cell(r, StuColClassCode).GetString().Trim();
+            var username = wsStudents.Cell(r, StuColUsername).GetString().Trim();
+            if (string.IsNullOrEmpty(classCode) && string.IsNullOrEmpty(username)) continue;
+
+            studentRows.Add(new StudentRosterImportRow(r, classCode, username));
+        }
+
+        return (classRows, studentRows);
+    }
+
+    private static DateTime? ParseExcelDate(IXLCell cell)
+    {
+        if (cell.TryGetValue<DateTime>(out var dt)) return dt;
+
+        var text = cell.GetString().Trim();
+        if (string.IsNullOrEmpty(text)) return null;
+
+        if (DateTime.TryParseExact(text, "dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var exact))
+            return exact;
+
+        return DateTime.TryParse(text, System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var parsed) ? parsed : null;
+    }
+
+    private async Task<(List<ImportRowError> Errors, Dictionary<string, int> CourseCodeToId)> ValidateClassRosterRowsAsync(
+        List<ClassImportRow> rows, CancellationToken ct)
+    {
+        var errors = new List<ImportRowError>();
+
+        var courseCodeToId = (await _unitOfWork.CourseRepository.GetAllAsync(ct))
+            .Where(c => !c.IsDeleted)
+            .ToDictionary(c => c.CourseCode, c => c.CourseId, StringComparer.OrdinalIgnoreCase);
+        var existingClassCodes = (await _unitOfWork.ClassRepository.GetAllAsync(ct))
+            .Select(c => c.ClassCode)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var validStatuses = Enum.GetNames<ClassStatus>();
+
+        var seenInFile = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in rows)
+        {
+            if (string.IsNullOrWhiteSpace(row.ClassName))
+                errors.Add(new ImportRowError(row.RowNumber, "Classes.ClassName", "Tên lớp không được để trống."));
+
+            if (!courseCodeToId.ContainsKey(row.CourseCode))
+                errors.Add(new ImportRowError(row.RowNumber, "Classes.CourseCode", $"Khóa học '{row.CourseCode}' không tồn tại."));
+
+            if (!row.StartDate.HasValue || !row.EndDate.HasValue)
+                errors.Add(new ImportRowError(row.RowNumber, "Classes.StartDate", "Ngày bắt đầu/kết thúc không hợp lệ. Định dạng: dd/MM/yyyy."));
+            else if (row.EndDate < row.StartDate)
+                errors.Add(new ImportRowError(row.RowNumber, "Classes.EndDate", "Ngày kết thúc phải sau hoặc bằng ngày bắt đầu."));
+
+            if (row.Capacity < 1)
+                errors.Add(new ImportRowError(row.RowNumber, "Classes.Capacity", "Sĩ số tối đa phải >= 1."));
+
+            if (!validStatuses.Contains(row.Status, StringComparer.OrdinalIgnoreCase))
+                errors.Add(new ImportRowError(row.RowNumber, "Classes.Status", $"Trạng thái '{row.Status}' không hợp lệ. Chấp nhận: {string.Join(", ", validStatuses)}."));
+
+            if (existingClassCodes.Contains(row.ClassCode))
+                errors.Add(new ImportRowError(row.RowNumber, "Classes.ClassCode", $"Mã lớp '{row.ClassCode}' đã tồn tại trong hệ thống."));
+
+            if (!seenInFile.Add(row.ClassCode))
+                errors.Add(new ImportRowError(row.RowNumber, "Classes.ClassCode", $"Mã lớp '{row.ClassCode}' bị trùng lặp trong sheet Classes."));
+        }
+
+        return (errors, courseCodeToId);
+    }
+
+    private async Task<List<ImportRowError>> ValidateStudentRosterRowsAsync(
+        List<StudentRosterImportRow> rows, List<ClassImportRow> classRows,
+        Dictionary<string, int> courseCodeToId, CancellationToken ct)
+    {
+        var errors = new List<ImportRowError>();
+
+        var fileClassCourseCode = classRows
+            .ToDictionary(c => c.ClassCode, c => c.CourseCode, StringComparer.OrdinalIgnoreCase);
+        var existingClasses = (await _unitOfWork.ClassRepository.GetAllAsync(ct))
+            .Where(c => !c.IsDeleted)
+            .ToDictionary(c => c.ClassCode, c => c, StringComparer.OrdinalIgnoreCase);
+
+        var accounts = (await _unitOfWork.AccountRepository.GetAllAsync(ct))
+            .ToDictionary(a => a.Username, a => a, StringComparer.OrdinalIgnoreCase);
+        var roleNamesById = (await _unitOfWork.RoleRepository.GetAllAsync(ct))
+            .ToDictionary(r => r.RoleId, r => r.RoleName);
+        var accountIdsWithProfile = (await _unitOfWork.UserProfileRepository.GetAllAsync(ct))
+            .Select(p => p.AccountId)
+            .ToHashSet();
+
+        var allEnrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct)).ToList();
+        var allEtrs = (await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(ct)).ToList();
+        var allCourseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct)).ToList();
+
+        var seenPairs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in rows)
+        {
+            int? resolvedCourseId = null;
+            int? existingClassId = null;
+
+            if (fileClassCourseCode.TryGetValue(row.ClassCode, out var courseCode))
+            {
+                if (courseCodeToId.TryGetValue(courseCode, out var cid)) resolvedCourseId = cid;
+            }
+            else if (existingClasses.TryGetValue(row.ClassCode, out var existingClass))
+            {
+                existingClassId = existingClass.ClassId;
+                resolvedCourseId = existingClass.CourseId;
+            }
+            else
+            {
+                errors.Add(new ImportRowError(row.RowNumber, "Students.ClassCode",
+                    $"Mã lớp '{row.ClassCode}' không tồn tại trong sheet Classes hoặc trong hệ thống."));
+            }
+
+            if (!accounts.TryGetValue(row.Username, out var account))
+            {
+                errors.Add(new ImportRowError(row.RowNumber, "Students.Username", $"Tài khoản '{row.Username}' không tồn tại trong hệ thống."));
+            }
+            else
+            {
+                var roleName = roleNamesById.TryGetValue(account.RoleId, out var rn) ? rn : null;
+                if (!string.Equals(roleName, "Student", StringComparison.OrdinalIgnoreCase))
+                    errors.Add(new ImportRowError(row.RowNumber, "Students.Username", $"Tài khoản '{row.Username}' không phải là học viên (Student)."));
+
+                if (!accountIdsWithProfile.Contains(account.AccountId))
+                    errors.Add(new ImportRowError(row.RowNumber, "Students.Username", $"Tài khoản '{row.Username}' chưa có hồ sơ cá nhân (UserProfile), không thể ghi danh."));
+
+                if (existingClassId.HasValue &&
+                    allEnrollments.Any(e => e.AccountId == account.AccountId && e.ClassId == existingClassId.Value && e.Status != EnrollmentStatus.Deleted))
+                {
+                    errors.Add(new ImportRowError(row.RowNumber, "Students.Username", $"Học viên '{row.Username}' đã được ghi danh vào lớp '{row.ClassCode}'."));
+                }
+
+                if (resolvedCourseId.HasValue)
+                {
+                    var studentEnrollments = allEnrollments.Where(e => e.AccountId == account.AccountId).ToList();
+                    var classIdsForCourse = existingClasses.Values
+                        .Where(c => c.CourseId == resolvedCourseId.Value)
+                        .Select(c => c.ClassId)
+                        .ToHashSet();
+                    var hasOngoingEtr = allEtrs.Any(etr => !etr.IsLocked &&
+                        studentEnrollments.Any(e => e.EnrollmentId == etr.EnrollmentId && classIdsForCourse.Contains(e.ClassId)));
+                    if (hasOngoingEtr)
+                        errors.Add(new ImportRowError(row.RowNumber, "Students.Username", $"Học viên '{row.Username}' đang có ETR chưa hoàn tất cho khóa học này ở lớp khác."));
+
+                    if (!allCourseSubjects.Any(cs => cs.CourseId == resolvedCourseId.Value))
+                        errors.Add(new ImportRowError(row.RowNumber, "Students.ClassCode", $"Khóa học của lớp '{row.ClassCode}' chưa có môn học nào được cấu hình."));
+                }
+            }
+
+            if (!seenPairs.Add($"{row.ClassCode}::{row.Username}"))
+                errors.Add(new ImportRowError(row.RowNumber, "Students.Username", $"Học viên '{row.Username}' bị trùng lặp cho lớp '{row.ClassCode}' trong file."));
         }
 
         return errors;

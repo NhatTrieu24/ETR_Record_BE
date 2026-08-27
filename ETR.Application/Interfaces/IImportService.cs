@@ -18,4 +18,9 @@ public interface IImportService
     Task<byte[]> GenerateAccountImportTemplateAsync(CancellationToken ct = default);
     Task<ImportValidationResult> ValidateAccountImportAsync(Stream fileStream, bool isCallerAdmin, CancellationToken ct = default);
     Task<ImportCommitResult> CommitAccountImportAsync(Stream fileStream, int createdByAccountId, bool isCallerAdmin, CancellationToken ct = default);
+
+    // ── Classes & Roster (bulk class creation + student enrollment) ─────────
+    Task<byte[]> GenerateClassRosterImportTemplateAsync(CancellationToken ct = default);
+    Task<ImportValidationResult> ValidateClassRosterImportAsync(Stream fileStream, CancellationToken ct = default);
+    Task<ImportCommitResult> CommitClassRosterImportAsync(Stream fileStream, int createdByAccountId, CancellationToken ct = default);
 }

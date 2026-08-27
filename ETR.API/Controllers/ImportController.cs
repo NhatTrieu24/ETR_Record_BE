@@ -209,4 +209,63 @@ public class ImportController : ControllerBase
 
         return Ok(result);
     }
+
+    // ── Classes & Roster (bulk class creation + student enrollment) ─────────
+
+    /// <summary>
+    /// [Module/Flow]: Bulk Import — Classes and Roster
+    /// [Core Responsibility]: Tải về file Excel mẫu (2 sheet: Classes, Students) để tạo hàng loạt lớp học và ghi danh học viên.
+    /// [Target Audience]: Admin, Academic
+    /// </summary>
+    [HttpGet("classes-roster/template")]
+    [Authorize(Roles = "Admin,Academic")]
+    public async Task<IActionResult> GetClassRosterImportTemplate(CancellationToken cancellationToken)
+    {
+        var bytes = await _importService.GenerateClassRosterImportTemplateAsync(cancellationToken);
+        return File(bytes,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "bulk_import_classes_roster.xlsx");
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Bulk Import — Classes and Roster
+    /// [Core Responsibility]: Validate file Excel tạo lớp + ghi danh học viên (dry-run, không ghi DB). Trả về danh sách lỗi nếu có.
+    /// [Target Audience]: Admin, Academic
+    /// </summary>
+    [HttpPost("classes-roster/validate")]
+    [Authorize(Roles = "Admin,Academic")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> ValidateClassRosterImport(IFormFile file, CancellationToken cancellationToken)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("File không được để trống.");
+
+        await using var stream = file.OpenReadStream();
+        var result = await _importService.ValidateClassRosterImportAsync(stream, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Bulk Import — Classes and Roster
+    /// [Core Responsibility]: Validate và tạo hàng loạt lớp học + ghi danh học viên từ file Excel vào DB trong một transaction.
+    /// [Target Audience]: Admin, Academic
+    /// </summary>
+    [HttpPost("classes-roster/commit")]
+    [Authorize(Roles = "Admin,Academic")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> CommitClassRosterImport(IFormFile file, CancellationToken cancellationToken)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("File không được để trống.");
+
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+
+        await using var stream = file.OpenReadStream();
+        var result = await _importService.CommitClassRosterImportAsync(stream, accountId, cancellationToken);
+
+        if (result.Errors.Count > 0 && result.Imported == 0)
+            return BadRequest(result);
+
+        return Ok(result);
+    }
 }
