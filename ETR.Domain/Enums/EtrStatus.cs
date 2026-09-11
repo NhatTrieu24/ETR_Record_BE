@@ -10,5 +10,9 @@ public enum EtrStatus
     Verified,
     Completed,
     ReturnedForCorrection,
-    Cancelled
+    Cancelled,
+    Pending,
+    UnderReview,
+    Approved,
+    Rejected
 }

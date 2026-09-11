@@ -13,6 +13,8 @@ public class AccountServiceTests
     {
         var unitOfWork = new Mock<IUnitOfWork>();
         var accountRepo = new Mock<IGenericRepository<Account>>();
+        accountRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Account>());
         accountRepo.Setup(r => r.AddAsync(It.IsAny<Account>(), It.IsAny<CancellationToken>()))
             .Callback<Account, CancellationToken>((a, _) => a.AccountId = 99)
             .Returns(Task.CompletedTask);

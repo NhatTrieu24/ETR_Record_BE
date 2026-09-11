@@ -350,7 +350,8 @@ public class DashboardService : IDashboardService
         var profiles = (await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken)).ToList();
         var attachments = (await _unitOfWork.AttachmentRepository.GetAllAsync(cancellationToken))
             .Where(a => a.OwnerType == nameof(EvidenceFile) && evidenceFiles.Select(e => e.EvidenceFileId).Contains(a.OwnerId))
-            .ToDictionary(a => a.OwnerId);
+            .GroupBy(a => a.OwnerId)
+            .ToDictionary(g => g.Key, g => g.First());
 
         return evidenceFiles
             .Select(e => new RecentEvidenceFileSummary(
@@ -376,7 +377,7 @@ public class DashboardService : IDashboardService
     // separate entity — reuses the Expired/ExpiringSoon threshold already computed for MyEtrs.
     private static CertificateSummary ComputeCertificateSummary(IEnumerable<StudentEtrSummary> myEtrs)
     {
-        var completed = myEtrs.Where(e => e.Status == EtrStatus.Completed).ToList();
+        var completed = myEtrs.Where(e => e.Status == EtrStatus.Completed || e.Status == EtrStatus.Approved).ToList();
         var now = DateTime.UtcNow;
 
         var valid = completed.Count(e => !e.ExpiryDate.HasValue || e.ExpiryDate.Value >= now.AddDays(ExpiringSoonDaysThreshold));
