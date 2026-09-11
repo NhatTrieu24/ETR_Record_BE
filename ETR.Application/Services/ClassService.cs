@@ -323,6 +323,18 @@ public class ClassService : IClassService
 
         if (cls.IsDeleted) return;
 
+        if (cls.Status == ClassStatus.InProgress || cls.Status == ClassStatus.Completed)
+        {
+            throw new BusinessRuleViolationException($"Không thể xóa lớp học đang ở trạng thái '{cls.Status}'. Vui lòng đổi trạng thái lớp sang 'Đã hủy' (Cancelled) thay vì xóa.");
+        }
+
+        var hasActiveEnrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken))
+            .Any(e => e.ClassId == id && !e.IsDeleted && e.Status != EnrollmentStatus.Withdrawn && e.Status != EnrollmentStatus.Deleted);
+        if (hasActiveEnrollments)
+        {
+            throw new BusinessRuleViolationException($"Không thể xóa lớp '{cls.ClassName}' vì đã có học viên ghi danh. Vui lòng hủy ghi danh học viên hoặc đổi trạng thái lớp sang 'Đã hủy' (Cancelled).");
+        }
+
         // Soft Delete
         cls.IsDeleted = true;
         cls.DeletedAt = DateTime.UtcNow;

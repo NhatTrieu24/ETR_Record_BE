@@ -169,12 +169,34 @@ public class EtrService : IEtrService
         var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(id, cancellationToken);
         if (etr == null) throw new KeyNotFoundException("ETRCourseRecord not found.");
 
+        if (etr.IsLocked)
+        {
+            throw new BusinessRuleViolationException("Không thể xóa hồ sơ ETR đã bị khóa.");
+        }
+
+        if (etr.Status != EtrStatus.Draft && etr.Status != EtrStatus.Cancelled)
+        {
+            throw new BusinessRuleViolationException($"Không thể xóa hồ sơ ETR ở trạng thái '{etr.Status}'. Chỉ có thể xóa hồ sơ ở trạng thái Bản nháp (Draft) hoặc Đã hủy (Cancelled).");
+        }
+
         etr.IsDeleted = true;
         etr.DeletedAt = DateTime.UtcNow;
         etr.UpdatedAt = DateTime.UtcNow;
         etr.UpdatedByAccountId = deletedByAccountId;
 
         _unitOfWork.ETRCourseRecordRepository.Update(etr);
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = deletedByAccountId,
+            ActionType = AuditActionType.DELETE.ToString(),
+            EntityName = nameof(ETRCourseRecord),
+            RecordId = etr.ETRCourseRecordId,
+            OldValue = etr.Status.ToString(),
+            NewValue = "Deleted",
+            Description = $"ETRCourseRecord #{etr.ETRCourseRecordId} soft-deleted"
+        }, cancellationToken);
+
         await _unitOfWork.SaveAsync(cancellationToken);
     }
 

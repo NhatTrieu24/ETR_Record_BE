@@ -2,6 +2,7 @@ using ETR.Application.Compliance;
 using ETR.Application.DTOs.EvidenceType;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 
 namespace ETR.Application.Services;
 
@@ -97,12 +98,31 @@ public class EvidenceTypeService : IEvidenceTypeService
         var evidenceType = await _unitOfWork.EvidenceTypeRepository.GetByIdAsync(id, cancellationToken);
         if (evidenceType == null) throw new KeyNotFoundException("EvidenceType not found.");
 
+        var inUse = (await _unitOfWork.EvidenceFileRepository.GetAllAsync(cancellationToken))
+            .Any(e => e.EvidenceTypeId == id && !e.IsDeleted);
+        if (inUse)
+        {
+            throw new BusinessRuleViolationException($"Không thể xóa loại bằng chứng '{evidenceType.TypeName}' vì đang có hồ sơ/file bằng chứng liên kết.");
+        }
+
         evidenceType.IsDeleted = true;
         evidenceType.DeletedAt = DateTime.UtcNow;
         evidenceType.UpdatedAt = DateTime.UtcNow;
         evidenceType.UpdatedByAccountId = deletedByAccountId;
 
         _unitOfWork.EvidenceTypeRepository.Update(evidenceType);
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = deletedByAccountId,
+            ActionType = AuditActionType.DELETE.ToString(),
+            EntityName = nameof(EvidenceType),
+            RecordId = evidenceType.EvidenceTypeId,
+            OldValue = evidenceType.TypeName,
+            NewValue = "Deleted",
+            Description = $"EvidenceType #{evidenceType.EvidenceTypeId} ({evidenceType.TypeName}) soft-deleted"
+        }, cancellationToken);
+
         await _unitOfWork.SaveAsync(cancellationToken);
     }
 }

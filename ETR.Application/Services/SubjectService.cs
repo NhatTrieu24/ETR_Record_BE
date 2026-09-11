@@ -2,6 +2,7 @@ using ETR.Application.Compliance;
 using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 
 namespace ETR.Application.Services;
 
@@ -94,6 +95,20 @@ public class SubjectService : ISubjectService
 
         if (subject.IsDeleted) return;
 
+        var isUsedInCourse = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken))
+            .Any(cs => cs.SubjectId == id && !cs.IsDeleted);
+        if (isUsedInCourse)
+        {
+            throw new BusinessRuleViolationException($"Không thể xóa môn học '{subject.SubjectName}' vì đang được liên kết trong khóa học đào tạo. Vui lòng gỡ môn học khỏi các khóa học trước.");
+        }
+
+        var isUsedInClass = (await _unitOfWork.ClassSubjectRepository.GetAllAsync(cancellationToken))
+            .Any(cs => cs.SubjectId == id && !cs.IsDeleted);
+        if (isUsedInClass)
+        {
+            throw new BusinessRuleViolationException($"Không thể xóa môn học '{subject.SubjectName}' vì đang được mở giảng dạy trong lớp học.");
+        }
+
         // Soft Delete
         subject.IsDeleted = true;
         subject.DeletedAt = DateTime.UtcNow;
@@ -101,6 +116,18 @@ public class SubjectService : ISubjectService
         subject.UpdatedByAccountId = deletedByAccountId;
 
         _unitOfWork.SubjectRepository.Update(subject);
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = deletedByAccountId,
+            ActionType = AuditActionType.DELETE.ToString(),
+            EntityName = nameof(Subject),
+            RecordId = subject.SubjectId,
+            OldValue = subject.SubjectName,
+            NewValue = "Deleted",
+            Description = $"Subject #{subject.SubjectId} ({subject.SubjectCode} - {subject.SubjectName}) soft-deleted"
+        }, cancellationToken);
+
         await _unitOfWork.SaveAsync(cancellationToken);
     }
 }

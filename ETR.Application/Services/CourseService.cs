@@ -294,6 +294,13 @@ public class CourseService : ICourseService
 
         if (course.IsDeleted) return;
 
+        var activeClasses = (await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken))
+            .Where(c => c.CourseId == id && !c.IsDeleted && c.Status != ClassStatus.Cancelled).ToList();
+        if (activeClasses.Any())
+        {
+            throw new BusinessRuleViolationException($"Không thể xóa khóa học '{course.CourseName}' vì đang có {activeClasses.Count} lớp học liên kết chưa hủy. Vui lòng hủy hoặc kết thúc các lớp học trước khi xóa khóa.");
+        }
+
         // Soft Delete
         course.IsDeleted = true;
         course.DeletedAt = DateTime.UtcNow;
@@ -431,9 +438,20 @@ public class CourseService : ICourseService
             .FirstOrDefault(cs => cs.CourseId == courseId && cs.SubjectId == subjectId)
             ?? throw new KeyNotFoundException("CourseSubject mapping not found.");
 
-        // Check if there are any enrollments before deleting? Business logic usually prevents deleting if course has active enrollments
-        var hasEnrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken))
-            .Any(e => e.ClassId != 0); // Need proper check if required, skipping deep check for now to allow soft delete/hard delete
+        // Check if there are active classes under this course using this subject
+        var classIdsInCourse = (await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken))
+            .Where(c => c.CourseId == courseId && !c.IsDeleted && c.Status != ClassStatus.Cancelled)
+            .Select(c => c.ClassId).ToHashSet();
+
+        if (classIdsInCourse.Any())
+        {
+            var hasActiveClasses = (await _unitOfWork.ClassSubjectRepository.GetAllAsync(cancellationToken))
+                .Any(cs => classIdsInCourse.Contains(cs.ClassId) && cs.SubjectId == subjectId && !cs.IsDeleted);
+            if (hasActiveClasses)
+            {
+                throw new BusinessRuleViolationException("Không thể gỡ môn học khỏi khóa học vì đang có lớp học thuộc khóa đang giảng dạy môn học này.");
+            }
+        }
             
         // CourseSubject is a mapping table, usually hard deleted unless IsDeleted exists. BaseEntity has IsDeleted.
         existingMapping.IsDeleted = true;

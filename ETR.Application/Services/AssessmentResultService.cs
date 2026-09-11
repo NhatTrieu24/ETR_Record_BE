@@ -361,12 +361,39 @@ public class AssessmentResultService : IAssessmentResultService
         var result = await _unitOfWork.AssessmentResultRepository.GetByIdAsync(id, cancellationToken);
         if (result == null) throw new KeyNotFoundException("AssessmentResult not found.");
 
+        if (result.IsPublished)
+        {
+            throw new BusinessRuleViolationException("Không thể xóa kết quả đánh giá/điểm thi đã được công bố (Published).");
+        }
+
+        if (result.SubjectResultId > 0)
+        {
+            var isSignedOff = (await _unitOfWork.SubjectSignoffRepository.GetAllAsync(cancellationToken))
+                .Any(s => s.SubjectResultId == result.SubjectResultId && !s.IsDeleted);
+            if (isSignedOff)
+            {
+                throw new BusinessRuleViolationException("Không thể xóa kết quả đánh giá của môn học đã được ký chốt (Signoff).");
+            }
+        }
+
         result.IsDeleted = true;
         result.DeletedAt = DateTime.UtcNow;
         result.UpdatedAt = DateTime.UtcNow;
         result.UpdatedByAccountId = deletedByAccountId;
 
         _unitOfWork.AssessmentResultRepository.Update(result);
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = deletedByAccountId,
+            ActionType = AuditActionType.DELETE.ToString(),
+            EntityName = nameof(AssessmentResult),
+            RecordId = result.AssessmentResultId,
+            OldValue = result.Score.ToString(),
+            NewValue = "Deleted",
+            Description = $"AssessmentResult #{result.AssessmentResultId} (Score: {result.Score}) soft-deleted"
+        }, cancellationToken);
+
         await _unitOfWork.SaveAsync(cancellationToken);
     }
 

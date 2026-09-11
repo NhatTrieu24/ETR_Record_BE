@@ -87,6 +87,11 @@ public class AccountService : IAccountService
             }
         }
 
+        if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 6)
+        {
+            throw new BusinessRuleViolationException("Mật khẩu phải có ít nhất 6 ký tự để đảm bảo an toàn.");
+        }
+
         var existingAccounts = await _unitOfWork.AccountRepository.GetAllAsync(cancellationToken);
         if (existingAccounts.Any(a => a.Username == request.Username))
         {
@@ -221,6 +226,11 @@ public class AccountService : IAccountService
         if (accountId == deletedByAccountId)
         {
             throw new BusinessRuleViolationException("You cannot delete your own account.");
+        }
+
+        if (accountId == 1)
+        {
+            throw new BusinessRuleViolationException("Không thể vô hiệu hóa hoặc xóa tài khoản Quản trị viên hệ thống gốc (ID: 1).");
         }
 
         var account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken)

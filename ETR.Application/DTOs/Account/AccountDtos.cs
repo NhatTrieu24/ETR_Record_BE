@@ -13,7 +13,7 @@ public record AccountResponse(
 
 public record CreateAccountRequest(
     [Required, EmailAddress, MaxLength(255)] string Username,
-    [Required, MaxLength(100)] string Password,
+    [Required, MinLength(6), MaxLength(100)] string Password,
     [Required] int RoleId,
     [Required] int DepartmentId);
 

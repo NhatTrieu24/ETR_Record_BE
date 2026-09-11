@@ -2,6 +2,7 @@ using ETR.Application.Compliance;
 using ETR.Application.DTOs.Department;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 
 namespace ETR.Application.Services;
 
@@ -97,12 +98,38 @@ public class DepartmentService : IDepartmentService
         var department = await _unitOfWork.DepartmentRepository.GetByIdAsync(id, cancellationToken);
         if (department == null) throw new KeyNotFoundException("Department not found.");
 
+        if (id == 1 || id == 2 ||
+            department.DepartmentName.Equals("Administration", StringComparison.OrdinalIgnoreCase) ||
+            department.DepartmentName.Equals("Training", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new BusinessRuleViolationException("Không thể xóa các phòng ban mặc định cốt lõi của hệ thống (Administration / Training).");
+        }
+
+        var hasActiveAccounts = (await _unitOfWork.AccountRepository.GetAllAsync(cancellationToken))
+            .Any(a => a.DepartmentId == id && a.IsActive && !a.IsDeleted);
+        if (hasActiveAccounts)
+        {
+            throw new BusinessRuleViolationException($"Không thể xóa phòng ban '{department.DepartmentName}' vì vẫn còn tài khoản người dùng đang trực thuộc. Vui lòng chuyển phòng ban cho nhân sự trước khi xóa.");
+        }
+
         department.IsDeleted = true;
         department.DeletedAt = DateTime.UtcNow;
         department.UpdatedAt = DateTime.UtcNow;
         department.UpdatedByAccountId = deletedByAccountId;
 
         _unitOfWork.DepartmentRepository.Update(department);
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = deletedByAccountId,
+            ActionType = AuditActionType.DELETE.ToString(),
+            EntityName = nameof(Department),
+            RecordId = department.DepartmentId,
+            OldValue = department.DepartmentName,
+            NewValue = "Deleted",
+            Description = $"Department #{department.DepartmentId} ({department.DepartmentName}) soft-deleted"
+        }, cancellationToken);
+
         await _unitOfWork.SaveAsync(cancellationToken);
     }
 }
