@@ -60,6 +60,8 @@ public partial class ExportService
     {
         var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(classId, cancellationToken)
             ?? throw new KeyNotFoundException("Class not found.");
+        var course = await _unitOfWork.CourseRepository.GetByIdAsync(trainingClass.CourseId, cancellationToken)
+            ?? throw new BusinessRuleViolationException("Course not found.");
 
         var enrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken))
             .Where(e => e.ClassId == classId).ToList();
@@ -67,16 +69,19 @@ public partial class ExportService
 
         var sessions = (await _unitOfWork.SessionRepository.GetAllAsync(cancellationToken))
             .Where(s => s.ClassId == classId)
-            .ToDictionary(s => s.SessionId, s => s);
+            .OrderBy(s => s.SessionDate)
+            .ThenBy(s => s.SessionId)
+            .ToList();
+
+        var subjects = (await _unitOfWork.SubjectRepository.GetAllAsync(cancellationToken)).ToDictionary(s => s.SubjectId, s => s);
 
         var records = (await _unitOfWork.AttendanceRecordRepository.GetAllAsync(cancellationToken))
             .Where(r => enrollmentIds.Contains(r.EnrollmentId))
-            .OrderBy(r => sessions.GetValueOrDefault(r.SessionId)?.SessionDate)
-            .ToList();
+            .ToDictionary(r => (r.SessionId, r.EnrollmentId), r => r);
 
         var profiles = (await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken)).ToList();
 
-        var excelBytes = BuildAttendanceReportExcel(trainingClass, enrollments, profiles, sessions, records);
+        var excelBytes = BuildAttendanceReportExcel(trainingClass, course, enrollments, profiles, sessions, subjects, records);
         var fileName = $"{SanitizeForFileName(trainingClass.ClassCode)}_Attendance_Report_{DateTime.UtcNow:yyyyMMddHHmmss}.xlsx";
         return await WriteExportFileAsync("AttendanceReport", fileName, excelBytes, requestedByAccountId, webRootPath, null, cancellationToken);
     }
@@ -85,6 +90,8 @@ public partial class ExportService
     {
         var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(classId, cancellationToken)
             ?? throw new KeyNotFoundException("Class not found.");
+        var course = await _unitOfWork.CourseRepository.GetByIdAsync(trainingClass.CourseId, cancellationToken)
+            ?? throw new BusinessRuleViolationException("Course not found.");
 
         var enrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken))
             .Where(e => e.ClassId == classId).ToList();
@@ -95,6 +102,8 @@ public partial class ExportService
             .ToDictionary(s => s.SessionId, s => s);
 
         var subjects = (await _unitOfWork.SubjectRepository.GetAllAsync(cancellationToken)).ToDictionary(s => s.SubjectId, s => s);
+        var subjectResults = (await _unitOfWork.SubjectResultRepository.GetAllAsync(cancellationToken))
+            .ToDictionary(sr => sr.SubjectResultId, sr => sr);
 
         var results = (await _unitOfWork.AssessmentResultRepository.GetAllAsync(cancellationToken))
             .Where(r => enrollmentAccountIds.Contains(r.AccountId) && (r.SessionId == null || sessions.ContainsKey(r.SessionId.Value)))
@@ -103,7 +112,7 @@ public partial class ExportService
 
         var profiles = (await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken)).ToList();
 
-        var excelBytes = BuildAssessmentReportExcel(trainingClass, results, profiles, sessions, subjects);
+        var excelBytes = BuildAssessmentReportExcel(trainingClass, course, results, profiles, subjects, subjectResults);
         var fileName = $"{SanitizeForFileName(trainingClass.ClassCode)}_Assessment_Report_{DateTime.UtcNow:yyyyMMddHHmmss}.xlsx";
         return await WriteExportFileAsync("AssessmentReport", fileName, excelBytes, requestedByAccountId, webRootPath, null, cancellationToken);
     }
@@ -121,10 +130,20 @@ public partial class ExportService
 
         var etrs = (await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken))
             .Where(e => enrollmentIds.Contains(e.EnrollmentId)).ToList();
+        var etrIds = etrs.Select(e => e.ETRCourseRecordId).ToHashSet();
+
+        var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken))
+            .Where(cs => cs.CourseId == trainingClass.CourseId)
+            .OrderBy(cs => cs.SequenceNo)
+            .ToList();
+        var subjects = (await _unitOfWork.SubjectRepository.GetAllAsync(cancellationToken)).ToDictionary(s => s.SubjectId, s => s);
+
+        var subjectResults = (await _unitOfWork.SubjectResultRepository.GetAllAsync(cancellationToken))
+            .Where(sr => etrIds.Contains(sr.EtrId)).ToList();
 
         var profiles = (await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken)).ToList();
 
-        var excelBytes = BuildClassSummaryExcel(trainingClass, course, enrollments, etrs, profiles);
+        var excelBytes = BuildClassSummaryExcel(trainingClass, course, enrollments, etrs, profiles, courseSubjects, subjects, subjectResults);
         var fileName = $"{SanitizeForFileName(trainingClass.ClassCode)}_Class_Summary_{DateTime.UtcNow:yyyyMMddHHmmss}.xlsx";
         return await WriteExportFileAsync("ClassSummary", fileName, excelBytes, requestedByAccountId, webRootPath, null, cancellationToken);
     }
@@ -220,19 +239,22 @@ public partial class ExportService
 
     private static byte[] BuildAttendanceReportExcel(
         Class trainingClass,
+        Course course,
         List<CourseEnrollment> enrollments,
         List<UserProfile> profiles,
-        Dictionary<int, Session> sessions,
-        List<AttendanceRecord> records)
+        List<Session> sessions,
+        Dictionary<int, Subject> subjects,
+        Dictionary<(int SessionId, int EnrollmentId), AttendanceRecord> records)
     {
         using var workbook = new XLWorkbook();
         var sheet = workbook.Worksheets.Add("Attendance");
 
         sheet.Cell(1, 1).Value = $"Attendance Report — {trainingClass.ClassCode} ({trainingClass.ClassName})";
         sheet.Cell(1, 1).Style.Font.Bold = true;
+        sheet.Cell(2, 1).Value = $"Course: {course.CourseCode} — {course.CourseName}";
 
-        var headerRow = 3;
-        string[] headers = ["Student Code", "Student Name", "Session", "Session Date", "Status", "Remarks"];
+        var headerRow = 4;
+        string[] headers = ["Student Code", "Student Name", "Subject", "Session", "Session Date", "Status", "Remarks"];
         for (var col = 0; col < headers.Length; col++)
         {
             var cell = sheet.Cell(headerRow, col + 1);
@@ -242,19 +264,24 @@ public partial class ExportService
         }
 
         var row = headerRow + 1;
-        foreach (var record in records)
+        foreach (var session in sessions)
         {
-            var enrollment = enrollments.FirstOrDefault(e => e.EnrollmentId == record.EnrollmentId);
-            var profile = enrollment == null ? null : profiles.FirstOrDefault(p => p.AccountId == enrollment.AccountId);
-            var session = sessions.GetValueOrDefault(record.SessionId);
+            var subject = subjects.GetValueOrDefault(session.SubjectId);
 
-            sheet.Cell(row, 1).Value = profile?.UserCode ?? "-";
-            sheet.Cell(row, 2).Value = profile?.FullName ?? "-";
-            sheet.Cell(row, 3).Value = session?.SessionTitle ?? record.SessionId.ToString();
-            sheet.Cell(row, 4).Value = session?.SessionDate?.ToString("yyyy-MM-dd") ?? "-";
-            sheet.Cell(row, 5).Value = record.Status.ToString();
-            sheet.Cell(row, 6).Value = record.Remarks ?? "-";
-            row++;
+            foreach (var enrollment in enrollments)
+            {
+                var profile = profiles.FirstOrDefault(p => p.AccountId == enrollment.AccountId);
+                var record = records.GetValueOrDefault((session.SessionId, enrollment.EnrollmentId));
+
+                sheet.Cell(row, 1).Value = profile?.UserCode ?? "-";
+                sheet.Cell(row, 2).Value = profile?.FullName ?? "-";
+                sheet.Cell(row, 3).Value = subject?.SubjectName ?? "-";
+                sheet.Cell(row, 4).Value = session.SessionTitle;
+                sheet.Cell(row, 5).Value = session.SessionDate?.ToString("yyyy-MM-dd") ?? "-";
+                sheet.Cell(row, 6).Value = record?.Status.ToString() ?? "Not Recorded";
+                sheet.Cell(row, 7).Value = record?.Remarks ?? "-";
+                row++;
+            }
         }
 
         sheet.Columns().AdjustToContents();
@@ -266,18 +293,20 @@ public partial class ExportService
 
     private static byte[] BuildAssessmentReportExcel(
         Class trainingClass,
+        Course course,
         List<AssessmentResult> results,
         List<UserProfile> profiles,
-        Dictionary<int, Session> sessions,
-        Dictionary<int, Subject> subjects)
+        Dictionary<int, Subject> subjects,
+        Dictionary<int, SubjectResult> subjectResults)
     {
         using var workbook = new XLWorkbook();
         var sheet = workbook.Worksheets.Add("Assessment");
 
         sheet.Cell(1, 1).Value = $"Assessment Report — {trainingClass.ClassCode} ({trainingClass.ClassName})";
         sheet.Cell(1, 1).Style.Font.Bold = true;
+        sheet.Cell(2, 1).Value = $"Course: {course.CourseCode} — {course.CourseName}";
 
-        var headerRow = 3;
+        var headerRow = 4;
         string[] headers = ["Student Name", "Subject", "Score", "Status", "Attempt #", "Taken At", "Published"];
         for (var col = 0; col < headers.Length; col++)
         {
@@ -291,8 +320,8 @@ public partial class ExportService
         foreach (var result in results)
         {
             var profile = profiles.FirstOrDefault(p => p.AccountId == result.AccountId);
-            var session = result.SessionId.HasValue ? sessions.GetValueOrDefault(result.SessionId.Value) : null;
-            var subject = session != null ? subjects.GetValueOrDefault(session.SubjectId) : null;
+            var subjectResult = subjectResults.GetValueOrDefault(result.SubjectResultId);
+            var subject = subjectResult != null ? subjects.GetValueOrDefault(subjectResult.SubjectId) : null;
 
             sheet.Cell(row, 1).Value = profile?.FullName ?? "-";
             sheet.Cell(row, 2).Value = subject?.SubjectName ?? "-";
@@ -319,7 +348,10 @@ public partial class ExportService
         Course course,
         List<CourseEnrollment> enrollments,
         List<ETRCourseRecord> etrs,
-        List<UserProfile> profiles)
+        List<UserProfile> profiles,
+        List<CourseSubject> courseSubjects,
+        Dictionary<int, Subject> subjects,
+        List<SubjectResult> subjectResults)
     {
         using var workbook = new XLWorkbook();
         var sheet = workbook.Worksheets.Add("Class Summary");
@@ -329,8 +361,18 @@ public partial class ExportService
         sheet.Cell(2, 1).Value = $"Course: {course.CourseCode} — {course.CourseName}";
 
         var headerRow = 4;
-        string[] headers = ["Student Code", "Student Name", "ETR Status", "Issued Date", "Expiry Date"];
-        for (var col = 0; col < headers.Length; col++)
+        var headers = new List<string> { "Student Code", "Student Name" };
+        foreach (var courseSubject in courseSubjects)
+        {
+            var subjectName = subjects.GetValueOrDefault(courseSubject.SubjectId)?.SubjectName ?? $"Subject {courseSubject.SubjectId}";
+            headers.Add($"{subjectName} Score");
+            headers.Add($"{subjectName} Attendance %");
+        }
+        headers.Add("ETR Status");
+        headers.Add("Issued Date");
+        headers.Add("Expiry Date");
+
+        for (var col = 0; col < headers.Count; col++)
         {
             var cell = sheet.Cell(headerRow, col + 1);
             cell.Value = headers[col];
@@ -344,11 +386,25 @@ public partial class ExportService
             var profile = profiles.FirstOrDefault(p => p.AccountId == enrollment.AccountId);
             var etr = etrs.FirstOrDefault(e => e.EnrollmentId == enrollment.EnrollmentId);
 
-            sheet.Cell(row, 1).Value = profile?.UserCode ?? "-";
-            sheet.Cell(row, 2).Value = profile?.FullName ?? "-";
-            sheet.Cell(row, 3).Value = etr?.Status.ToString() ?? "(no ETR)";
-            sheet.Cell(row, 4).Value = etr?.IssuedDate?.ToString("yyyy-MM-dd") ?? "-";
-            sheet.Cell(row, 5).Value = etr?.ExpiryDate?.ToString("yyyy-MM-dd") ?? "-";
+            var col = 1;
+            sheet.Cell(row, col++).Value = profile?.UserCode ?? "-";
+            sheet.Cell(row, col++).Value = profile?.FullName ?? "-";
+
+            foreach (var courseSubject in courseSubjects)
+            {
+                var subjectResult = etr == null
+                    ? null
+                    : subjectResults.FirstOrDefault(sr => sr.EtrId == etr.ETRCourseRecordId && sr.SubjectId == courseSubject.SubjectId);
+
+                sheet.Cell(row, col++).Value = subjectResult?.Score?.ToString("0.##") ?? "-";
+                sheet.Cell(row, col++).Value = subjectResult?.AttendanceRate.HasValue == true
+                    ? $"{subjectResult.AttendanceRate.Value:0.#}%"
+                    : "-";
+            }
+
+            sheet.Cell(row, col++).Value = etr?.Status.ToString() ?? "(no ETR)";
+            sheet.Cell(row, col++).Value = etr?.IssuedDate?.ToString("yyyy-MM-dd") ?? "-";
+            sheet.Cell(row, col++).Value = etr?.ExpiryDate?.ToString("yyyy-MM-dd") ?? "-";
             row++;
         }
 
