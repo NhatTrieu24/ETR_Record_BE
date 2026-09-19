@@ -36,6 +36,11 @@ public class ImportService : IImportService
     private const int AccColPassword       = 2;
     private const int AccColRoleName       = 3;
     private const int AccColDepartmentName = 4;
+    private const int AccColFullName       = 5;
+    private const int AccColDateOfBirth    = 6;
+    private const int AccColGender         = 7;
+    private const int AccColPhone          = 8;
+    private const int AccColOrganization   = 9;
     private const int AccDataStartRow      = 3; // row 1 is title, row 2 is header
 
     // Classes & Roster — sheet "Classes"
@@ -690,27 +695,39 @@ public class ImportService : IImportService
 
         // ── Row 1: title ──────────────────────────────────────────────────
         ws.Cell(1, 1).Value = "TẠO HÀNG LOẠT TÀI KHOẢN NGƯỜI DÙNG";
-        ws.Range(1, 1, 1, AccColDepartmentName).Merge().Style
+        ws.Range(1, 1, 1, AccColOrganization).Merge().Style
             .Font.SetBold(true)
             .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
 
         // ── Row 2: column headers ─────────────────────────────────────────
-        ws.Cell(2, AccColUsername).Value = "Username (email)*";
-        ws.Cell(2, AccColPassword).Value = "Mật khẩu*";
-        ws.Cell(2, AccColRoleName).Value = "Vai trò (Role)*";
+        ws.Cell(2, AccColUsername).Value       = "Username (email)*";
+        ws.Cell(2, AccColPassword).Value       = "Mật khẩu*";
+        ws.Cell(2, AccColRoleName).Value       = "Vai trò (Role)*";
         ws.Cell(2, AccColDepartmentName).Value = "Phòng ban (Department)*";
+        ws.Cell(2, AccColFullName).Value       = "Họ và tên (FullName)*";
+        ws.Cell(2, AccColDateOfBirth).Value    = "Ngày sinh (dd/MM/yyyy)";
+        ws.Cell(2, AccColGender).Value         = "Giới tính (Gender)";
+        ws.Cell(2, AccColPhone).Value          = "Số điện thoại (Phone)";
+        ws.Cell(2, AccColOrganization).Value   = "Đơn vị/Tổ chức (Organization)";
+
         ws.Row(2).Style.Font.SetBold(true)
             .Fill.SetBackgroundColor(XLColor.LightSteelBlue);
 
-        ws.Columns().AdjustToContents();
-
-        // Dropdown validation for Role/Department columns over a generous row range so users can
-        // keep adding rows below the pre-filled ones.
+        // Dropdown validation for Role/Department/Gender columns
         const int maxTemplateRows = 500;
         var roleRange = ws.Range(AccDataStartRow, AccColRoleName, AccDataStartRow + maxTemplateRows, AccColRoleName);
         roleRange.CreateDataValidation().List($"\"{string.Join(",", roles)}\"", true);
+
         var deptRange = ws.Range(AccDataStartRow, AccColDepartmentName, AccDataStartRow + maxTemplateRows, AccColDepartmentName);
         deptRange.CreateDataValidation().List($"\"{string.Join(",", departments)}\"", true);
+
+        var genderRange = ws.Range(AccDataStartRow, AccColGender, AccDataStartRow + maxTemplateRows, AccColGender);
+        genderRange.CreateDataValidation().List("\"Nam,Nữ,Khác\"", true);
+
+        ws.Column(AccColDateOfBirth).Style.DateFormat.Format = "dd/MM/yyyy";
+        ws.Column(AccColPhone).Style.NumberFormat.Format = "@";
+
+        ws.Columns().AdjustToContents();
 
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
@@ -747,13 +764,42 @@ public class ImportService : IImportService
                 var departments = (await _unitOfWork.DepartmentRepository.GetAllAsync(innerCt))
                     .ToDictionary(d => d.DepartmentName, d => d.DepartmentId, StringComparer.OrdinalIgnoreCase);
 
+                var existingProfiles = (await _unitOfWork.UserProfileRepository.GetAllAsync(innerCt)).ToList();
+                var userCodeCounters = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+                static string GetRolePrefix(string roleName) => roleName.ToUpperInvariant() switch
+                {
+                    "ADMIN" => "ADM",
+                    "INSTRUCTOR" => "INS",
+                    "QA" => "QA",
+                    "ACADEMIC" => "ACA",
+                    "TRAININGMANAGER" => "MGR",
+                    "STUDENT" => "STU",
+                    "AUDITOR" or "AUDIT" => "AUD",
+                    _ => "USR"
+                };
+
+                foreach (var roleName in roles.Keys)
+                {
+                    var prefix = GetRolePrefix(roleName);
+                    var maxNumber = 0;
+                    foreach (var p in existingProfiles.Where(p => p.UserCode != null && p.UserCode.StartsWith(prefix + "-")))
+                    {
+                        var suffix = p.UserCode.Substring(prefix.Length + 1);
+                        if (int.TryParse(suffix, out var num) && num > maxNumber)
+                            maxNumber = num;
+                    }
+                    var countWithPrefix = existingProfiles.Count(p => p.UserCode != null && p.UserCode.StartsWith(prefix));
+                    userCodeCounters[roleName] = Math.Max(maxNumber, countWithPrefix);
+                }
+
                 var imported = 0;
                 foreach (var row in rows)
                 {
                     var account = new Account
                     {
-                        Username = row.Username,
-                        PasswordHash = BCrypt.Net.BCrypt.HashPassword(row.Password),
+                        Username = row.Username.Trim(),
+                        PasswordHash = BCrypt.Net.BCrypt.HashPassword(row.Password.Trim()),
                         RoleId = roles[row.RoleName],
                         DepartmentId = departments[row.DepartmentName],
                         Status = AccountStatus.Active,
@@ -765,6 +811,28 @@ public class ImportService : IImportService
                     await _unitOfWork.AccountRepository.AddAsync(account, innerCt);
                     await _unitOfWork.SaveAsync(innerCt);
 
+                    var prefix = GetRolePrefix(row.RoleName);
+                    userCodeCounters[row.RoleName] = userCodeCounters.GetValueOrDefault(row.RoleName, 0) + 1;
+                    var finalUserCode = $"{prefix}-{userCodeCounters[row.RoleName]:D3}";
+
+                    var profile = new UserProfile
+                    {
+                        AccountId = account.AccountId,
+                        UserCode = finalUserCode,
+                        FullName = row.FullName.Trim(),
+                        Email = row.Username.Trim(),
+                        Phone = string.IsNullOrWhiteSpace(row.Phone) ? null : row.Phone.Trim(),
+                        DateOfBirth = row.DateOfBirth ?? new DateTime(2000, 1, 1),
+                        Gender = string.IsNullOrWhiteSpace(row.Gender) ? "Khác" : row.Gender.Trim(),
+                        Organization = string.IsNullOrWhiteSpace(row.Organization) ? null : row.Organization.Trim(),
+                        Status = LearnerStatus.Active,
+                        CreatedAt = DateTime.UtcNow,
+                        CreatedByAccountId = createdByAccountId
+                    };
+
+                    await _unitOfWork.UserProfileRepository.AddAsync(profile, innerCt);
+                    await _unitOfWork.SaveAsync(innerCt);
+
                     await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                     {
                         AccountId = createdByAccountId,
@@ -773,6 +841,16 @@ public class ImportService : IImportService
                         RecordId = account.AccountId,
                         NewValue = account.Username,
                         Description = $"Account #{account.AccountId} ({account.Username}) created via bulk Excel import (row {row.RowNumber})"
+                    }, innerCt);
+
+                    await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                    {
+                        AccountId = createdByAccountId,
+                        ActionType = AuditActionType.INSERT.ToString(),
+                        EntityName = nameof(UserProfile),
+                        RecordId = profile.AccountId,
+                        NewValue = profile.UserCode,
+                        Description = $"UserProfile for Account #{account.AccountId} ({profile.FullName}, {profile.UserCode}) created via bulk Excel import (row {row.RowNumber})"
                     }, innerCt);
 
                     imported++;
@@ -807,7 +885,47 @@ public class ImportService : IImportService
             var password = ws.Cell(r, AccColPassword).GetString().Trim();
             var roleName = ws.Cell(r, AccColRoleName).GetString().Trim();
             var departmentName = ws.Cell(r, AccColDepartmentName).GetString().Trim();
-            rows.Add(new AccountImportRow(r, username, password, roleName, departmentName));
+            var fullName = ws.Cell(r, AccColFullName).GetString().Trim();
+            var phone = ws.Cell(r, AccColPhone).GetString().Trim();
+            var gender = ws.Cell(r, AccColGender).GetString().Trim();
+            var organization = ws.Cell(r, AccColOrganization).GetString().Trim();
+
+            DateTime? dateOfBirth = null;
+            var dobCell = ws.Cell(r, AccColDateOfBirth);
+            if (!dobCell.IsEmpty())
+            {
+                if (dobCell.DataType == XLDataType.DateTime)
+                {
+                    dateOfBirth = dobCell.GetDateTime();
+                }
+                else
+                {
+                    var rawDob = dobCell.GetString().Trim();
+                    if (!string.IsNullOrEmpty(rawDob))
+                    {
+                        string[] formats = ["dd/MM/yyyy", "d/M/yyyy", "yyyy-MM-dd", "dd-MM-yyyy", "MM/dd/yyyy"];
+                        if (DateTime.TryParseExact(rawDob, formats, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var parsedDob))
+                        {
+                            dateOfBirth = parsedDob;
+                        }
+                        else if (DateTime.TryParse(rawDob, out var parsedFallbackDob))
+                        {
+                            dateOfBirth = parsedFallbackDob;
+                        }
+                        else
+                        {
+                            dateOfBirth = DateTime.MinValue; // Sentinel indicating invalid date format
+                        }
+                    }
+                }
+            }
+
+            rows.Add(new AccountImportRow(
+                r, username, password, roleName, departmentName, fullName,
+                dateOfBirth,
+                string.IsNullOrEmpty(gender) ? null : gender,
+                string.IsNullOrEmpty(phone) ? null : phone,
+                string.IsNullOrEmpty(organization) ? null : organization));
         }
         return Task.FromResult(rows);
     }
@@ -825,7 +943,14 @@ public class ImportService : IImportService
             .Select(a => a.Username)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        var existingProfiles = (await _unitOfWork.UserProfileRepository.GetAllAsync(ct)).ToList();
+        var existingProfileEmails = existingProfiles
+            .Where(p => !string.IsNullOrWhiteSpace(p.Email))
+            .Select(p => p.Email)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         var seenInFile = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var row in rows)
         {
             if (!new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(row.Username) || row.Username.Length > 255)
@@ -845,8 +970,41 @@ public class ImportService : IImportService
             if (existingUsernames.Contains(row.Username))
                 errors.Add(new ImportRowError(row.RowNumber, "Username", $"Username '{row.Username}' đã tồn tại trong hệ thống."));
 
+            if (existingProfileEmails.Contains(row.Username))
+                errors.Add(new ImportRowError(row.RowNumber, "Username", $"Email '{row.Username}' đã được sử dụng bởi một hồ sơ người dùng khác."));
+
             if (!seenInFile.Add(row.Username))
                 errors.Add(new ImportRowError(row.RowNumber, "Username", $"Username '{row.Username}' bị trùng lặp trong file."));
+
+            // Profile fields validation
+            if (string.IsNullOrWhiteSpace(row.FullName))
+                errors.Add(new ImportRowError(row.RowNumber, "FullName", "Họ và tên không được để trống."));
+            else if (row.FullName.Length > 255)
+                errors.Add(new ImportRowError(row.RowNumber, "FullName", "Họ và tên tối đa 255 ký tự."));
+
+            if (row.DateOfBirth.HasValue)
+            {
+                if (row.DateOfBirth.Value == DateTime.MinValue)
+                    errors.Add(new ImportRowError(row.RowNumber, "DateOfBirth", "Ngày sinh không đúng định dạng (dd/MM/yyyy)."));
+                else if (row.DateOfBirth.Value.Date > DateTime.UtcNow.Date)
+                    errors.Add(new ImportRowError(row.RowNumber, "DateOfBirth", "Ngày sinh không được ở tương lai."));
+                else if (row.DateOfBirth.Value < new DateTime(1900, 1, 1))
+                    errors.Add(new ImportRowError(row.RowNumber, "DateOfBirth", "Ngày sinh không hợp lệ (trước năm 1900)."));
+            }
+
+            if (!string.IsNullOrWhiteSpace(row.Phone))
+            {
+                if (row.Phone.Length > 20)
+                    errors.Add(new ImportRowError(row.RowNumber, "Phone", "Số điện thoại tối đa 20 ký tự."));
+                else if (!System.Text.RegularExpressions.Regex.IsMatch(row.Phone, @"^[0-9+\s().-]{7,20}$"))
+                    errors.Add(new ImportRowError(row.RowNumber, "Phone", "Số điện thoại không hợp lệ (chỉ chứa chữ số và dấu +, -, dấu cách, 7-20 ký tự)."));
+            }
+
+            if (!string.IsNullOrWhiteSpace(row.Gender) && row.Gender.Length > 50)
+                errors.Add(new ImportRowError(row.RowNumber, "Gender", "Giới tính tối đa 50 ký tự."));
+
+            if (!string.IsNullOrWhiteSpace(row.Organization) && row.Organization.Length > 255)
+                errors.Add(new ImportRowError(row.RowNumber, "Organization", "Đơn vị/Tổ chức tối đa 255 ký tự."));
         }
 
         return errors;
