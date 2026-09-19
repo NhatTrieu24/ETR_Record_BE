@@ -43,6 +43,17 @@ public class ImportService : IImportService
     private const int AccColOrganization   = 9;
     private const int AccDataStartRow      = 3; // row 1 is title, row 2 is header
 
+    // Students (bulk student creation for Academic — no Role column)
+    private const int StuAccColUsername       = 1;
+    private const int StuAccColPassword       = 2;
+    private const int StuAccColDepartmentName = 3;
+    private const int StuAccColFullName       = 4;
+    private const int StuAccColDateOfBirth    = 5;
+    private const int StuAccColGender         = 6;
+    private const int StuAccColPhone          = 7;
+    private const int StuAccColOrganization   = 8;
+    private const int StuAccDataStartRow      = 3; // row 1 is title, row 2 is header
+
     // Classes & Roster — sheet "Classes"
     private const int ClsColClassCode  = 1;
     private const int ClsColClassName  = 2;
@@ -963,6 +974,307 @@ public class ImportService : IImportService
                 errors.Add(new ImportRowError(row.RowNumber, "RoleName", $"Vai trò '{row.RoleName}' không tồn tại."));
             else if (!isCallerAdmin && !string.Equals(row.RoleName, "Student", StringComparison.OrdinalIgnoreCase))
                 errors.Add(new ImportRowError(row.RowNumber, "RoleName", "Academic staff chỉ được tạo tài khoản Student."));
+
+            if (!departments.Contains(row.DepartmentName))
+                errors.Add(new ImportRowError(row.RowNumber, "DepartmentName", $"Phòng ban '{row.DepartmentName}' không tồn tại."));
+
+            if (existingUsernames.Contains(row.Username))
+                errors.Add(new ImportRowError(row.RowNumber, "Username", $"Username '{row.Username}' đã tồn tại trong hệ thống."));
+
+            if (existingProfileEmails.Contains(row.Username))
+                errors.Add(new ImportRowError(row.RowNumber, "Username", $"Email '{row.Username}' đã được sử dụng bởi một hồ sơ người dùng khác."));
+
+            if (!seenInFile.Add(row.Username))
+                errors.Add(new ImportRowError(row.RowNumber, "Username", $"Username '{row.Username}' bị trùng lặp trong file."));
+
+            // Profile fields validation
+            if (string.IsNullOrWhiteSpace(row.FullName))
+                errors.Add(new ImportRowError(row.RowNumber, "FullName", "Họ và tên không được để trống."));
+            else if (row.FullName.Length > 255)
+                errors.Add(new ImportRowError(row.RowNumber, "FullName", "Họ và tên tối đa 255 ký tự."));
+
+            if (row.DateOfBirth.HasValue)
+            {
+                if (row.DateOfBirth.Value == DateTime.MinValue)
+                    errors.Add(new ImportRowError(row.RowNumber, "DateOfBirth", "Ngày sinh không đúng định dạng (dd/MM/yyyy)."));
+                else if (row.DateOfBirth.Value.Date > DateTime.UtcNow.Date)
+                    errors.Add(new ImportRowError(row.RowNumber, "DateOfBirth", "Ngày sinh không được ở tương lai."));
+                else if (row.DateOfBirth.Value < new DateTime(1900, 1, 1))
+                    errors.Add(new ImportRowError(row.RowNumber, "DateOfBirth", "Ngày sinh không hợp lệ (trước năm 1900)."));
+            }
+
+            if (!string.IsNullOrWhiteSpace(row.Phone))
+            {
+                if (row.Phone.Length > 20)
+                    errors.Add(new ImportRowError(row.RowNumber, "Phone", "Số điện thoại tối đa 20 ký tự."));
+                else if (!System.Text.RegularExpressions.Regex.IsMatch(row.Phone, @"^[0-9+\s().-]{7,20}$"))
+                    errors.Add(new ImportRowError(row.RowNumber, "Phone", "Số điện thoại không hợp lệ (chỉ chứa chữ số và dấu +, -, dấu cách, 7-20 ký tự)."));
+            }
+
+            if (!string.IsNullOrWhiteSpace(row.Gender) && row.Gender.Length > 50)
+                errors.Add(new ImportRowError(row.RowNumber, "Gender", "Giới tính tối đa 50 ký tự."));
+
+            if (!string.IsNullOrWhiteSpace(row.Organization) && row.Organization.Length > 255)
+                errors.Add(new ImportRowError(row.RowNumber, "Organization", "Đơn vị/Tổ chức tối đa 255 ký tự."));
+        }
+
+        return errors;
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  STUDENTS (bulk student creation for Academic — role implicitly Student)
+    // ════════════════════════════════════════════════════════════════════════
+
+    public async Task<byte[]> GenerateStudentImportTemplateAsync(CancellationToken ct = default)
+    {
+        var departments = (await _unitOfWork.DepartmentRepository.GetAllAsync(ct)).Select(d => d.DepartmentName).OrderBy(n => n).ToList();
+
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Học viên");
+
+        // ── Row 1: title ──────────────────────────────────────────────────
+        ws.Cell(1, 1).Value = "TẠO HÀNG LOẠT TÀI KHOẢN HỌC VIÊN (STUDENT)";
+        ws.Range(1, 1, 1, StuAccColOrganization).Merge().Style
+            .Font.SetBold(true)
+            .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+
+        // ── Row 2: column headers ─────────────────────────────────────────
+        ws.Cell(2, StuAccColUsername).Value       = "Username (email)*";
+        ws.Cell(2, StuAccColPassword).Value       = "Mật khẩu*";
+        ws.Cell(2, StuAccColDepartmentName).Value = "Phòng ban (Department)*";
+        ws.Cell(2, StuAccColFullName).Value       = "Họ và tên (FullName)*";
+        ws.Cell(2, StuAccColDateOfBirth).Value    = "Ngày sinh (dd/MM/yyyy)";
+        ws.Cell(2, StuAccColGender).Value         = "Giới tính (Gender)";
+        ws.Cell(2, StuAccColPhone).Value          = "Số điện thoại (Phone)";
+        ws.Cell(2, StuAccColOrganization).Value   = "Đơn vị/Tổ chức (Organization)";
+
+        ws.Row(2).Style.Font.SetBold(true)
+            .Fill.SetBackgroundColor(XLColor.LightSteelBlue);
+
+        // Dropdown validation for Department/Gender columns
+        const int maxTemplateRows = 500;
+        var deptRange = ws.Range(StuAccDataStartRow, StuAccColDepartmentName, StuAccDataStartRow + maxTemplateRows, StuAccColDepartmentName);
+        deptRange.CreateDataValidation().List($"\"{string.Join(",", departments)}\"", true);
+
+        var genderRange = ws.Range(StuAccDataStartRow, StuAccColGender, StuAccDataStartRow + maxTemplateRows, StuAccColGender);
+        genderRange.CreateDataValidation().List("\"Nam,Nữ,Khác\"", true);
+
+        ws.Column(StuAccColDateOfBirth).Style.DateFormat.Format = "dd/MM/yyyy";
+        ws.Column(StuAccColPhone).Style.NumberFormat.Format = "@";
+
+        ws.Columns().AdjustToContents();
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return stream.ToArray();
+    }
+
+    public async Task<ImportValidationResult> ValidateStudentImportAsync(Stream fileStream, CancellationToken ct = default)
+    {
+        var rows = await ParseStudentAccountRowsAsync(fileStream, ct);
+        var errors = await ValidateStudentAccountRowsAsync(rows, ct);
+        return new ImportValidationResult(
+            TotalRows: rows.Count,
+            ValidRows: rows.Count - errors.Select(e => e.Row).Distinct().Count(),
+            ErrorRows: errors.Select(e => e.Row).Distinct().Count(),
+            CanCommit: errors.Count == 0,
+            Errors: errors);
+    }
+
+    public async Task<ImportCommitResult> CommitStudentImportAsync(
+        Stream fileStream, int createdByAccountId, CancellationToken ct = default)
+    {
+        var rows = await ParseStudentAccountRowsAsync(fileStream, ct);
+        var errors = await ValidateStudentAccountRowsAsync(rows, ct);
+        if (errors.Count > 0)
+            return new ImportCommitResult(Imported: 0, Skipped: rows.Count, Errors: errors);
+
+        return await _unitOfWork.ExecuteInStrategyAsync(async (innerCt) =>
+        {
+            await _unitOfWork.BeginTransactionAsync(innerCt);
+            try
+            {
+                var studentRole = (await _unitOfWork.RoleRepository.GetAllAsync(innerCt))
+                    .FirstOrDefault(r => string.Equals(r.RoleName, "Student", StringComparison.OrdinalIgnoreCase))
+                    ?? throw new InvalidOperationException("Role 'Student' not found in system.");
+
+                var departments = (await _unitOfWork.DepartmentRepository.GetAllAsync(innerCt))
+                    .ToDictionary(d => d.DepartmentName, d => d.DepartmentId, StringComparer.OrdinalIgnoreCase);
+
+                var existingProfiles = (await _unitOfWork.UserProfileRepository.GetAllAsync(innerCt)).ToList();
+
+                const string prefix = "STU";
+                var maxNumber = 0;
+                foreach (var p in existingProfiles.Where(p => p.UserCode != null && p.UserCode.StartsWith(prefix + "-")))
+                {
+                    var suffix = p.UserCode.Substring(prefix.Length + 1);
+                    if (int.TryParse(suffix, out var num) && num > maxNumber)
+                        maxNumber = num;
+                }
+                var countWithPrefix = existingProfiles.Count(p => p.UserCode != null && p.UserCode.StartsWith(prefix));
+                var stuCounter = Math.Max(maxNumber, countWithPrefix);
+
+                var imported = 0;
+                foreach (var row in rows)
+                {
+                    var account = new Account
+                    {
+                        Username = row.Username.Trim(),
+                        PasswordHash = BCrypt.Net.BCrypt.HashPassword(row.Password.Trim()),
+                        RoleId = studentRole.RoleId,
+                        DepartmentId = departments[row.DepartmentName],
+                        Status = AccountStatus.Active,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow,
+                        CreatedByAccountId = createdByAccountId
+                    };
+
+                    await _unitOfWork.AccountRepository.AddAsync(account, innerCt);
+                    await _unitOfWork.SaveAsync(innerCt);
+
+                    stuCounter++;
+                    var finalUserCode = $"{prefix}-{stuCounter:D3}";
+
+                    var profile = new UserProfile
+                    {
+                        AccountId = account.AccountId,
+                        UserCode = finalUserCode,
+                        FullName = row.FullName.Trim(),
+                        Email = row.Username.Trim(),
+                        Phone = string.IsNullOrWhiteSpace(row.Phone) ? null : row.Phone.Trim(),
+                        DateOfBirth = row.DateOfBirth ?? new DateTime(2000, 1, 1),
+                        Gender = string.IsNullOrWhiteSpace(row.Gender) ? "Khác" : row.Gender.Trim(),
+                        Organization = string.IsNullOrWhiteSpace(row.Organization) ? null : row.Organization.Trim(),
+                        Status = LearnerStatus.Active,
+                        CreatedAt = DateTime.UtcNow,
+                        CreatedByAccountId = createdByAccountId
+                    };
+
+                    await _unitOfWork.UserProfileRepository.AddAsync(profile, innerCt);
+                    await _unitOfWork.SaveAsync(innerCt);
+
+                    await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                    {
+                        AccountId = createdByAccountId,
+                        ActionType = AuditActionType.INSERT.ToString(),
+                        EntityName = nameof(Account),
+                        RecordId = account.AccountId,
+                        NewValue = account.Username,
+                        Description = $"Student Account #{account.AccountId} ({account.Username}) created via bulk student Excel import (row {row.RowNumber})"
+                    }, innerCt);
+
+                    await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                    {
+                        AccountId = createdByAccountId,
+                        ActionType = AuditActionType.INSERT.ToString(),
+                        EntityName = nameof(UserProfile),
+                        RecordId = profile.AccountId,
+                        NewValue = profile.UserCode,
+                        Description = $"UserProfile for Student #{account.AccountId} ({profile.FullName}, {profile.UserCode}) created via bulk student Excel import (row {row.RowNumber})"
+                    }, innerCt);
+
+                    imported++;
+                }
+
+                await _unitOfWork.SaveAsync(innerCt);
+                await _unitOfWork.CommitTransactionAsync(innerCt);
+
+                return new ImportCommitResult(Imported: imported, Skipped: 0, Errors: []);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync(innerCt);
+                throw;
+            }
+        }, ct);
+    }
+
+    private static Task<List<StudentAccountImportRow>> ParseStudentAccountRowsAsync(Stream fileStream, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        using var workbook = new XLWorkbook(fileStream);
+        var ws = workbook.Worksheet(1);
+        var rows = new List<StudentAccountImportRow>();
+        int lastRow = ws.LastRowUsed()?.RowNumber() ?? StuAccDataStartRow - 1;
+
+        for (int r = StuAccDataStartRow; r <= lastRow; r++)
+        {
+            var username = ws.Cell(r, StuAccColUsername).GetString().Trim();
+            if (string.IsNullOrEmpty(username)) continue;
+
+            var password = ws.Cell(r, StuAccColPassword).GetString().Trim();
+            var departmentName = ws.Cell(r, StuAccColDepartmentName).GetString().Trim();
+            var fullName = ws.Cell(r, StuAccColFullName).GetString().Trim();
+            var phone = ws.Cell(r, StuAccColPhone).GetString().Trim();
+            var gender = ws.Cell(r, StuAccColGender).GetString().Trim();
+            var organization = ws.Cell(r, StuAccColOrganization).GetString().Trim();
+
+            DateTime? dateOfBirth = null;
+            var dobCell = ws.Cell(r, StuAccColDateOfBirth);
+            if (!dobCell.IsEmpty())
+            {
+                if (dobCell.DataType == XLDataType.DateTime)
+                {
+                    dateOfBirth = dobCell.GetDateTime();
+                }
+                else
+                {
+                    var rawDob = dobCell.GetString().Trim();
+                    if (!string.IsNullOrEmpty(rawDob))
+                    {
+                        string[] formats = ["dd/MM/yyyy", "d/M/yyyy", "yyyy-MM-dd", "dd-MM-yyyy", "MM/dd/yyyy"];
+                        if (DateTime.TryParseExact(rawDob, formats, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var parsedDob))
+                        {
+                            dateOfBirth = parsedDob;
+                        }
+                        else if (DateTime.TryParse(rawDob, out var parsedFallbackDob))
+                        {
+                            dateOfBirth = parsedFallbackDob;
+                        }
+                        else
+                        {
+                            dateOfBirth = DateTime.MinValue;
+                        }
+                    }
+                }
+            }
+
+            rows.Add(new StudentAccountImportRow(
+                r, username, password, departmentName, fullName,
+                dateOfBirth,
+                string.IsNullOrEmpty(gender) ? null : gender,
+                string.IsNullOrEmpty(phone) ? null : phone,
+                string.IsNullOrEmpty(organization) ? null : organization));
+        }
+        return Task.FromResult(rows);
+    }
+
+    private async Task<List<ImportRowError>> ValidateStudentAccountRowsAsync(List<StudentAccountImportRow> rows, CancellationToken ct)
+    {
+        var errors = new List<ImportRowError>();
+
+        var departments = (await _unitOfWork.DepartmentRepository.GetAllAsync(ct))
+            .Select(d => d.DepartmentName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var existingUsernames = (await _unitOfWork.AccountRepository.GetAllAsync(ct))
+            .Select(a => a.Username)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var existingProfiles = (await _unitOfWork.UserProfileRepository.GetAllAsync(ct)).ToList();
+        var existingProfileEmails = existingProfiles
+            .Where(p => !string.IsNullOrWhiteSpace(p.Email))
+            .Select(p => p.Email)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var seenInFile = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var row in rows)
+        {
+            if (!new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(row.Username) || row.Username.Length > 255)
+                errors.Add(new ImportRowError(row.RowNumber, "Username", $"Username '{row.Username}' phải là email hợp lệ, tối đa 255 ký tự."));
+
+            if (string.IsNullOrWhiteSpace(row.Password))
+                errors.Add(new ImportRowError(row.RowNumber, "Password", "Mật khẩu không được để trống."));
 
             if (!departments.Contains(row.DepartmentName))
                 errors.Add(new ImportRowError(row.RowNumber, "DepartmentName", $"Phòng ban '{row.DepartmentName}' không tồn tại."));

@@ -170,4 +170,113 @@ public class ImportServiceAccountTests
         Assert.Equal("0912345678", createdProfile.Phone);
         Assert.Equal("Vietnam Airlines", createdProfile.Organization);
     }
+
+    [Fact]
+    public async Task GenerateStudentImportTemplateAsync_CreatesWorkbookWithAll8Columns()
+    {
+        var (uow, clsSvc, enrSvc) = BuildMocks();
+        var service = new ImportService(uow.Object, clsSvc.Object, enrSvc.Object);
+
+        var bytes = await service.GenerateStudentImportTemplateAsync();
+
+        Assert.NotNull(bytes);
+        Assert.NotEmpty(bytes);
+
+        using var ms = new MemoryStream(bytes);
+        using var workbook = new XLWorkbook(ms);
+        var ws = workbook.Worksheet("Học viên");
+        Assert.NotNull(ws);
+
+        Assert.Equal("Username (email)*", ws.Cell(2, 1).GetString());
+        Assert.Equal("Mật khẩu*", ws.Cell(2, 2).GetString());
+        Assert.Equal("Phòng ban (Department)*", ws.Cell(2, 3).GetString());
+        Assert.Equal("Họ và tên (FullName)*", ws.Cell(2, 4).GetString());
+        Assert.Equal("Ngày sinh (dd/MM/yyyy)", ws.Cell(2, 5).GetString());
+        Assert.Equal("Giới tính (Gender)", ws.Cell(2, 6).GetString());
+        Assert.Equal("Số điện thoại (Phone)", ws.Cell(2, 7).GetString());
+        Assert.Equal("Đơn vị/Tổ chức (Organization)", ws.Cell(2, 8).GetString());
+    }
+
+    [Fact]
+    public async Task ValidateStudentImportAsync_FlagsMissingDepartment()
+    {
+        var (uow, clsSvc, enrSvc) = BuildMocks();
+        var service = new ImportService(uow.Object, clsSvc.Object, enrSvc.Object);
+
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Học viên");
+        ws.Cell(3, 1).Value = "student1@etr.com";
+        ws.Cell(3, 2).Value = "P@ssw0rd123";
+        ws.Cell(3, 3).Value = "NonExistentDept";
+        ws.Cell(3, 4).Value = "Nguyen Van A";
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+
+        var result = await service.ValidateStudentImportAsync(stream);
+
+        Assert.False(result.CanCommit);
+        Assert.Contains(result.Errors, e => e.Column == "DepartmentName");
+    }
+
+    [Fact]
+    public async Task CommitStudentImportAsync_CreatesStudentAccountAndProfile()
+    {
+        var (uow, clsSvc, enrSvc) = BuildMocks();
+
+        Account? createdAccount = null;
+        UserProfile? createdProfile = null;
+
+        uow.Setup(u => u.AccountRepository.AddAsync(It.IsAny<Account>(), It.IsAny<CancellationToken>()))
+            .Callback<Account, CancellationToken>((a, _) =>
+            {
+                a.AccountId = 300;
+                createdAccount = a;
+            })
+            .Returns(Task.CompletedTask);
+
+        uow.Setup(u => u.UserProfileRepository.AddAsync(It.IsAny<UserProfile>(), It.IsAny<CancellationToken>()))
+            .Callback<UserProfile, CancellationToken>((p, _) =>
+            {
+                createdProfile = p;
+            })
+            .Returns(Task.CompletedTask);
+
+        var service = new ImportService(uow.Object, clsSvc.Object, enrSvc.Object);
+
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Học viên");
+        ws.Cell(3, 1).Value = "student99@etr.com";
+        ws.Cell(3, 2).Value = "P@ssw0rd123";
+        ws.Cell(3, 3).Value = "Training";
+        ws.Cell(3, 4).Value = "Tran Thi C";
+        ws.Cell(3, 5).Value = "20/10/2002";
+        ws.Cell(3, 6).Value = "Nữ";
+        ws.Cell(3, 7).Value = "0987654321";
+        ws.Cell(3, 8).Value = "Bamboo Airways";
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+
+        var result = await service.CommitStudentImportAsync(stream, createdByAccountId: 1);
+
+        Assert.Equal(1, result.Imported);
+        Assert.Empty(result.Errors);
+
+        Assert.NotNull(createdAccount);
+        Assert.Equal("student99@etr.com", createdAccount.Username);
+        Assert.Equal(6, createdAccount.RoleId); // RoleId 6 is Student
+
+        Assert.NotNull(createdProfile);
+        Assert.Equal(300, createdProfile.AccountId);
+        Assert.Equal("Tran Thi C", createdProfile.FullName);
+        Assert.Equal("STU-002", createdProfile.UserCode);
+        Assert.Equal("student99@etr.com", createdProfile.Email);
+        Assert.Equal(new DateTime(2002, 10, 20), createdProfile.DateOfBirth);
+        Assert.Equal("Nữ", createdProfile.Gender);
+        Assert.Equal("0987654321", createdProfile.Phone);
+        Assert.Equal("Bamboo Airways", createdProfile.Organization);
+    }
 }
