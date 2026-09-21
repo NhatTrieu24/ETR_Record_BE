@@ -171,27 +171,8 @@ public class ClassService : IClassService
         }
         await _unitOfWork.SaveAsync(ct);
 
-        // 2. Tự động tạo sẵn danh sách Sessions (Buổi học) cho từng môn học
-        foreach (var cs in courseSubjects)
-        {
-            // Nếu RequiredSessions chưa set hoặc <= 0, mặc định tạo ít nhất 1 buổi
-            int sessionCount = cs.RequiredSessions > 0 ? cs.RequiredSessions : 1;
-
-            for (int i = 1; i <= sessionCount; i++)
-            {
-                var session = new Session
-                {
-                    ClassId = cls.ClassId,
-                    SubjectId = cs.SubjectId,
-                    SessionTitle = $"Buổi {i}",
-                    SessionDate = null, // Giảng viên sẽ lên lịch hoặc điểm danh sau
-                    Location = request.Location,
-                    IsConfirmed = false
-                };
-                await _unitOfWork.SessionRepository.AddAsync(session, ct);
-                sessions.Add(session);
-            }
-        }
+        // 2. Tự động tạo sẵn danh sách Sessions (Buổi học) theo chuẩn ICAO và SubjectType
+        sessions = await GenerateSessionsForClassCoreAsync(cls, courseSubjects, subjectMap, request.Location, ct);
         await _unitOfWork.SaveAsync(ct);
 
         assignments = classSubjects.Select(x => new InstructorAssignmentResponse(x.ClassSubjectId, x.SubjectId, x.InstructorAccountId)).ToList();
@@ -297,23 +278,9 @@ public class ClassService : IClassService
 
                 if (!existingSessions.Any())
                 {
-                    foreach (var cs in courseSubjects)
-                    {
-                        int sessionCount = cs.RequiredSessions > 0 ? cs.RequiredSessions : 1;
-                        for (int i = 1; i <= sessionCount; i++)
-                        {
-                            var session = new Session
-                            {
-                                ClassId = cls.ClassId,
-                                SubjectId = cs.SubjectId,
-                                SessionTitle = $"Buổi {i}",
-                                SessionDate = null,
-                                Location = request.Location,
-                                IsConfirmed = false
-                            };
-                            await _unitOfWork.SessionRepository.AddAsync(session, ct);
-                        }
-                    }
+                    var subjectMap = (await _unitOfWork.SubjectRepository.GetAllAsync(ct))
+                        .ToDictionary(s => s.SubjectId, s => s.SubjectType);
+                    await GenerateSessionsForClassCoreAsync(cls, courseSubjects, subjectMap, request.Location, ct);
                     await _unitOfWork.SaveAsync(ct);
                 }
 
@@ -394,5 +361,126 @@ public class ClassService : IClassService
         {
             throw new BusinessRuleViolationException("InstructorAccountId must reference an account with the Instructor role.");
         }
+    }
+
+    private async Task<List<Session>> GenerateSessionsForClassCoreAsync(
+        Class cls,
+        List<CourseSubject> courseSubjects,
+        IReadOnlyDictionary<int, string> subjectMap,
+        string? classLocation,
+        CancellationToken ct)
+    {
+        var sessions = new List<Session>();
+
+        // Tải danh sách Assessments và PracticalChecklists thuộc khóa học để tự động gắn vào các buổi kiểm tra
+        var assessments = (await _unitOfWork.AssessmentRepository.GetAllAsync(ct))
+            .Where(a => a.CourseId == cls.CourseId && !a.IsDeleted)
+            .ToList();
+
+        var checklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(ct))
+            .Where(pc => (pc.CourseId == cls.CourseId || pc.CourseId == 0) && !pc.IsDeleted)
+            .ToList();
+
+        var orderedCourseSubjects = courseSubjects.OrderBy(cs => cs.SequenceNo).ToList();
+        var currentDate = cls.StartDate.Date;
+
+        foreach (var cs in orderedCourseSubjects)
+        {
+            subjectMap.TryGetValue(cs.SubjectId, out var subjectType);
+            bool isPractical = !string.IsNullOrEmpty(subjectType) &&
+                (subjectType.Contains("Practical", StringComparison.OrdinalIgnoreCase) ||
+                 subjectType.Contains("SIM", StringComparison.OrdinalIgnoreCase) ||
+                 subjectType.Contains("Simulator", StringComparison.OrdinalIgnoreCase));
+
+            // 1. Phân bổ địa điểm theo SubjectType (Facility / Location Routing)
+            string sessionLocation;
+            if (isPractical)
+            {
+                sessionLocation = !string.IsNullOrWhiteSpace(classLocation)
+                    ? (classLocation.Contains("Sim", StringComparison.OrdinalIgnoreCase) ? classLocation : $"{classLocation} (SIM Room)")
+                    : "Buồng lái mô phỏng (SIM / FSTD Room)";
+            }
+            else
+            {
+                sessionLocation = !string.IsNullOrWhiteSpace(classLocation)
+                    ? classLocation
+                    : "Phòng học lý thuyết (Ground Classroom)";
+            }
+
+            int sessionCount = cs.RequiredSessions > 0 ? cs.RequiredSessions : 1;
+            var subjectAssessment = assessments.FirstOrDefault(a => a.SubjectId == cs.SubjectId);
+            var subjectChecklist = checklists.FirstOrDefault(c => c.SubjectId == cs.SubjectId);
+
+            for (int i = 1; i <= sessionCount; i++)
+            {
+                DateTime sessionDate = currentDate <= cls.EndDate.Date ? currentDate : cls.EndDate.Date;
+
+                // 2. Gán bài kiểm tra / đánh giá vào buổi học cuối của môn (Assessment Assignment)
+                bool isFinalSession = (i == sessionCount);
+                int? assessmentId = null;
+                int? checklistId = null;
+                bool isAssessmentRequired = false;
+                bool isChecklistRequired = false;
+                string title;
+
+                if (isFinalSession && subjectAssessment != null)
+                {
+                    assessmentId = subjectAssessment.AssessmentId;
+                    isAssessmentRequired = true;
+                }
+
+                if (isFinalSession && (subjectChecklist != null || isPractical))
+                {
+                    if (subjectChecklist != null) checklistId = subjectChecklist.PracticalChecklistId;
+                    isChecklistRequired = true;
+                }
+
+                if (assessmentId.HasValue && checklistId.HasValue)
+                {
+                    title = $"Buổi {i} (Đánh giá Lý thuyết & Thực hành)";
+                }
+                else if (assessmentId.HasValue)
+                {
+                    title = $"Buổi {i} (Đánh giá: {subjectAssessment!.ComponentName})";
+                }
+                else if (isChecklistRequired)
+                {
+                    title = $"Buổi {i} (Đánh giá thực hành buồng lái)";
+                }
+                else
+                {
+                    title = $"Buổi {i}";
+                }
+
+                var session = new Session
+                {
+                    ClassId = cls.ClassId,
+                    SubjectId = cs.SubjectId,
+                    SessionTitle = title,
+                    SessionDate = sessionDate,
+                    Location = sessionLocation,
+                    AssessmentId = assessmentId,
+                    PracticalChecklistId = checklistId,
+                    IsAssessmentRequired = isAssessmentRequired,
+                    IsChecklistRequired = isChecklistRequired,
+                    IsConfirmed = false
+                };
+
+                await _unitOfWork.SessionRepository.AddAsync(session, ct);
+                sessions.Add(session);
+
+                // 3. Quản trị mệt mỏi ICAO (Fatigue Risk Management):
+                // Môn SIM/Practical tối đa 4h/ngày -> mỗi ngày xếp 1 buổi SIM.
+                // Môn Theory tối đa 8h/ngày -> mỗi ngày xếp 1 buổi lý thuyết.
+                // Tăng dần ngày và bỏ qua Chủ nhật
+                currentDate = currentDate.AddDays(1);
+                if (currentDate.DayOfWeek == DayOfWeek.Sunday)
+                {
+                    currentDate = currentDate.AddDays(1);
+                }
+            }
+        }
+
+        return sessions;
     }
 }
