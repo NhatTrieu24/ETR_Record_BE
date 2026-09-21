@@ -237,6 +237,10 @@ public class ClassService : IClassService
 
                 // Update ClassSubjects
                 var existingAssignments = _unitOfWork.ClassSubjectRepository.GetQueryable().Where(x => x.ClassId == cls.ClassId).ToList();
+                var existingDict = existingAssignments
+                    .GroupBy(x => x.SubjectId)
+                    .ToDictionary(g => g.Key, g => g.First().InstructorAccountId);
+
                 foreach (var ea in existingAssignments)
                 {
                     _unitOfWork.ClassSubjectRepository.Delete(ea);
@@ -248,9 +252,13 @@ public class ClassService : IClassService
                 var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct))
                     .Where(x => x.CourseId == request.CourseId).ToList();
 
-                var assignmentDict = request.InstructorAssignments?
-                    .Where(a => a.InstructorAccountId.HasValue)
-                    .ToDictionary(a => a.SubjectId, a => a.InstructorAccountId) ?? new Dictionary<int, int?>();
+                // If request.InstructorAssignments is null (caller only updated general class info), preserve existing assignments
+                var assignmentDict = request.InstructorAssignments != null
+                    ? request.InstructorAssignments
+                        .Where(a => a.InstructorAccountId.HasValue)
+                        .GroupBy(a => a.SubjectId)
+                        .ToDictionary(g => g.Key, g => g.First().InstructorAccountId)
+                    : existingDict;
 
                 // 1. Gán lại ClassSubject cho tất cả môn học trong khóa
                 foreach (var cs in courseSubjects)

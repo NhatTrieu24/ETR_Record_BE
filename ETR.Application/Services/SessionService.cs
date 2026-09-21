@@ -104,8 +104,9 @@ public class SessionService : ISessionService
                 throw new ValidationException("PracticalChecklist does not match the class's course or the specified subject.");
         }
 
-        // Since request.SessionDate is a DateTime (not nullable), we can just validate it.
-        // We do this if we consider request.SessionDate effectively always provided.
+        // Check instructor overlap only when the session date/time is actually changed
+        var isDateChanged = !session.SessionDate.HasValue || Math.Abs((session.SessionDate.Value - request.SessionDate).TotalMinutes) >= 1;
+        if (isDateChanged)
         {
             var classSubject = _unitOfWork.ClassSubjectRepository.GetQueryable()
                 .FirstOrDefault(cs => cs.ClassId == session.ClassId && cs.SubjectId == session.SubjectId);
@@ -133,6 +134,8 @@ public class SessionService : ISessionService
         }
 
         // Only these fields can be updated by Instructor/Admin
+        if (!string.IsNullOrWhiteSpace(request.SessionTitle))
+            session.SessionTitle = request.SessionTitle.Trim();
         session.SessionDate = request.SessionDate;
         session.Location = request.Location;
         session.IsAssessmentRequired = request.IsAssessmentRequired;
