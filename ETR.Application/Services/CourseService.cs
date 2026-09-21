@@ -95,6 +95,7 @@ public class CourseService : ICourseService
                         SubjectId = s.SubjectId,
                         SequenceNo = s.SequenceNo,
                         RequiredHours = s.RequiredHours,
+                        RequiredSessions = s.RequiredSessions,
                         IsMandatory = s.IsMandatory,
                         PassingScore = s.PassingScore,
                         CreatedAt = DateTime.UtcNow,
@@ -231,6 +232,7 @@ public class CourseService : ICourseService
                         // Update
                         existing.SequenceNo = reqSub.SequenceNo;
                         existing.RequiredHours = reqSub.RequiredHours;
+                        existing.RequiredSessions = reqSub.RequiredSessions;
                         existing.IsMandatory = reqSub.IsMandatory;
                         existing.PassingScore = reqSub.PassingScore;
                         _unitOfWork.CourseSubjectRepository.Update(existing);
@@ -251,6 +253,7 @@ public class CourseService : ICourseService
                             SubjectId = reqSub.SubjectId,
                             SequenceNo = reqSub.SequenceNo,
                             RequiredHours = reqSub.RequiredHours,
+                            RequiredSessions = reqSub.RequiredSessions,
                             IsMandatory = reqSub.IsMandatory,
                             PassingScore = reqSub.PassingScore,
                             CreatedAt = DateTime.UtcNow,
@@ -347,6 +350,7 @@ public class CourseService : ICourseService
             SubjectId = request.SubjectId,
             SequenceNo = request.SequenceNo,
             RequiredHours = request.RequiredHours,
+            RequiredSessions = request.RequiredSessions,
             IsMandatory = request.IsMandatory,
             PassingScore = request.PassingScore,
             CreatedAt = DateTime.UtcNow,
@@ -404,6 +408,7 @@ public class CourseService : ICourseService
 
         existingMapping.SequenceNo = request.SequenceNo;
         existingMapping.RequiredHours = request.RequiredHours;
+        existingMapping.RequiredSessions = request.RequiredSessions;
         existingMapping.IsMandatory = request.IsMandatory;
         existingMapping.PassingScore = request.PassingScore;
 
