@@ -95,6 +95,37 @@ public class ClassService : IClassService
             throw new BusinessRuleViolationException($"A class with code '{request.ClassCode}' already exists.");
         }
 
+        if (request.StartDate.Date < DateTime.UtcNow.Date)
+        {
+            throw new BusinessRuleViolationException("Ngày bắt đầu đào tạo không được ở trong quá khứ.");
+        }
+
+        if (request.EndDate <= request.StartDate)
+        {
+            throw new BusinessRuleViolationException("Ngày kết thúc phải sau ngày bắt đầu.");
+        }
+
+        // Lấy toàn bộ môn học thuộc khóa học (CourseSubjects) để kiểm tra thời lượng đào tạo chuẩn ICAO
+        var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct))
+            .Where(x => x.CourseId == request.CourseId).ToList();
+
+        var subjectMap = (await _unitOfWork.SubjectRepository.GetAllAsync(ct))
+            .ToDictionary(s => s.SubjectId, s => s.SubjectType);
+
+        var subjectPairs = courseSubjects.Select(cs => (
+            cs.RequiredHours,
+            subjectMap.TryGetValue(cs.SubjectId, out var st) ? st : null
+        ));
+
+        var (minTrainingDays, minBufferDays, totalMinDays, minEndDate) =
+            ClassDurationValidator.CalculateMinDuration(request.StartDate, subjectPairs);
+
+        if (request.EndDate.Date < minEndDate.Date)
+        {
+            throw new BusinessRuleViolationException(
+                $"Thời gian kết thúc quá ngắn so với tổng số giờ học chuẩn ICAO/CAAV. Lớp học yêu cầu tối thiểu {totalMinDays} ngày đào tạo (kết thúc từ ngày {minEndDate:dd/MM/yyyy}, bao gồm {minTrainingDays} ngày học và {minBufferDays} ngày đệm).");
+        }
+
         var cls = new Class
         {
             ClassCode = request.ClassCode,
@@ -115,10 +146,6 @@ public class ClassService : IClassService
         var assignments = new List<InstructorAssignmentResponse>();
         var classSubjects = new List<ClassSubject>();
         var sessions = new List<Session>();
-
-        // Lấy toàn bộ môn học thuộc khóa học (CourseSubjects)
-        var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct))
-            .Where(x => x.CourseId == request.CourseId).ToList();
 
         var assignmentDict = request.InstructorAssignments?
             .Where(a => a.InstructorAccountId.HasValue)

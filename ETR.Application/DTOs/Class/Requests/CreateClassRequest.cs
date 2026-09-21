@@ -16,9 +16,9 @@ public record CreateClassRequest(
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        if (EndDate < StartDate)
+        if (EndDate <= StartDate)
         {
-            yield return new ValidationResult("EndDate must be greater than or equal to StartDate.", new[] { nameof(EndDate) });
+            yield return new ValidationResult("EndDate must be greater than StartDate.", new[] { nameof(EndDate) });
         }
     }
 }

@@ -279,4 +279,77 @@ public class ImportServiceAccountTests
         Assert.Equal("0987654321", createdProfile.Phone);
         Assert.Equal("Bamboo Airways", createdProfile.Organization);
     }
+
+    [Theory]
+    [InlineData("123456")] // Too short
+    [InlineData("abcdefghij")] // Non-numeric
+    [InlineData("0123")] // Too short
+    [InlineData("01234567890123456")] // Too long
+    public async Task ValidateAccountImportAsync_FlagsInvalidPhone(string invalidPhone)
+    {
+        var (uow, clsSvc, enrSvc) = BuildMocks();
+        var service = new ImportService(uow.Object, clsSvc.Object, enrSvc.Object);
+
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Tài khoản");
+        ws.Cell(3, 1).Value = "student1@etr.com";
+        ws.Cell(3, 2).Value = "P@ssw0rd123";
+        ws.Cell(3, 3).Value = "Student";
+        ws.Cell(3, 4).Value = "Training";
+        ws.Cell(3, 5).Value = "Nguyen Van A";
+        ws.Cell(3, 8).Value = invalidPhone;
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+
+        var result = await service.ValidateAccountImportAsync(stream, isCallerAdmin: true);
+
+        Assert.False(result.CanCommit);
+        Assert.Contains(result.Errors, e => e.Column == "Phone");
+    }
+
+    [Theory]
+    [InlineData("0912345678")] // Standard 10 digits
+    [InlineData("+84912345678")] // Standard international
+    [InlineData("02812345678")] // 11 digits
+    [InlineData("0912-345-678")] // With hyphens
+    public async Task ValidateAccountImportAsync_AcceptsValidPhone(string validPhone)
+    {
+        var (uow, clsSvc, enrSvc) = BuildMocks();
+        var service = new ImportService(uow.Object, clsSvc.Object, enrSvc.Object);
+
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Tài khoản");
+        ws.Cell(3, 1).Value = "student1@etr.com";
+        ws.Cell(3, 2).Value = "P@ssw0rd123";
+        ws.Cell(3, 3).Value = "Student";
+        ws.Cell(3, 4).Value = "Training";
+        ws.Cell(3, 5).Value = "Nguyen Van A";
+        ws.Cell(3, 8).Value = validPhone;
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+
+        var result = await service.ValidateAccountImportAsync(stream, isCallerAdmin: true);
+
+        Assert.True(result.CanCommit);
+        Assert.DoesNotContain(result.Errors, e => e.Column == "Phone");
+    }
+
+    [Fact]
+    public async Task GenerateAccountImportTemplateAsync_HasPhoneDataValidation()
+    {
+        var (uow, clsSvc, enrSvc) = BuildMocks();
+        var service = new ImportService(uow.Object, clsSvc.Object, enrSvc.Object);
+
+        var bytes = await service.GenerateAccountImportTemplateAsync();
+        using var ms = new MemoryStream(bytes);
+        using var workbook = new XLWorkbook(ms);
+        var ws = workbook.Worksheet("Tài khoản");
+
+        var dataValidations = ws.DataValidations.GetAllInRange(ws.Range(3, 8, 503, 8).RangeAddress);
+        Assert.NotEmpty(dataValidations);
+    }
 }
