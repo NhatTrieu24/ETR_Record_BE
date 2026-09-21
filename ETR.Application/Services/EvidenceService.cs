@@ -20,7 +20,17 @@ public class EvidenceService : IEvidenceService
 
     private static readonly HashSet<string> AllowedMimeTypes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"
+        "image/jpeg", "image/pjpeg", "image/png", "image/x-png", "image/gif", "image/webp", "application/pdf"
+    };
+
+    private static readonly Dictionary<string, string> ExtensionToMimeMap = new(StringComparer.OrdinalIgnoreCase)
+    {
+        { ".jpg", "image/jpeg" },
+        { ".jpeg", "image/jpeg" },
+        { ".png", "image/png" },
+        { ".gif", "image/gif" },
+        { ".webp", "image/webp" },
+        { ".pdf", "application/pdf" }
     };
 
     private static readonly HashSet<string> AllowedVerificationStatuses = new(StringComparer.Ordinal)
@@ -77,7 +87,13 @@ public class EvidenceService : IEvidenceService
         if (string.IsNullOrEmpty(fileExtension) || !AllowedExtensions.Contains(fileExtension))
             throw new ValidationException($"File extension '{fileExtension}' is not allowed. Allowed extensions: {string.Join(", ", AllowedExtensions)}.");
 
-        if (string.IsNullOrEmpty(request.MimeType) || !AllowedMimeTypes.Contains(request.MimeType))
+        var mimeType = request.MimeType;
+        if (string.IsNullOrWhiteSpace(mimeType) && ExtensionToMimeMap.TryGetValue(fileExtension, out var inferredMime))
+        {
+            mimeType = inferredMime;
+        }
+
+        if (string.IsNullOrEmpty(mimeType) || !AllowedMimeTypes.Contains(mimeType))
             throw new ValidationException($"File content type '{request.MimeType}' is not allowed.");
 
         if (!Uri.TryCreate(request.FileUrl, UriKind.Absolute, out var parsedUrl) || parsedUrl.Scheme != Uri.UriSchemeHttps)
@@ -115,7 +131,7 @@ public class EvidenceService : IEvidenceService
             Url = request.FileUrl,
             PublicId = request.PublicId,
             FileName = request.FileName,
-            MimeType = request.MimeType,
+            MimeType = mimeType,
             FileSize = request.FileSize,
             UploadedByAccountId = uploadedByAccountId,
             UploadedAt = DateTime.UtcNow,

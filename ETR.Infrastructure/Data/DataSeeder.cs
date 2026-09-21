@@ -97,16 +97,16 @@ public static class DataSeeder
     {
         if (!await context.Courses.AnyAsync())
         {
-            context.Courses.Add(new Course { CourseCode = "AMT-101", CourseName = "Aircraft Maintenance Technician", DurationHours = 120, Status = CourseStatus.Active });
-            context.Courses.Add(new Course { CourseCode = "B737-TR", CourseName = "B737 Type Rating", DurationHours = 160, Status = CourseStatus.Active });
-            context.Courses.Add(new Course { CourseCode = "A320-FAM", CourseName = "A320 Familiarization", DurationHours = 40, Status = CourseStatus.Active });
-            context.Courses.Add(new Course { CourseCode = "ENG-101", CourseName = "Aviation English", DurationHours = 60, Status = CourseStatus.Active });
-            context.Courses.Add(new Course { CourseCode = "SMS-101", CourseName = "Safety Management Systems", DurationHours = 20, Status = CourseStatus.Active });
-            context.Courses.Add(new Course { CourseCode = "HF-101", CourseName = "Human Factors", DurationHours = 15, Status = CourseStatus.Active });
-            context.Courses.Add(new Course { CourseCode = "A350-TR", CourseName = "A350 Type Rating", DurationHours = 160, Status = CourseStatus.Active });
-            context.Courses.Add(new Course { CourseCode = "B787-TR", CourseName = "B787 Type Rating", DurationHours = 160, Status = CourseStatus.Active });
-            context.Courses.Add(new Course { CourseCode = "DGR-101", CourseName = "Dangerous Goods Regulations", DurationHours = 10, Status = CourseStatus.Active });
-            context.Courses.Add(new Course { CourseCode = "SEC-101", CourseName = "Aviation Security", DurationHours = 10, Status = CourseStatus.Active });
+            context.Courses.Add(new Course { CourseCode = "AMT-101", CourseName = "Aircraft Maintenance Technician", DurationHours = 120, Status = CourseStatus.Active, ValidityMonths = 24 });
+            context.Courses.Add(new Course { CourseCode = "B737-TR", CourseName = "B737 Type Rating", DurationHours = 160, Status = CourseStatus.Active, ValidityMonths = 12 });
+            context.Courses.Add(new Course { CourseCode = "A320-FAM", CourseName = "A320 Familiarization", DurationHours = 40, Status = CourseStatus.Active, ValidityMonths = 24 });
+            context.Courses.Add(new Course { CourseCode = "ENG-101", CourseName = "Aviation English", DurationHours = 60, Status = CourseStatus.Active, ValidityMonths = 36 });
+            context.Courses.Add(new Course { CourseCode = "SMS-101", CourseName = "Safety Management Systems", DurationHours = 20, Status = CourseStatus.Active, ValidityMonths = 12 });
+            context.Courses.Add(new Course { CourseCode = "HF-101", CourseName = "Human Factors", DurationHours = 15, Status = CourseStatus.Active, ValidityMonths = 24 });
+            context.Courses.Add(new Course { CourseCode = "A350-TR", CourseName = "A350 Type Rating", DurationHours = 160, Status = CourseStatus.Active, ValidityMonths = 12 });
+            context.Courses.Add(new Course { CourseCode = "B787-TR", CourseName = "B787 Type Rating", DurationHours = 160, Status = CourseStatus.Active, ValidityMonths = 12 });
+            context.Courses.Add(new Course { CourseCode = "DGR-101", CourseName = "Dangerous Goods Regulations", DurationHours = 10, Status = CourseStatus.Active, ValidityMonths = 12 });
+            context.Courses.Add(new Course { CourseCode = "SEC-101", CourseName = "Aviation Security", DurationHours = 10, Status = CourseStatus.Active, ValidityMonths = 24 });
             await context.SaveChangesAsync();
         }
 
@@ -411,7 +411,11 @@ public static class DataSeeder
         if (!await context.ETRCourseRecords.AnyAsync())
         {
             var enrollments = await context.CourseEnrollments.ToListAsync();
+            var classes = await context.Classes.ToDictionaryAsync(c => c.ClassId, c => c.CourseId);
+            var courses = await context.Courses.ToDictionaryAsync(c => c.CourseId, c => c);
             var rand = new Random(42);
+            int certIndex = 0;
+
             foreach(var enrollment in enrollments)
             {
                 var status = enrollment.Status == EnrollmentStatus.Completed ? EtrStatus.Completed : EtrStatus.InProgress;
@@ -430,6 +434,43 @@ public static class DataSeeder
                 {
                     etr.VerifiedAt = DateTime.UtcNow.AddDays(-2);
                     etr.CompletedAt = DateTime.UtcNow.AddDays(-2);
+                    etr.IsLocked = true;
+
+                    // Seed IssuedDate and ExpiryDate for Completed certificates
+                    classes.TryGetValue(enrollment.ClassId, out var courseId);
+                    if (courseId > 0 && courses.TryGetValue(courseId, out var course) && course.ValidityMonths.HasValue)
+                    {
+                        var validityMonths = course.ValidityMonths.Value;
+                        certIndex++;
+                        switch (certIndex % 5)
+                        {
+                            case 0:
+                                // Expired: hết hạn 15 ngày trước
+                                etr.ExpiryDate = DateTime.UtcNow.AddDays(-15);
+                                etr.IssuedDate = etr.ExpiryDate.Value.AddMonths(-validityMonths);
+                                break;
+                            case 1:
+                                // Expired: hết hạn 5 ngày trước
+                                etr.ExpiryDate = DateTime.UtcNow.AddDays(-5);
+                                etr.IssuedDate = etr.ExpiryDate.Value.AddMonths(-validityMonths);
+                                break;
+                            case 2:
+                                // ExpiringSoon: còn 7 ngày (trong ngưỡng 30 ngày)
+                                etr.ExpiryDate = DateTime.UtcNow.AddDays(7);
+                                etr.IssuedDate = etr.ExpiryDate.Value.AddMonths(-validityMonths);
+                                break;
+                            case 3:
+                                // ExpiringSoon: còn 20 ngày (trong ngưỡng 30 ngày)
+                                etr.ExpiryDate = DateTime.UtcNow.AddDays(20);
+                                etr.IssuedDate = etr.ExpiryDate.Value.AddMonths(-validityMonths);
+                                break;
+                            default:
+                                // Valid: còn hạn dài (6 tháng)
+                                etr.IssuedDate = DateTime.UtcNow.AddMonths(-2);
+                                etr.ExpiryDate = etr.IssuedDate.Value.AddMonths(validityMonths);
+                                break;
+                        }
+                    }
                 }
 
                 context.ETRCourseRecords.Add(etr);
