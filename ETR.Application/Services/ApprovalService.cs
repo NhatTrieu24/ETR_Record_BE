@@ -183,6 +183,10 @@ public class ApprovalService : IApprovalService
                 {
                     await _etrService.CompleteEtrAsync(request.ETRCourseRecordId, actionByAccountId, ct);
                 }
+                else if (newStatus == "Verified")
+                {
+                    await _etrService.VerifyEtrAsync(request.ETRCourseRecordId, actionByAccountId, ct);
+                }
 
                 await _unitOfWork.CommitTransactionAsync(ct);
 

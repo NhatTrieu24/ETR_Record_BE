@@ -421,6 +421,74 @@ public class AssessmentResultService : IAssessmentResultService
                     .Any(cs => cs.ClassId == classForSignoff.ClassId && cs.SubjectId == subjectResult.SubjectId && cs.InstructorAccountId == signoffByAccountId);
                 ClassOwnershipValidator.EnsureInstructorOwnsSubject(signoffByRoleName, isAssignedSignoff);
 
+                // Check already signed off
+                var existingSignoff = (await _unitOfWork.SubjectSignoffRepository.GetAllAsync(ct))
+                    .FirstOrDefault(s => s.SubjectResultId == request.SubjectResultId && !s.IsDeleted);
+                if (existingSignoff != null)
+                {
+                    throw new BusinessRuleViolationException("Môn học này đã được ký chốt trước đó. Không thể ký lại trừ khi có yêu cầu mở khóa (Amendment Request).");
+                }
+
+                // 1. Validation: Attendance
+                if (!subjectResult.AttendanceRate.HasValue)
+                {
+                    throw new BusinessRuleViolationException("Không thể ký chốt môn học. Chưa có dữ liệu điểm danh cho học viên trong môn học này.");
+                }
+
+                // 2. Validation: Assessments - All assessments configured for this subject in the course must have scores
+                var courseAssessments = (await _unitOfWork.AssessmentRepository.GetAllAsync(ct))
+                    .Where(a => a.CourseId == subjectResult.CourseId && a.SubjectId == subjectResult.SubjectId && !a.IsDeleted)
+                    .ToList();
+
+                if (courseAssessments.Count > 0)
+                {
+                    var studentResults = (await _unitOfWork.AssessmentResultRepository.GetAllAsync(ct))
+                        .Where(r => r.SubjectResultId == request.SubjectResultId && !r.IsDeleted)
+                        .ToList();
+
+                    var missingAssessments = courseAssessments
+                        .Where(a => !studentResults.Any(r => r.AssessmentId == a.AssessmentId && r.ResultStatus != "Pending"))
+                        .ToList();
+
+                    if (missingAssessments.Count > 0)
+                    {
+                        var names = string.Join(", ", missingAssessments.Select(a => a.ComponentName));
+                        throw new BusinessRuleViolationException($"Không thể ký chốt môn học. Còn bài kiểm tra chưa được nhập điểm: {names}.");
+                    }
+                }
+
+                // 3. Validation: Mandatory Practical Checklists
+                var mandatoryChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(ct))
+                    .Where(p => p.CourseId == subjectResult.CourseId && p.SubjectId == subjectResult.SubjectId && p.IsRequired && !p.IsDeleted)
+                    .ToList();
+
+                if (mandatoryChecklists.Count > 0)
+                {
+                    var checklistResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(ct))
+                        .Where(r => r.SubjectResultId == request.SubjectResultId && !r.IsDeleted)
+                        .ToList();
+
+                    var missingChecklists = mandatoryChecklists
+                        .Where(c => !checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.ResultStatus != "Pending"))
+                        .ToList();
+
+                    if (missingChecklists.Count > 0)
+                    {
+                        var names = string.Join(", ", missingChecklists.Select(c => c.ItemName));
+                        throw new BusinessRuleViolationException($"Không thể ký chốt môn học. Còn danh mục thực hành bắt buộc chưa được đánh giá: {names}.");
+                    }
+                }
+
+                // 4. Validation: Mandatory Evidence Files (Must be uploaded BEFORE signing off)
+                var evidenceFiles = (await _unitOfWork.EvidenceFileRepository.GetAllAsync(ct))
+                    .Where(e => e.SubjectResultId == request.SubjectResultId && !e.IsDeleted)
+                    .ToList();
+
+                if (evidenceFiles.Count == 0)
+                {
+                    throw new BusinessRuleViolationException("Không thể ký chốt môn học. Chưa tải lên tệp minh chứng (Evidence) cho môn học này. Giảng viên phải tải lên minh chứng trước khi ký chốt.");
+                }
+
                 var signoff = new SubjectSignoff
                 {
                     SubjectResultId = request.SubjectResultId,

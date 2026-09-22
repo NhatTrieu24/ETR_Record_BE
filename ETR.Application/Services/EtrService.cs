@@ -442,11 +442,53 @@ public class EtrService : IEtrService
 
     public async Task<EtrRecordResponse> VerifyEtrAsync(int etrCourseRecordId, int accountId, CancellationToken cancellationToken = default)
     {
-        var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(etrCourseRecordId, cancellationToken)
+        var etr = await _unitOfWork.ETRCourseRecordRepository.GetWithSubjectResultsAsync(etrCourseRecordId, cancellationToken)
             ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
 
         if (etr.Status != EtrStatus.Submitted)
             throw new BusinessRuleViolationException("Cannot verify ETR that is not in Submitted status.");
+
+        var enrollment = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(etr.EnrollmentId, cancellationToken)
+            ?? throw new BusinessRuleViolationException("Enrollment not found.");
+
+        var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(enrollment.ClassId, cancellationToken)
+            ?? throw new BusinessRuleViolationException("Class not found.");
+
+        var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken))
+            .Where(cs => cs.CourseId == trainingClass.CourseId && cs.IsMandatory).ToList();
+
+        // 1. Check all mandatory subjects are Passed or Exempted
+        foreach (var cs in courseSubjects)
+        {
+            var sr = etr.SubjectResults?.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
+            if (sr == null || (sr.Status != SubjectResultStatus.Passed && sr.Status != SubjectResultStatus.Exempted))
+            {
+                throw new BusinessRuleViolationException($"Cannot verify ETR. Mandatory subject (ID: {cs.SubjectId}) is not Passed or Exempted.");
+            }
+        }
+
+        // 2. Check all evidence is Verified
+        var allEvidences = await _unitOfWork.EvidenceFileRepository.GetAllAsync(cancellationToken);
+        var etrSubjectIds = etr.SubjectResults?.Select(sr => sr.SubjectResultId).ToList() ?? new List<int>();
+        var pendingEvidences = allEvidences
+            .Where(e => etrSubjectIds.Contains(e.SubjectResultId) && e.VerificationStatus != "Verified" && !e.IsDeleted)
+            .ToList();
+
+        if (pendingEvidences.Any())
+        {
+            throw new BusinessRuleViolationException($"Cannot verify ETR. {pendingEvidences.Count} evidence file(s) are not yet Verified.");
+        }
+
+        // 3. Check all subject signoffs exist
+        var allSignoffs = await _unitOfWork.SubjectSignoffRepository.GetAllAsync(cancellationToken);
+        foreach (var sr in etr.SubjectResults ?? Enumerable.Empty<SubjectResult>())
+        {
+            var hasSignoff = allSignoffs.Any(s => s.SubjectResultId == sr.SubjectResultId && !s.IsDeleted);
+            if (!hasSignoff)
+            {
+                throw new BusinessRuleViolationException($"Cannot verify ETR. Subject (ID: {sr.SubjectId}) has not been signed off by instructor.");
+            }
+        }
 
         // === AUDIT LOG ===
         var auditLog = new AuditLog
