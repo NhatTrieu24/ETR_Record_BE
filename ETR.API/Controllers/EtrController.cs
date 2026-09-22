@@ -147,7 +147,7 @@ public class EtrController : ControllerBase
     /// Trả lại ETR để chỉnh sửa (chuyển từ Submitted về Draft).
     /// </summary>
     [HttpPost("{id}/return")]
-    [Authorize(Roles = "QA,Admin")]
+    [Authorize(Roles = "QA,Admin,TrainingManager")]
     public async Task<IActionResult> ReturnEtr(int id, [FromBody] ReturnEtrRequest? request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 

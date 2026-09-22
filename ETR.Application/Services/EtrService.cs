@@ -520,8 +520,8 @@ public class EtrService : IEtrService
         var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(etrCourseRecordId, cancellationToken)
             ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
 
-        if (etr.Status != EtrStatus.Submitted)
-            throw new BusinessRuleViolationException("Cannot return ETR that is not in Submitted status.");
+        if (etr.Status != EtrStatus.Submitted && etr.Status != EtrStatus.Verified)
+            throw new BusinessRuleViolationException("Cannot return ETR that is not in Submitted or Verified status.");
 
         if (string.IsNullOrWhiteSpace(comment))
             throw new ValidationException("A comment is required when returning an ETR for correction.");

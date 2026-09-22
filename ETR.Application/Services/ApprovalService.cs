@@ -55,8 +55,8 @@ public class ApprovalService : IApprovalService
     {
         [ApprovalActionType.Verify] = ["QA", "Admin"],
         [ApprovalActionType.Approve] = ["TrainingManager", "Admin"],
-        [ApprovalActionType.Reject] = ["QA", "Admin"],
-        [ApprovalActionType.Return] = ["QA", "Admin"],
+        [ApprovalActionType.Reject] = ["TrainingManager", "QA", "Admin"],
+        [ApprovalActionType.Return] = ["TrainingManager", "QA", "Admin"],
     };
 
     // ApprovalActionType (API/DTO contract for ?action=) is a deliberately separate enum from
@@ -168,7 +168,7 @@ public class ApprovalService : IApprovalService
                     var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(request.ETRCourseRecordId, ct)
                         ?? throw new BusinessRuleViolationException("ETRCourseRecord not found.");
 
-                    if (etr.Status == EtrStatus.Submitted)
+                    if (etr.Status == EtrStatus.Submitted || etr.Status == EtrStatus.Verified)
                     {
                         etr.Status = EtrStatus.ReturnedForCorrection;
                         etr.UpdatedAt = DateTime.UtcNow;
