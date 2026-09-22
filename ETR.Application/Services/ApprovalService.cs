@@ -168,6 +168,15 @@ public class ApprovalService : IApprovalService
                     var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(request.ETRCourseRecordId, ct)
                         ?? throw new BusinessRuleViolationException("ETRCourseRecord not found.");
 
+                    if (actionByRoleName == "TrainingManager" && etr.Status != EtrStatus.Verified)
+                    {
+                        throw new BusinessRuleViolationException("Training Manager chỉ có thể trả về hồ sơ đã được QA thẩm định (Verified).");
+                    }
+                    if (actionByRoleName == "QA" && etr.Status != EtrStatus.Submitted)
+                    {
+                        throw new BusinessRuleViolationException("QA chỉ có thể trả về hồ sơ đang chờ thẩm định (Submitted).");
+                    }
+
                     if (etr.Status == EtrStatus.Submitted || etr.Status == EtrStatus.Verified)
                     {
                         etr.Status = EtrStatus.ReturnedForCorrection;
