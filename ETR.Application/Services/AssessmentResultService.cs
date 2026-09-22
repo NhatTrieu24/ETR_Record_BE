@@ -451,7 +451,7 @@ public class AssessmentResultService : IAssessmentResultService
         }, cancellationToken);
     }
 
-    private async Task EvaluateSubjectPassabilityAsync(int subjectResultId, CancellationToken ct)
+    public async Task EvaluateSubjectPassabilityAsync(int subjectResultId, CancellationToken ct = default)
     {
         var subjectResult = await _unitOfWork.SubjectResultRepository.GetByIdAsync(subjectResultId, ct);
         if (subjectResult == null) return;
@@ -465,42 +465,42 @@ public class AssessmentResultService : IAssessmentResultService
         var passingScore = subjectResult.PassingScoreSnapshot ?? courseSubject?.PassingScore ?? 50m;
         subjectResult.PassingScoreSnapshot ??= passingScore;
 
-        var isPassable = true;
+        // 1. Academic & Attendance Thresholds
+        var attendanceFailed = (subjectResult.AttendanceRate ?? 0) < BusinessRuleEngine.MinimumAttendanceThreshold;
+        var scoreFailed = (subjectResult.Score ?? 0) < passingScore;
 
-        // 1. Attendance Threshold
-        if ((subjectResult.AttendanceRate ?? 0) < BusinessRuleEngine.MinimumAttendanceThreshold)
-        {
-            isPassable = false;
-        }
-
-        // 2. Practical Checklist — ngưỡng đọc từ CourseSubject.PassingScore, không hard-code
+        // 2. Practical Checklist
         var checklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(ct))
             .Where(p => p.CourseId == subjectResult.CourseId && p.SubjectId == subjectResult.SubjectId && p.IsRequired).ToList();
 
         var checklistResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(ct))
             .Where(r => r.SubjectResultId == subjectResultId).ToList();
 
-        if (checklists.Any(c => !checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.Score >= passingScore)))
-        {
-            isPassable = false; // Mandatory checklist not completed
-        }
+        var checklistFailed = checklists.Any(c => checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.Score < passingScore));
+        var checklistsAllPassed = checklists.All(c => checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.Score >= passingScore));
 
         // 3. Mandatory Evidence Files (At least ONE EvidenceFile must be linked, and all must be Verified)
         var evidenceFiles = (await _unitOfWork.EvidenceFileRepository.GetAllAsync(ct))
-            .Where(e => e.SubjectResultId == subjectResultId).ToList();
+            .Where(e => e.SubjectResultId == subjectResultId && !e.IsDeleted).ToList();
 
-        if (evidenceFiles.Count == 0 || evidenceFiles.Any(e => e.VerificationStatus != "Verified"))
+        var evidenceRejected = evidenceFiles.Any(e => e.VerificationStatus == "Rejected");
+        var evidenceAllVerified = evidenceFiles.Count > 0 && evidenceFiles.All(e => e.VerificationStatus == "Verified");
+
+        // Determine Status
+        if (scoreFailed || attendanceFailed || checklistFailed || evidenceRejected)
         {
-            isPassable = false; // No evidence file uploaded, or not all evidence has been Verified yet
+            subjectResult.Status = SubjectResultStatus.Failed;
+        }
+        else if (checklistsAllPassed && evidenceAllVerified)
+        {
+            subjectResult.Status = SubjectResultStatus.Passed;
+        }
+        else
+        {
+            // Academic and attendance requirements pass, but waiting for evidence upload / QA verification or checklist completion
+            subjectResult.Status = SubjectResultStatus.Pending;
         }
 
-        // 4. Score check (using CourseSubject.PassingScore)
-        if ((subjectResult.Score ?? 0) < passingScore)
-        {
-            isPassable = false; // Score too low
-        }
-
-        subjectResult.Status = isPassable ? SubjectResultStatus.Passed : SubjectResultStatus.Failed;
         subjectResult.EvaluatedAt = DateTime.UtcNow;
         _unitOfWork.SubjectResultRepository.Update(subjectResult);
     }

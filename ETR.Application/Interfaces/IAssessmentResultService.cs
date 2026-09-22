@@ -12,4 +12,5 @@ public interface IAssessmentResultService
     Task<AssessmentResultResponse> PublishAssessmentResultAsync(int id, int publishedByAccountId, CancellationToken cancellationToken = default);
     Task DeleteAssessmentResultAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default);
     Task<SubjectSignoffResponse> SignoffSubjectResultAsync(CreateSubjectSignoffRequest request, int signoffByAccountId, string signoffByRoleName, CancellationToken cancellationToken = default);
+    Task EvaluateSubjectPassabilityAsync(int subjectResultId, CancellationToken cancellationToken = default);
 }

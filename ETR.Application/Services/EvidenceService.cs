@@ -41,10 +41,12 @@ public class EvidenceService : IEvidenceService
     private const string OwnerType = nameof(EvidenceFile);
 
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IAssessmentResultService _assessmentResultService;
 
-    public EvidenceService(IUnitOfWork unitOfWork)
+    public EvidenceService(IUnitOfWork unitOfWork, IAssessmentResultService assessmentResultService)
     {
         _unitOfWork = unitOfWork;
+        _assessmentResultService = assessmentResultService;
     }
 
     public async Task<IEnumerable<EvidenceResponse>> GetAllEvidencesAsync(CancellationToken cancellationToken = default)
@@ -158,6 +160,12 @@ public class EvidenceService : IEvidenceService
         var response = await ApplyVerificationAsync(evidence, request.VerificationStatus, request.VerificationComment, verifiedByAccountId, cancellationToken);
         await _unitOfWork.SaveAsync(cancellationToken);
 
+        if (evidence.SubjectResultId > 0)
+        {
+            await _assessmentResultService.EvaluateSubjectPassabilityAsync(evidence.SubjectResultId, cancellationToken);
+            await _unitOfWork.SaveAsync(cancellationToken);
+        }
+
         return response;
     }
 
@@ -195,6 +203,17 @@ public class EvidenceService : IEvidenceService
 
         if (verified.Count > 0)
         {
+            await _unitOfWork.SaveAsync(cancellationToken);
+
+            var subjectResultIds = verified
+                .Select(v => v.SubjectResultId)
+                .Where(sId => sId > 0)
+                .Distinct();
+
+            foreach (var sId in subjectResultIds)
+            {
+                await _assessmentResultService.EvaluateSubjectPassabilityAsync(sId, cancellationToken);
+            }
             await _unitOfWork.SaveAsync(cancellationToken);
         }
 
