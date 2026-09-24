@@ -26,12 +26,18 @@ public class AuthController : ControllerBase
     private readonly IUnitOfWork _unitOfWork;
     private readonly ITokenService _tokenService;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IAuthSecurityService _authSecurityService;
 
-    public AuthController(IUnitOfWork unitOfWork, ITokenService tokenService, ICurrentUserService currentUserService)
+    public AuthController(
+        IUnitOfWork unitOfWork,
+        ITokenService tokenService,
+        ICurrentUserService currentUserService,
+        IAuthSecurityService authSecurityService)
     {
         _unitOfWork = unitOfWork;
         _tokenService = tokenService;
         _currentUserService = currentUserService;
+        _authSecurityService = authSecurityService;
     }
 
     /// <summary>
@@ -117,31 +123,94 @@ public class AuthController : ControllerBase
     [Authorize]
     public async Task<ActionResult> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken cancellationToken)
     {
-        return Ok("Đổi mật khẩu thành công (mock).");
+        var accountId = _currentUserService.AccountId
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
+        await _authSecurityService.ChangePasswordAsync(accountId, request.OldPassword, request.NewPassword, cancellationToken);
+        return Ok(new { message = "Đổi mật khẩu thành công." });
     }
 
     /// <summary>
     /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
-    /// [Core Responsibility]: Khởi tạo luồng quên mật khẩu.
+    /// [Core Responsibility]: Khởi tạo luồng quên mật khẩu, gửi mã OTP và liên kết đặt lại mật khẩu qua email.
     /// [Target Audience]: Public (Unauthenticated)
     /// </summary>
     [HttpPost("forgot-password")]
     [EnableRateLimiting("AuthPolicy")]
-    public ActionResult ForgotPassword([FromBody] ForgotPasswordRequest request)
+    public async Task<ActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request, CancellationToken cancellationToken)
     {
-        return Ok(new { message = "Yêu cầu đặt lại mật khẩu đã được gửi đến email: " + request.Email });
+        var clientBaseUrl = request.ClientBaseUrl;
+        if (string.IsNullOrWhiteSpace(clientBaseUrl))
+        {
+            clientBaseUrl = Request.Headers["Origin"].ToString();
+            if (string.IsNullOrWhiteSpace(clientBaseUrl))
+            {
+                clientBaseUrl = Request.Headers["Referer"].ToString();
+            }
+        }
+
+        await _authSecurityService.ForgotPasswordAsync(request.Email, clientBaseUrl, cancellationToken);
+        return Ok(new { message = "Nếu địa chỉ email tồn tại trong hệ thống, hướng dẫn đặt lại mật khẩu và mã xác thực đã được gửi đến email của bạn." });
     }
 
     /// <summary>
     /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
-    /// [Core Responsibility]: Đặt lại mật khẩu của người dùng bằng cách sử dụng reset token.
+    /// [Core Responsibility]: Đặt lại mật khẩu của người dùng bằng mã OTP hoặc reset token.
     /// [Target Audience]: Public (Unauthenticated)
     /// </summary>
     [HttpPost("reset-password")]
     [EnableRateLimiting("AuthPolicy")]
-    public ActionResult ResetPassword([FromBody] ResetPasswordRequest request)
+    public async Task<ActionResult> ResetPassword([FromBody] ResetPasswordRequest request, CancellationToken cancellationToken)
     {
-        return Ok(new { message = "Mật khẩu đã được đặt lại thành công." });
+        await _authSecurityService.ResetPasswordAsync(request.Token, request.NewPassword, request.Email, cancellationToken);
+        return Ok(new { message = "Mật khẩu đã được đặt lại thành công. Bạn có thể đăng nhập bằng mật khẩu mới." });
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Gửi mã xác thực email (OTP) và liên kết kích hoạt đến email người dùng.
+    /// [Target Audience]: Public / Authenticated
+    /// </summary>
+    [HttpPost("send-verification-email")]
+    [EnableRateLimiting("AuthPolicy")]
+    public async Task<ActionResult> SendVerificationEmail([FromBody] SendEmailVerificationRequest request, CancellationToken cancellationToken)
+    {
+        var clientBaseUrl = request.ClientBaseUrl;
+        if (string.IsNullOrWhiteSpace(clientBaseUrl))
+        {
+            clientBaseUrl = Request.Headers["Origin"].ToString();
+            if (string.IsNullOrWhiteSpace(clientBaseUrl))
+            {
+                clientBaseUrl = Request.Headers["Referer"].ToString();
+            }
+        }
+
+        await _authSecurityService.SendEmailVerificationAsync(request.Email, clientBaseUrl, cancellationToken);
+        return Ok(new { message = "Mã xác thực email đã được gửi đến hộp thư của bạn." });
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Xác thực email người dùng thông qua mã OTP hoặc token.
+    /// [Target Audience]: Public / Authenticated
+    /// </summary>
+    [HttpPost("verify-email")]
+    public async Task<ActionResult> VerifyEmail([FromBody] VerifyEmailRequest request, CancellationToken cancellationToken)
+    {
+        await _authSecurityService.VerifyEmailAsync(request.Token, request.Email, cancellationToken);
+        return Ok(new { message = "Xác thực email thành công." });
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Quản lý Định danh &amp; Truy cập
+    /// [Core Responsibility]: Kiểm tra trạng thái đã xác thực email của một tài khoản.
+    /// [Target Audience]: All Roles
+    /// </summary>
+    [HttpGet("verification-status")]
+    public ActionResult GetVerificationStatus([FromQuery] string email)
+    {
+        var isVerified = _authSecurityService.IsEmailVerified(email);
+        return Ok(new { email, isVerified });
     }
 
     /// <summary>

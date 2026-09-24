@@ -27,6 +27,7 @@ try
             options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
         });
     builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddMemoryCache();
 
     // Model-binding/DataAnnotations validation errors (auto-triggered by [ApiController] before an action
     // even runs) go through the same 422 "validation" contract as GlobalExceptionHandler's ValidationException

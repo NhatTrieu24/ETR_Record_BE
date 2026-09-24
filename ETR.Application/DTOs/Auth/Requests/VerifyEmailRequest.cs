@@ -2,7 +2,6 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ETR.Application.DTOs;
 
-public record ResetPasswordRequest(
+public record VerifyEmailRequest(
     [Required] string Token,
-    [Required, MinLength(6)] string NewPassword,
     string? Email = null);
