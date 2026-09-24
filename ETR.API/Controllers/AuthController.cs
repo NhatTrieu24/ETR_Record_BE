@@ -54,7 +54,7 @@ public class AuthController : ControllerBase
 
         var passwordIsValid = BCrypt.Net.BCrypt.Verify(request.Password, account?.PasswordHash ?? DummyPasswordHash);
 
-        if (account == null || account.Status != AccountStatus.Active || !passwordIsValid)
+        if (account == null || !account.IsActive || account.Status != AccountStatus.Active || !passwordIsValid)
         {
             return Unauthorized("Invalid credentials or account is inactive.");
         }
