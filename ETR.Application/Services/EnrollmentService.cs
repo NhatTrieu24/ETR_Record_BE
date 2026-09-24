@@ -125,6 +125,11 @@ public class EnrollmentService : IEnrollmentService
                 var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(classId, ct);
                 if (trainingClass == null) throw new BusinessRuleViolationException("Class not found.");
 
+                if (trainingClass.Status == ClassStatus.Completed || trainingClass.Status == ClassStatus.Cancelled)
+                {
+                    throw new BusinessRuleViolationException($"Không thể ghi danh vào lớp học đã kết thúc hoặc đã hủy (Trạng thái lớp: {trainingClass.Status}).");
+                }
+
                 var course = await _unitOfWork.CourseRepository.GetByIdAsync(trainingClass.CourseId, ct);
 
                 // === BUSINESS RULE 1: Course must have at least one Subject before enrollment ===
@@ -137,6 +142,15 @@ public class EnrollmentService : IEnrollmentService
                 var allEtrs = await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(ct);
                 var allEnrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct);
                 var allClasses = await _unitOfWork.ClassRepository.GetAllAsync(ct);
+
+                if (trainingClass.Capacity > 0)
+                {
+                    var currentEnrolledCount = allEnrollments.Count(e => e.ClassId == classId && e.Status != EnrollmentStatus.Deleted && e.Status != EnrollmentStatus.Withdrawn);
+                    if (currentEnrolledCount >= trainingClass.Capacity)
+                    {
+                        throw new BusinessRuleViolationException($"Lớp học '{trainingClass.ClassName}' đã đạt sĩ số tối đa ({trainingClass.Capacity} học viên). Không thể ghi danh thêm.");
+                    }
+                }
 
                 var studentEnrollments = allEnrollments.Where(e => e.AccountId == accountId).ToList();
                 

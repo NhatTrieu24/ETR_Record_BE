@@ -99,6 +99,24 @@ try
             ValidAudience = jwtSettings.GetValue<string>("Audience"),
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey))
         };
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var db = context.HttpContext.RequestServices.GetRequiredService<ETR.Infrastructure.Data.AppDbContext>();
+                var userIdClaim = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (int.TryParse(userIdClaim, out var accountId))
+                {
+                    var account = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(
+                        Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AsNoTracking(db.Accounts),
+                        a => a.AccountId == accountId);
+                    if (account == null || !account.IsActive || account.Status != ETR.Domain.Enums.AccountStatus.Active)
+                    {
+                        context.Fail("Your account has been deactivated or locked. Please contact your system administrator.");
+                    }
+                }
+            }
+        };
     });
 
     // 2. Đăng ký các dịch vụ thuộc Clean Architecture các tầng

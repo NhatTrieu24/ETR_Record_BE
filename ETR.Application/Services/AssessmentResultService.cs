@@ -61,6 +61,11 @@ public class AssessmentResultService : IAssessmentResultService
                 var assessment = await _unitOfWork.AssessmentRepository.GetByIdAsync(request.AssessmentId, ct);
                 if (assessment == null) throw new BusinessRuleViolationException("Assessment not found.");
 
+                if (request.Score < 0 || request.Score > 100)
+                {
+                    throw new BusinessRuleViolationException($"Điểm số ({request.Score}) không hợp lệ. Điểm phải nằm trong thang điểm từ 0 đến 100.");
+                }
+
                 var subjectResult = await _unitOfWork.SubjectResultRepository.GetByIdAsync(request.SubjectResultId, ct);
                 if (subjectResult == null) throw new BusinessRuleViolationException("SubjectResult not found.");
 
@@ -433,6 +438,11 @@ public class AssessmentResultService : IAssessmentResultService
                 if (!subjectResult.AttendanceRate.HasValue)
                 {
                     throw new BusinessRuleViolationException("Không thể ký chốt môn học. Chưa có dữ liệu điểm danh cho học viên trong môn học này.");
+                }
+
+                if (subjectResult.AttendanceRate.Value < BusinessRuleEngine.MinimumAttendanceThreshold)
+                {
+                    throw new BusinessRuleViolationException($"Không thể ký chốt môn học. Tỷ lệ điểm danh của học viên ({subjectResult.AttendanceRate.Value:F1}%) chưa đạt mức tối thiểu bắt buộc ({BusinessRuleEngine.MinimumAttendanceThreshold}%).");
                 }
 
                 // 2. Validation: Assessments - All assessments configured for this subject in the course must have scores

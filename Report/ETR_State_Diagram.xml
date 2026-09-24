@@ -1,0 +1,111 @@
+<mxfile host="app.diagrams.net" modified="2026-09-24T18:40:00.000Z" agent="Antigravity" version="21.0.0" type="device">
+  <diagram id="etr-state-machine" name="ETR Lifecycle State Diagram">
+    <mxGraphModel dx="1200" dy="1600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1400" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- 1. INITIAL STATE -->
+        <mxCell id="node_start" value="" style="ellipse;html=1;shape=startState;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="340" y="40" width="30" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- Edge Start -> DRAFT -->
+        <mxCell id="edge_start_draft" value="Student Enrolled" style="edgeStyle=orthogonalEdgeStyle;html=1;verticalAlign=bottom;endArrow=open;endSize=8;strokeColor=#000000;strokeWidth=2;fontSize=11;fontFamily=Arial;" edge="1" parent="1" source="node_start" target="node_draft">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 2. STATE: DRAFT -->
+        <mxCell id="node_draft" value="&lt;b&gt;DRAFT&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=24;strokeColor=#000000;strokeWidth=2;fillColor=#ffffff;fontSize=14;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="270" y="140" width="170" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Edge DRAFT -> SUBMITTED -->
+        <mxCell id="edge_draft_submitted" value="Submit ETR&#xa;(All criteria met)" style="edgeStyle=orthogonalEdgeStyle;html=1;verticalAlign=bottom;endArrow=open;endSize=8;strokeColor=#000000;strokeWidth=2;fontSize=11;fontFamily=Arial;" edge="1" parent="1" source="node_draft" target="node_submitted">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 3. STATE: SUBMITTED -->
+        <mxCell id="node_submitted" value="&lt;b&gt;SUBMITTED&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=24;strokeColor=#000000;strokeWidth=2;fillColor=#ffffff;fontSize=14;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="270" y="270" width="170" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Edge SUBMITTED -> VERIFIED -->
+        <mxCell id="edge_submitted_verified" value="QA Verify" style="edgeStyle=orthogonalEdgeStyle;html=1;verticalAlign=bottom;endArrow=open;endSize=8;strokeColor=#000000;strokeWidth=2;fontSize=11;fontFamily=Arial;" edge="1" parent="1" source="node_submitted" target="node_verified">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Edge SUBMITTED -> RETURNED FOR CORRECTION -->
+        <mxCell id="edge_submitted_returned" value="QA Return&#xa;(With comment)" style="edgeStyle=orthogonalEdgeStyle;html=1;verticalAlign=bottom;endArrow=open;endSize=8;strokeColor=#000000;strokeWidth=2;fontSize=11;fontFamily=Arial;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="node_submitted" target="node_returned">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="615" y="300" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 4. STATE: RETURNED FOR CORRECTION -->
+        <mxCell id="node_returned" value="&lt;b&gt;RETURNED FOR&#xa;CORRECTION&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=24;strokeColor=#000000;strokeWidth=2;fillColor=#ffffff;fontSize=13;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="525" y="380" width="180" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- Edge RETURNED FOR CORRECTION -> SUBMITTED (Dashed) -->
+        <mxCell id="edge_returned_submitted" value="Re-submit ETR&#xa;(After correction)" style="edgeStyle=orthogonalEdgeStyle;html=1;verticalAlign=bottom;endArrow=open;endSize=8;dashed=1;strokeColor=#000000;strokeWidth=2;fontSize=11;fontFamily=Arial;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.75;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="node_returned" target="node_submitted">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="480" y="415" />
+              <mxPoint x="480" y="360" />
+              <mxPoint x="398" y="360" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 5. STATE: VERIFIED -->
+        <mxCell id="node_verified" value="&lt;b&gt;VERIFIED&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=24;strokeColor=#000000;strokeWidth=2;fillColor=#ffffff;fontSize=14;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="270" y="490" width="170" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Edge VERIFIED -> RETURNED FOR CORRECTION -->
+        <mxCell id="edge_verified_returned" value="Manager Return&#xa;(With comment)" style="edgeStyle=orthogonalEdgeStyle;html=1;verticalAlign=bottom;endArrow=open;endSize=8;strokeColor=#000000;strokeWidth=2;fontSize=11;fontFamily=Arial;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="node_verified" target="node_returned">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="615" y="520" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Edge VERIFIED -> COMPLETED -->
+        <mxCell id="edge_verified_completed" value="Training Manager Approve" style="edgeStyle=orthogonalEdgeStyle;html=1;verticalAlign=bottom;endArrow=open;endSize=8;strokeColor=#000000;strokeWidth=2;fontSize=11;fontFamily=Arial;" edge="1" parent="1" source="node_verified" target="node_completed">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 6. STATE: COMPLETED / LOCKED -->
+        <mxCell id="node_completed" value="&lt;b&gt;COMPLETED&lt;br&gt;(LOCKED)&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=24;strokeColor=#000000;strokeWidth=2;fillColor=#ffffff;fontSize=14;fontFamily=Arial;" vertex="1" parent="1">
+          <mxGeometry x="270" y="660" width="170" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- 7. CRITICAL ADMIN REOPEN TRANSITION (LOOP FROM COMPLETED TO VERIFIED) -->
+        <mxCell id="edge_reopen" value="&lt;b&gt;Admin Reopen&lt;/b&gt;&lt;br&gt;&lt;i&gt;(Mandatory Audit Reason)&lt;br&gt;[BR-048: Reverts to Verified]&lt;/i&gt;" style="edgeStyle=orthogonalEdgeStyle;html=1;verticalAlign=middle;endArrow=open;endSize=8;strokeColor=#b45309;strokeWidth=2.5;fontColor=#b45309;fontSize=11;fontFamily=Arial;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="node_completed" target="node_verified">
+          <mxGeometry x="-0.1" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="120" y="695" />
+              <mxPoint x="120" y="520" />
+            </Array>
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Edge COMPLETED -> FINAL -->
+        <mxCell id="edge_completed_final" value="Locked &amp; Archived&#xa;(Retention complete)" style="edgeStyle=orthogonalEdgeStyle;html=1;verticalAlign=bottom;endArrow=open;endSize=8;strokeColor=#000000;strokeWidth=2;fontSize=11;fontFamily=Arial;" edge="1" parent="1" source="node_completed" target="node_final">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 8. FINAL STATE (BULLSEYE) -->
+        <mxCell id="node_final" value="" style="ellipse;html=1;shape=endState;fillColor=#000000;strokeColor=#b85450;strokeWidth=2.5;" vertex="1" parent="1">
+          <mxGeometry x="340" y="830" width="30" height="30" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

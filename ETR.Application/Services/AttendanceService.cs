@@ -55,6 +55,11 @@ public class AttendanceService : IAttendanceService
                 // trừ khi có quyền quản trị (Admin/Academic) can thiệp hỗ trợ.
                 if (session.SessionDate.HasValue)
                 {
+                    if (session.SessionDate.Value.Date > DateTime.UtcNow.Date)
+                    {
+                        throw new BusinessRuleViolationException("Không thể điểm danh trước cho buổi học trong tương lai.");
+                    }
+
                     var sessionExpiryTime = session.SessionDate.Value.Date.AddDays(1).AddHours(BusinessRuleEngine.AttendanceGracePeriodHours);
                     if (DateTime.UtcNow > sessionExpiryTime && string.Equals(recordedByRoleName, "Instructor", StringComparison.OrdinalIgnoreCase))
                     {

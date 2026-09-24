@@ -101,6 +101,9 @@ public class EvidenceService : IEvidenceService
         if (!Uri.TryCreate(request.FileUrl, UriKind.Absolute, out var parsedUrl) || parsedUrl.Scheme != Uri.UriSchemeHttps)
             throw new ValidationException("FileUrl must be an absolute https URL.");
 
+        if (request.FileSize.HasValue && request.FileSize.Value > 10 * 1024 * 1024)
+            throw new ValidationException("Dung lượng tệp vượt quá giới hạn tối đa cho phép là 10 MB.");
+
         // Treat 0 or negative as null for nullable FK fields to avoid FK violations
         var attendanceRecordId = request.AttendanceRecordId.HasValue && request.AttendanceRecordId.Value > 0
             ? request.AttendanceRecordId
