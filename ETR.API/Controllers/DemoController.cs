@@ -113,17 +113,17 @@ public class DemoController : ControllerBase
     {
         var etr = await _context.ETRCourseRecords.FirstOrDefaultAsync(e => e.ETRCourseRecordId == id, ct);
         if (etr == null)
-            return NotFound(new { message = $"Không tìm thấy hồ sơ ETR #{id}" });
+            return NotFound(new { message = $"ETR Course Record #{id} not found." });
 
         var enrollment = await _context.CourseEnrollments.FirstOrDefaultAsync(en => en.EnrollmentId == etr.EnrollmentId, ct);
         if (enrollment == null)
-            return BadRequest(new { message = "Không tìm thấy thông tin ghi danh của hồ sơ này." });
+            return BadRequest(new { message = "Enrollment record not found for this ETR." });
 
         var classId = enrollment.ClassId;
         var accountId = enrollment.AccountId;
         var enrollmentId = enrollment.EnrollmentId;
 
-        // 1. Điểm danh: Đánh dấu Present toàn bộ buổi học của lớp cho học viên này
+        // 1. Attendance: Mark Present for all class sessions for this learner
         var sessions = await _context.Sessions.Where(s => s.ClassId == classId).ToListAsync(ct);
         foreach (var sess in sessions)
         {
@@ -138,14 +138,14 @@ public class DemoController : ControllerBase
                     Status = AttendanceStatus.Present,
                     RecordedByAccountId = 2,
                     RecordedAt = DateTime.UtcNow,
-                    Remarks = "Điểm danh đầy đủ (Fast-forward)",
+                    Remarks = "Full Attendance (Fast-forward)",
                     IsDeleted = false
                 });
             }
             else
             {
                 att.Status = AttendanceStatus.Present;
-                att.Remarks = "Điểm danh đầy đủ (Fast-forward)";
+                att.Remarks = "Full Attendance (Fast-forward)";
             }
         }
 
@@ -181,7 +181,7 @@ public class DemoController : ControllerBase
                         PassingScoreSnapshot = asm.PassingScore,
                         WeightSnapshot = asm.Weight,
                         AttemptNo = 1,
-                        Remark = "Đạt điểm xuất sắc (Fast-forward)",
+                        Remark = "Excellent Grade (Fast-forward)",
                         IsDeleted = false
                     });
                 }
@@ -194,34 +194,74 @@ public class DemoController : ControllerBase
                 }
             }
 
-            // Đính kèm Minh chứng (Evidence) cho môn học
+            // Attach training evidence for subject and QA verify
             var evidence = await _context.EvidenceFiles
                 .FirstOrDefaultAsync(ev => ev.SubjectResultId == sr.SubjectResultId && !ev.IsDeleted, ct);
             if (evidence == null)
             {
-                _context.EvidenceFiles.Add(new EvidenceFile
+                evidence = new EvidenceFile
                 {
                     SubjectResultId = sr.SubjectResultId,
                     AccountId = accountId,
                     EvidenceTypeId = 1,
                     UploadedByAccountId = 2,
                     UploadedAt = DateTime.UtcNow,
-                    VerificationStatus = (targetStatus == "Verified" || targetStatus == "Completed") ? "Verified" : "Pending",
-                    VerifiedByAccountId = (targetStatus == "Verified" || targetStatus == "Completed") ? 3 : null,
-                    VerifiedAt = (targetStatus == "Verified" || targetStatus == "Completed") ? DateTime.UtcNow : null,
-                    VerificationComment = "Minh chứng hợp lệ đã qua kiểm định QA (Fast-forward)",
+                    VerificationStatus = "Verified",
+                    VerifiedByAccountId = 3, // QA Staff
+                    VerifiedAt = DateTime.UtcNow,
+                    VerificationComment = "Valid training evidence verified and approved by QA (Fast-forward)",
+                    IsDeleted = false
+                };
+                _context.EvidenceFiles.Add(evidence);
+                await _context.SaveChangesAsync(ct);
+
+                // Attach Attachment record for UI preview
+                _context.Attachments.Add(new Attachment
+                {
+                    OwnerType = nameof(EvidenceFile),
+                    OwnerId = evidence.EvidenceFileId,
+                    Url = "https://res.cloudinary.com/demo/image/upload/sample_practical_checklist.pdf",
+                    PublicId = "sample_practical_checklist",
+                    FileName = $"Evidence_SR_{sr.SubjectResultId}_Approved.pdf",
+                    MimeType = "application/pdf",
+                    FileSize = 1048576,
+                    UploadedByAccountId = 2,
+                    UploadedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedByAccountId = 2,
                     IsDeleted = false
                 });
             }
-            else if (targetStatus == "Verified" || targetStatus == "Completed")
+            else
             {
                 evidence.VerificationStatus = "Verified";
                 evidence.VerifiedByAccountId = 3;
                 evidence.VerifiedAt = DateTime.UtcNow;
-                evidence.VerificationComment = "Minh chứng hợp lệ đã qua kiểm định QA (Fast-forward)";
+                evidence.VerificationComment = "Valid training evidence verified and approved by QA (Fast-forward)";
+
+                var hasAttachment = await _context.Attachments
+                    .AnyAsync(a => a.OwnerType == nameof(EvidenceFile) && a.OwnerId == evidence.EvidenceFileId && !a.IsDeleted, ct);
+                if (!hasAttachment)
+                {
+                    _context.Attachments.Add(new Attachment
+                    {
+                        OwnerType = nameof(EvidenceFile),
+                        OwnerId = evidence.EvidenceFileId,
+                        Url = "https://res.cloudinary.com/demo/image/upload/sample_practical_checklist.pdf",
+                        PublicId = "sample_practical_checklist",
+                        FileName = $"Evidence_SR_{sr.SubjectResultId}_Approved.pdf",
+                        MimeType = "application/pdf",
+                        FileSize = 1048576,
+                        UploadedByAccountId = 2,
+                        UploadedAt = DateTime.UtcNow,
+                        CreatedAt = DateTime.UtcNow,
+                        CreatedByAccountId = 2,
+                        IsDeleted = false
+                    });
+                }
             }
 
-            // Ký xác nhận môn (Sign-off)
+            // Instructor Sign-off
             var signoff = await _context.SubjectSignoffs
                 .FirstOrDefaultAsync(so => so.SubjectResultId == sr.SubjectResultId && !so.IsDeleted, ct);
             if (signoff == null)
@@ -232,13 +272,13 @@ public class DemoController : ControllerBase
                     SignoffByAccountId = 2,
                     Role = "Instructor",
                     SignoffAt = DateTime.UtcNow,
-                    Comment = "Giảng viên xác nhận hoàn tất môn học",
+                    Comment = "Instructor confirmed subject completion and sign-off",
                     IsDeleted = false
                 });
             }
         }
 
-        // 3. Cập nhật trạng thái ETR
+        // 3. Update ETR status
         if (string.Equals(targetStatus, "Submitted", StringComparison.OrdinalIgnoreCase))
         {
             etr.Status = EtrStatus.Submitted;
@@ -267,7 +307,7 @@ public class DemoController : ControllerBase
 
         return Ok(new
         {
-            message = $"Hồ sơ ETR #{id} đã được tua nhanh thành công sang trạng thái [{targetStatus}]!",
+            message = $"ETR Course Record #{id} has been fast-forwarded to status [{targetStatus}] successfully!",
             etrId = id,
             status = etr.Status.ToString(),
             isLocked = etr.IsLocked
@@ -275,14 +315,14 @@ public class DemoController : ControllerBase
     }
 
     /// <summary>
-    /// Gỡ khóa Deep Freeze và khôi phục hồ sơ ETR về Draft hoặc Verified để demo lại nhiều lần.
+    /// Unlock Deep Freeze and reset ETR record back to Draft or Verified for repeat demonstrations.
     /// </summary>
     [HttpPost("etr/{id}/reset")]
     public async Task<IActionResult> ResetETR(int id, [FromQuery] string toStatus = "Draft", CancellationToken ct = default)
     {
         var etr = await _context.ETRCourseRecords.FirstOrDefaultAsync(e => e.ETRCourseRecordId == id, ct);
         if (etr == null)
-            return NotFound(new { message = $"Không tìm thấy hồ sơ ETR #{id}" });
+            return NotFound(new { message = $"ETR Course Record #{id} not found." });
 
         etr.IsLocked = false;
         if (string.Equals(toStatus, "Draft", StringComparison.OrdinalIgnoreCase))
@@ -308,7 +348,7 @@ public class DemoController : ControllerBase
 
         return Ok(new
         {
-            message = $"Hồ sơ ETR #{id} đã được mở khóa và khôi phục về trạng thái [{toStatus}] thành công!",
+            message = $"ETR Course Record #{id} has been unlocked and reset to status [{toStatus}] successfully!",
             etrId = id,
             status = etr.Status.ToString(),
             isLocked = etr.IsLocked
@@ -378,14 +418,14 @@ public class DemoController : ControllerBase
                 IsDeleted = false
             });
 
-            // Sinh 2 buổi học mẫu cho môn này
+            // Generate 2 sample sessions for this subject
             for (int s = 1; s <= 2; s++)
             {
                 _context.Sessions.Add(new Session
                 {
                     ClassId = newClass.ClassId,
                     SubjectId = cs.SubjectId,
-                    SessionTitle = $"Buổi {s}: Giảng huấn chuyên môn - Lớp {classCode}",
+                    SessionTitle = $"Session {s}: Specialized Ground Instruction - Class {classCode}",
                     SessionDate = DateTime.UtcNow.Date.AddDays(s * 2),
                     IsConfirmed = false,
                     IsDeleted = false
@@ -394,7 +434,7 @@ public class DemoController : ControllerBase
         }
         await _context.SaveChangesAsync(ct);
 
-        // 4. Lấy ngẫu nhiên học viên để ghi danh
+        // 4. Randomly pick learners to enroll
         var count = request?.StudentCount ?? 3;
         var existingStudentAccounts = await (from a in _context.Accounts.AsNoTracking()
                                             join p in _context.UserProfiles.AsNoTracking() on a.AccountId equals p.AccountId into profs
@@ -411,7 +451,7 @@ public class DemoController : ControllerBase
 
         var createdEtrList = new List<object>();
 
-        // 5. Ghi danh & Tự động sinh hồ sơ ETR ở trạng thái Draft
+        // 5. Enroll & automatically generate initial ETR in Draft status
         foreach (var stu in selectedStudents)
         {
             var enrollment = new CourseEnrollment
@@ -426,7 +466,7 @@ public class DemoController : ControllerBase
             _context.CourseEnrollments.Add(enrollment);
             await _context.SaveChangesAsync(ct);
 
-            // Tự động sinh ETR Course Record
+            // Auto generate ETR Course Record
             var etr = new ETRCourseRecord
             {
                 EnrollmentId = enrollment.EnrollmentId,
@@ -440,7 +480,7 @@ public class DemoController : ControllerBase
             _context.ETRCourseRecords.Add(etr);
             await _context.SaveChangesAsync(ct);
 
-            // Sinh SubjectResults gắn kèm các môn tương ứng
+            // Generate associated SubjectResults
             foreach (var cs in courseSubjects)
             {
                 var sr = new SubjectResult
@@ -467,7 +507,7 @@ public class DemoController : ControllerBase
 
         return Ok(new
         {
-            message = $"Đã tạo thành công Lớp học mới [{classCode}] kèm {selectedStudents.Count} hồ sơ ETR tự động ở trạng thái 'Draft'!",
+            message = $"Successfully created new Class [{classCode}] with {selectedStudents.Count} automated ETR Draft records!",
             classId = newClass.ClassId,
             classCode = newClass.ClassCode,
             className = newClass.ClassName,
@@ -478,14 +518,14 @@ public class DemoController : ControllerBase
     }
 
     /// <summary>
-    /// Điểm danh nhanh 100% Present cho một buổi học.
+    /// Fast attendance: Mark 100% Present for a session.
     /// </summary>
     [HttpPost("session/{id}/quick-attendance")]
     public async Task<IActionResult> QuickAttendance(int id, CancellationToken ct = default)
     {
         var session = await _context.Sessions.FirstOrDefaultAsync(s => s.SessionId == id, ct);
         if (session == null)
-            return NotFound(new { message = $"Không tìm thấy buổi học #{id}" });
+            return NotFound(new { message = $"Session #{id} not found." });
 
         var enrollments = await _context.CourseEnrollments
             .Where(e => e.ClassId == session.ClassId && !e.IsDeleted)
@@ -505,14 +545,14 @@ public class DemoController : ControllerBase
                     Status = AttendanceStatus.Present,
                     RecordedByAccountId = 2,
                     RecordedAt = DateTime.UtcNow,
-                    Remarks = "Điểm danh nhanh tự động (100% Present)",
+                    Remarks = "Quick Attendance (100% Present)",
                     IsDeleted = false
                 });
             }
             else
             {
                 att.Status = AttendanceStatus.Present;
-                att.Remarks = "Điểm danh nhanh tự động (100% Present)";
+                att.Remarks = "Quick Attendance (100% Present)";
             }
             updatedCount++;
         }
@@ -520,21 +560,21 @@ public class DemoController : ControllerBase
 
         return Ok(new
         {
-            message = $"Đã điểm danh Present 100% thành công cho {updatedCount} học viên trong buổi học #{id}!",
+            message = $"Marked 100% Present successfully for {updatedCount} students in session #{id}!",
             sessionId = id,
             updatedCount
         });
     }
 
     /// <summary>
-    /// Chấm điểm đạt chuẩn (88/100) cho toàn bộ học viên trong bài thi và chốt điểm (IsPublished = true).
+    /// Fast grading: Assign passing score (88/100) for all students in an assessment and publish results.
     /// </summary>
     [HttpPost("assessment/{id}/quick-grade")]
     public async Task<IActionResult> QuickGrade(int id, [FromQuery] decimal score = 88.0m, CancellationToken ct = default)
     {
         var asm = await _context.Assessments.FirstOrDefaultAsync(a => a.AssessmentId == id, ct);
         if (asm == null)
-            return NotFound(new { message = $"Không tìm thấy bài thi #{id}" });
+            return NotFound(new { message = $"Assessment #{id} not found." });
 
         var subjectResults = await (from sr in _context.SubjectResults
                                     join e in _context.ETRCourseRecords on sr.EtrId equals e.ETRCourseRecordId
@@ -565,7 +605,7 @@ public class DemoController : ControllerBase
                     PassingScoreSnapshot = asm.PassingScore,
                     WeightSnapshot = asm.Weight,
                     AttemptNo = 1,
-                    Remark = "Chấm điểm đạt chuẩn nhanh (Quick Grade)",
+                    Remark = "Standard Passing Score (Quick Grade)",
                     IsDeleted = false
                 });
             }
@@ -582,7 +622,7 @@ public class DemoController : ControllerBase
 
         return Ok(new
         {
-            message = $"Đã chấm điểm {score} (Đạt) và chốt điểm thành công cho {updatedCount} học viên trong bài thi #{id}!",
+            message = $"Assigned score {score} (Passed) and published successfully for {updatedCount} students in assessment #{id}!",
             assessmentId = id,
             updatedCount
         });

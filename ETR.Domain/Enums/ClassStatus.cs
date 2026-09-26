@@ -4,6 +4,7 @@ namespace ETR.Domain.Enums;
 /// (HasConversion&lt;string&gt; in AppDbContext).</summary>
 public enum ClassStatus
 {
+    Draft,
     Planned,
     Scheduled,
     InProgress,
