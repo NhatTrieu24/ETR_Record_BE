@@ -527,9 +527,12 @@ public class DemoController : ControllerBase
         if (session == null)
             return NotFound(new { message = $"Session #{id} not found." });
 
-        var enrollments = await _context.CourseEnrollments
-            .Where(e => e.ClassId == session.ClassId && !e.IsDeleted)
-            .ToListAsync(ct);
+        var enrollments = await (from en in _context.CourseEnrollments
+                                 join e in _context.ETRCourseRecords on en.EnrollmentId equals e.EnrollmentId into etrs
+                                 from e in etrs.DefaultIfEmpty()
+                                 where en.ClassId == session.ClassId && !en.IsDeleted && (e == null || (!e.IsLocked && e.Status != EtrStatus.Completed))
+                                 select en)
+                                 .ToListAsync(ct);
 
         int updatedCount = 0;
         foreach (var en in enrollments)
@@ -579,7 +582,7 @@ public class DemoController : ControllerBase
         var subjectResults = await (from sr in _context.SubjectResults
                                     join e in _context.ETRCourseRecords on sr.EtrId equals e.ETRCourseRecordId
                                     join en in _context.CourseEnrollments on e.EnrollmentId equals en.EnrollmentId
-                                    where sr.SubjectId == asm.SubjectId && !sr.IsDeleted
+                                    where sr.SubjectId == asm.SubjectId && !sr.IsDeleted && !e.IsLocked && e.Status != EtrStatus.Completed
                                     select new { sr, en.AccountId })
                                     .ToListAsync(ct);
 
