@@ -106,7 +106,7 @@ public class DepartmentService : IDepartmentService
         }
 
         var hasActiveAccounts = (await _unitOfWork.AccountRepository.GetAllAsync(cancellationToken))
-            .Any(a => a.DepartmentId == id && a.IsActive && !a.IsDeleted);
+            .Any(a => a.DepartmentId == id && a.Status == ETR.Domain.Enums.AccountStatus.Active && !a.IsDeleted);
         if (hasActiveAccounts)
         {
             throw new BusinessRuleViolationException($"Không thể xóa phòng ban '{department.DepartmentName}' vì vẫn còn tài khoản người dùng đang trực thuộc. Vui lòng chuyển phòng ban cho nhân sự trước khi xóa.");

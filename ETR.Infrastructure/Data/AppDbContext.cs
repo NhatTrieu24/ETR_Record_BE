@@ -85,6 +85,7 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<EvidenceType>().HasKey(e => e.EvidenceTypeId);
 
         modelBuilder.Entity<Account>().HasKey(e => e.AccountId);
+        modelBuilder.Entity<Account>().Ignore(a => a.IsActive);
         modelBuilder.Entity<UserProfile>().HasKey(e => e.AccountId);
 
         modelBuilder.Entity<Subject>().HasKey(e => e.SubjectId);

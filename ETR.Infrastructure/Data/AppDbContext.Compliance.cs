@@ -75,19 +75,12 @@ public partial class AppDbContext
                 throw new BusinessRuleViolationException("Không thể tự xóa mềm tài khoản của chính mình.");
             }
 
-            // Chặn tự vô hiệu hóa tài khoản (Status = Inactive/Disabled hoặc IsActive = false)
-            if (entry.State == EntityState.Modified)
+            // Chặn tự vô hiệu hóa tài khoản (Status = Inactive)
+            if (entry.State == EntityState.Modified
+                && entry.Property(nameof(Account.Status)).IsModified
+                && entry.Entity.Status == AccountStatus.Inactive)
             {
-                if (entry.Property(nameof(Account.Status)).IsModified
-                    && entry.Entity.Status == AccountStatus.Inactive)
-                {
-                    throw new BusinessRuleViolationException("Không thể tự vô hiệu hóa tài khoản của chính mình.");
-                }
-
-                if (entry.Property(nameof(Account.IsActive)).IsModified && !entry.Entity.IsActive)
-                {
-                    throw new BusinessRuleViolationException("Không thể tự vô hiệu hóa tài khoản của chính mình.");
-                }
+                throw new BusinessRuleViolationException("Không thể tự vô hiệu hóa tài khoản của chính mình.");
             }
         }
     }

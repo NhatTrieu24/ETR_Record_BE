@@ -160,7 +160,6 @@ public class AccountService : IAccountService
         }, cancellationToken);
 
         account.Status = status;
-        account.IsActive = status == AccountStatus.Active;
         account.UpdatedAt = DateTime.UtcNow;
         account.UpdatedByAccountId = updatedByAccountId;
 
@@ -247,12 +246,27 @@ public class AccountService : IAccountService
             Description = $"Account #{accountId} deactivated (soft delete)"
         }, cancellationToken);
 
-        account.IsActive = false;
+        var now = DateTime.UtcNow;
         account.Status = AccountStatus.Inactive;
-        account.UpdatedAt = DateTime.UtcNow;
+        account.IsDeleted = true;
+        account.DeletedAt = now;
+        account.UpdatedAt = now;
         account.UpdatedByAccountId = deletedByAccountId;
 
         _unitOfWork.AccountRepository.Update(account);
+
+        // Soft-delete linked UserProfile as well
+        var profiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
+        var profile = profiles.FirstOrDefault(p => p.AccountId == accountId);
+        if (profile != null)
+        {
+            profile.IsDeleted = true;
+            profile.DeletedAt = now;
+            profile.UpdatedAt = now;
+            profile.UpdatedByAccountId = deletedByAccountId;
+            _unitOfWork.UserProfileRepository.Update(profile);
+        }
+
         await _unitOfWork.SaveAsync(cancellationToken);
     }
 }

@@ -110,7 +110,7 @@ try
                     var account = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(
                         Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AsNoTracking(db.Accounts),
                         a => a.AccountId == accountId);
-                    if (account == null || !account.IsActive || account.Status != ETR.Domain.Enums.AccountStatus.Active)
+                    if (account == null || account.Status != ETR.Domain.Enums.AccountStatus.Active)
                     {
                         context.Fail("Your account has been deactivated or locked. Please contact your system administrator.");
                     }
