@@ -1,13 +1,13 @@
-BẢNG ĐIỂM DANH - Buổi 1 - CLS-2026-001,,,,
-SessionId: 1,ClassId: 1,SubjectId: 1,Ngày: 15/08/2026,Môn: Aviation Safety Fundamentals
-EnrollmentId,Họ và tên,Mã học viên,Trạng thái (Present/Absent)*,Ghi chú
-1,Nguyễn Văn An,STU001,Present,
-2,Trần Thị Bình,STU002,Present,
-3,Lê Văn Cường,STU003,Absent,Nghỉ bệnh có phép
-4,Phạm Thị Dung,STU004,Present,Đến muộn 15 phút do kẹt xe
-5,Hoàng Văn Em,STU005,Present,
-6,Đỗ Thị Fương,STU006,Present,
-7,Ngô Văn Giang,STU007,Absent,Không phép
-8,Vũ Thị Hoa,STU008,Present,
-9,Bùi Văn Inh,STU009,Present,
-10,Đinh Thị Kim,STU010,Absent,Lý do cá nhân
+ATTENDANCE SHEET - Session 1 - CLS-2026-001,,,,
+SessionId: 1,ClassId: 1,SubjectId: 1,Date: 15/08/2026,Subject: Aviation Safety Fundamentals
+EnrollmentId,FullName,UserCode,Status (Present/Absent)*,Remarks
+1,Nguyen Van An,STU001,Present,On time and attentive
+2,Tran Thi Binh,STU002,Present,On time and attentive
+3,Le Van Cuong,STU003,Absent,Excused sick leave
+4,Pham Thi Dung,STU004,Present,Arrived 15 minutes late due to traffic
+5,Hoang Van Em,STU005,Present,On time and attentive
+6,Do Thi Phuong,STU006,Present,On time and attentive
+7,Ngo Van Giang,STU007,Absent,Unexcused absence
+8,Vu Thi Hoa,STU008,Present,On time and attentive
+9,Bui Van Inh,STU009,Present,On time and attentive
+10,Dinh Thi Kim,STU010,Absent,Personal emergency

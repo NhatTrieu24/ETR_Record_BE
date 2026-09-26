@@ -1,13 +1,13 @@
-BẢNG NHẬP ĐIỂM - Kiểm tra lý thuyết giữa kỳ (Theory) - Môn: Aviation Safety Fundamentals,,,,
+ASSESSMENT SCORE ENTRY - Midterm Exam (Theory) - Subject: Aviation Safety Fundamentals,,,,
 AssessmentId: 1,CourseId: 1,PassingScore: 70,Weight: 0.4,Type: Theory
-AccountId,Họ và tên,Mã học viên,SubjectResultId,Điểm (0-100)* [Đạt: ≥70],Ghi chú
-101,Nguyễn Văn An,STU001,11,85,
-102,Trần Thị Bình,STU002,12,92,
-103,Lê Văn Cường,STU003,13,65,Cần ôn tập thêm
-104,Phạm Thị Dung,STU004,14,78,
-105,Hoàng Văn Em,STU005,15,88,
-106,Đỗ Thị Fương,STU006,16,55,Chưa đạt - cần retake
-107,Ngô Văn Giang,STU007,17,71,
-108,Vũ Thị Hoa,STU008,18,95,
-109,Bùi Văn Inh,STU009,19,80,
-110,Đinh Thị Kim,STU010,20,68,Sát ngưỡng - cần theo dõi 
+AccountId,FullName,UserCode,SubjectResultId,Score (0-100)* [Pass: >=70],Remarks
+101,Nguyen Van An,STU001,11,85,Pass - Good performance
+102,Tran Thi Binh,STU002,12,92,Distinction - Excellent
+103,Le Van Cuong,STU003,13,65,Review required - Below passing score
+104,Pham Thi Dung,STU004,14,78,Pass - Solid understanding
+105,Hoang Van Em,STU005,15,88,Pass - Good performance
+106,Do Thi Phuong,STU006,16,55,Failed - Retake needed
+107,Ngo Van Giang,STU007,17,71,Pass - Minimum requirement met
+108,Vu Thi Hoa,STU008,18,95,Distinction - Near perfect score
+109,Bui Van Inh,STU009,19,80,Pass - Good performance
+110,Dinh Thi Kim,STU010,20,68,Near threshold - Monitor performance

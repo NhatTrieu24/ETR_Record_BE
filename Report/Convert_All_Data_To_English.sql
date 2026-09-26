@@ -3,8 +3,6 @@
 -- Fixes all font corruption, mojibake (Ä/Ã/Æ), question marks (?), and test data.
 -- Run this script in Azure Portal Query Editor or SSMS connected to Azure SQL DB.
 -- =============================================================================
-IF DB_ID('ETRManagementDB') IS NOT NULL USE [ETRManagementDB];
-GO
 
 SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
