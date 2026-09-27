@@ -39,12 +39,13 @@ public class AccountService : IAccountService
 
     public async Task<IEnumerable<AccountResponse>> GetAllAccountsAsync(CancellationToken cancellationToken = default)
     {
-        var accounts = await _unitOfWork.AccountRepository.GetAllAsync(cancellationToken);
+        var allAccounts = await _unitOfWork.AccountRepository.GetAllIncludingDeletedAsync(cancellationToken);
+        var accounts = allAccounts.AsEnumerable();
 
         if (_currentUserService.RoleName == "Instructor" && _currentUserService.AccountId.HasValue)
         {
             var studentIds = await GetInstructorStudentIdsAsync(_currentUserService.AccountId.Value, cancellationToken);
-            accounts = accounts.Where(a => studentIds.Contains(a.AccountId)).ToList();
+            accounts = accounts.Where(a => studentIds.Contains(a.AccountId));
         }
 
         return accounts.Select(a => new AccountResponse(a.AccountId, a.Username, a.RoleId, a.DepartmentId, a.Status, a.IsActive));
@@ -52,7 +53,8 @@ public class AccountService : IAccountService
 
     public async Task<AccountResponse> GetAccountByIdAsync(int accountId, CancellationToken cancellationToken = default)
     {
-        var account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken)
+        var accounts = await _unitOfWork.AccountRepository.GetAllIncludingDeletedAsync(cancellationToken);
+        var account = accounts.FirstOrDefault(a => a.AccountId == accountId)
             ?? throw new KeyNotFoundException($"Account {accountId} not found.");
 
         if (_currentUserService.RoleName == "Instructor" && _currentUserService.AccountId.HasValue)
@@ -92,8 +94,9 @@ public class AccountService : IAccountService
             throw new BusinessRuleViolationException("Mật khẩu phải có ít nhất 6 ký tự để đảm bảo an toàn.");
         }
 
-        var existingAccounts = await _unitOfWork.AccountRepository.GetAllAsync(cancellationToken);
-        if (existingAccounts.Any(a => a.Username == request.Username))
+        var usernameExists = _unitOfWork.AccountRepository.GetQueryable()
+            .Any(a => a.Username == request.Username);
+        if (usernameExists)
         {
             throw new BusinessRuleViolationException($"An account with username '{request.Username}' already exists.");
         }
@@ -111,6 +114,17 @@ public class AccountService : IAccountService
         };
 
         await _unitOfWork.AccountRepository.AddAsync(account, cancellationToken);
+        await _unitOfWork.SaveAsync(cancellationToken);
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = createdByAccountId,
+            ActionType = AuditActionType.INSERT.ToString(),
+            EntityName = nameof(Account),
+            RecordId = account.AccountId,
+            NewValue = $"Username: {account.Username}, RoleId: {account.RoleId}",
+            Description = $"Created Account #{account.AccountId} ({account.Username}) with RoleId {account.RoleId}"
+        }, cancellationToken);
         await _unitOfWork.SaveAsync(cancellationToken);
 
         // Username doubles as the login email (validated [EmailAddress] on CreateAccountRequest) —
@@ -145,7 +159,8 @@ public class AccountService : IAccountService
             throw new BusinessRuleViolationException("Không thể tự vô hiệu hóa tài khoản của chính mình.");
         }
 
-        var account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken)
+        var accounts = await _unitOfWork.AccountRepository.GetAllIncludingDeletedAsync(cancellationToken);
+        var account = accounts.FirstOrDefault(a => a.AccountId == accountId)
             ?? throw new KeyNotFoundException($"Account {accountId} not found.");
 
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
@@ -160,10 +175,27 @@ public class AccountService : IAccountService
         }, cancellationToken);
 
         account.Status = status;
+        if (status == AccountStatus.Active)
+        {
+            account.IsDeleted = false;
+            account.DeletedAt = null;
+        }
         account.UpdatedAt = DateTime.UtcNow;
         account.UpdatedByAccountId = updatedByAccountId;
 
         _unitOfWork.AccountRepository.Update(account);
+
+        var profiles = await _unitOfWork.UserProfileRepository.GetAllIncludingDeletedAsync(cancellationToken);
+        var profile = profiles.FirstOrDefault(p => p.AccountId == accountId);
+        if (profile != null && status == AccountStatus.Active)
+        {
+            profile.IsDeleted = false;
+            profile.DeletedAt = null;
+            profile.UpdatedAt = DateTime.UtcNow;
+            profile.UpdatedByAccountId = updatedByAccountId;
+            _unitOfWork.UserProfileRepository.Update(profile);
+        }
+
         await _unitOfWork.SaveAsync(cancellationToken);
     }
 

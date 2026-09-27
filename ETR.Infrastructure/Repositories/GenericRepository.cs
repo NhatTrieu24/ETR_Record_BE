@@ -24,6 +24,11 @@ public class GenericRepository<T> : IGenericRepository<T> where T : BaseEntity
         return await _context.Set<T>().ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<T>> GetAllIncludingDeletedAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.Set<T>().IgnoreQueryFilters().ToListAsync(cancellationToken);
+    }
+
     public IQueryable<T> GetQueryable()
     {
         return _context.Set<T>().AsQueryable();

@@ -124,6 +124,17 @@ public class AssessmentResultService : IAssessmentResultService
 
                     _unitOfWork.AssessmentResultRepository.Update(pendingPlaceholder);
                     result = pendingPlaceholder;
+
+                    await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                    {
+                        AccountId = recordedByAccountId,
+                        ActionType = AuditActionType.INSERT.ToString(),
+                        EntityName = nameof(AssessmentResult),
+                        RecordId = result.AssessmentResultId,
+                        ETRRecordId = subjectResult.EtrId,
+                        NewValue = $"Score: {request.Score}, Status: {result.ResultStatus}",
+                        Description = $"Recorded initial score {request.Score} ({result.ResultStatus}) for Assessment #{request.AssessmentId} (SubjectResult #{request.SubjectResultId}, Account #{request.AccountId})"
+                    }, ct);
                 }
                 else
                 {
@@ -151,6 +162,7 @@ public class AssessmentResultService : IAssessmentResultService
                         // thay vì ném lỗi bắt buộc phải có giấy phép thi lại (Retake Authorization).
                         if (!latestResult.IsPublished)
                         {
+                            var oldScoreVal = latestResult.Score;
                             latestResult.Score = request.Score;
                             latestResult.ResultStatus = request.Score >= passingScore ? "Passed" : "Failed";
                             latestResult.PassingScoreSnapshot ??= passingScore;
@@ -160,6 +172,19 @@ public class AssessmentResultService : IAssessmentResultService
                             latestResult.UpdatedByAccountId = recordedByAccountId;
 
                             _unitOfWork.AssessmentResultRepository.Update(latestResult);
+
+                            await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                            {
+                                AccountId = recordedByAccountId,
+                                ActionType = AuditActionType.UPDATE.ToString(),
+                                EntityName = nameof(AssessmentResult),
+                                RecordId = latestResult.AssessmentResultId,
+                                ETRRecordId = subjectResult.EtrId,
+                                OldValue = $"Score: {oldScoreVal}",
+                                NewValue = $"Score: {request.Score}, Status: {latestResult.ResultStatus}",
+                                Description = $"Updated draft score from {oldScoreVal} to {request.Score} ({latestResult.ResultStatus}) for Assessment #{request.AssessmentId} (SubjectResult #{request.SubjectResultId}, Account #{request.AccountId})"
+                            }, ct);
+
                             await _unitOfWork.SaveAsync(ct);
 
                             await CalculateSubjectResultScoreAsync(request.SubjectResultId, ct);
@@ -217,6 +242,18 @@ public class AssessmentResultService : IAssessmentResultService
                         PublishedAt = null
                     };
                     await _unitOfWork.AssessmentResultRepository.AddAsync(result, ct);
+                    await _unitOfWork.SaveAsync(ct);
+
+                    await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                    {
+                        AccountId = recordedByAccountId,
+                        ActionType = AuditActionType.INSERT.ToString(),
+                        EntityName = nameof(AssessmentResult),
+                        RecordId = result.AssessmentResultId,
+                        ETRRecordId = subjectResult.EtrId,
+                        NewValue = $"Score: {request.Score}, Attempt: {attemptNo}, Status: {result.ResultStatus}",
+                        Description = $"Recorded attempt #{attemptNo} score {request.Score} ({result.ResultStatus}) for Assessment #{request.AssessmentId} (SubjectResult #{request.SubjectResultId}, Account #{request.AccountId})"
+                    }, ct);
                 }
 
                 await _unitOfWork.SaveAsync(ct);
@@ -355,6 +392,18 @@ public class AssessmentResultService : IAssessmentResultService
         result.UpdatedByAccountId = publishedByAccountId;
 
         _unitOfWork.AssessmentResultRepository.Update(result);
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = publishedByAccountId,
+            ActionType = AuditActionType.UPDATE.ToString(),
+            EntityName = nameof(AssessmentResult),
+            RecordId = id,
+            OldValue = "IsPublished: False",
+            NewValue = "IsPublished: True",
+            Description = $"Published AssessmentResult #{id} (Score: {result.Score}, Status: {result.ResultStatus})"
+        }, cancellationToken);
+
         await _unitOfWork.SaveAsync(cancellationToken);
 
         return new AssessmentResultResponse(
@@ -511,11 +560,55 @@ public class AssessmentResultService : IAssessmentResultService
                 };
 
                 await _unitOfWork.SubjectSignoffRepository.AddAsync(signoff, ct);
+
+                // Khi giảng viên ký xác nhận (Signoff) môn học, tất cả điểm số đánh giá và checklist thực hành
+                // thuộc môn học này chính thức được chốt và công bố (IsPublished = true).
+                var studentAssessmentResults = (await _unitOfWork.AssessmentResultRepository.GetAllAsync(ct))
+                    .Where(r => r.SubjectResultId == request.SubjectResultId && !r.IsDeleted)
+                    .ToList();
+                foreach (var ar in studentAssessmentResults)
+                {
+                    if (!ar.IsPublished)
+                    {
+                        ar.IsPublished = true;
+                        ar.PublishedAt ??= DateTime.UtcNow;
+                        ar.UpdatedAt = DateTime.UtcNow;
+                        ar.UpdatedByAccountId = signoffByAccountId;
+                        _unitOfWork.AssessmentResultRepository.Update(ar);
+                    }
+                }
+
+                var studentPracticalResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(ct))
+                    .Where(r => r.SubjectResultId == request.SubjectResultId && !r.IsDeleted)
+                    .ToList();
+                foreach (var pr in studentPracticalResults)
+                {
+                    if (!pr.IsPublished)
+                    {
+                        pr.IsPublished = true;
+                        pr.PublishedAt ??= DateTime.UtcNow;
+                        pr.UpdatedAt = DateTime.UtcNow;
+                        pr.UpdatedByAccountId = signoffByAccountId;
+                        _unitOfWork.PracticalChecklistResultRepository.Update(pr);
+                    }
+                }
+
                 await _unitOfWork.SaveAsync(ct);
 
                 // Evaluate Passing Conditions (Strict Gateway)
                 await EvaluateSubjectPassabilityAsync(subjectResult.SubjectResultId, ct);
                 
+                await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                {
+                    AccountId = signoffByAccountId,
+                    ActionType = AuditActionType.APPROVE.ToString(),
+                    EntityName = nameof(SubjectSignoff),
+                    RecordId = signoff.SubjectSignoffId,
+                    ETRRecordId = etrForSignoff?.ETRCourseRecordId,
+                    NewValue = $"SubjectResultId: {request.SubjectResultId}, Role: {signoffByRoleName}",
+                    Description = $"Instructor #{signoffByAccountId} ({signoffByRoleName}) signed off SubjectResult #{request.SubjectResultId} for ETR #{etrForSignoff?.ETRCourseRecordId}. Comment: {request.Comment ?? "N/A"}"
+                }, ct);
+
                 await _unitOfWork.SaveAsync(ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
 

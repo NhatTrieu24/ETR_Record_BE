@@ -187,6 +187,18 @@ public partial class ExportService : IExportService
         await _unitOfWork.ExportJobRepository.AddAsync(job, cancellationToken);
         await _unitOfWork.SaveAsync(cancellationToken);
 
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = requestedByAccountId,
+            ActionType = AuditActionType.EXPORT.ToString(),
+            EntityName = "TrainingPackage",
+            RecordId = job.ExportJobId,
+            ETRRecordId = etrCourseRecordId,
+            NewValue = zipFileName,
+            Description = $"Exported compliance Training Package for ETR #{etrCourseRecordId} ({zipFileName})"
+        }, cancellationToken);
+        await _unitOfWork.SaveAsync(cancellationToken);
+
         return new ExportJobResponse(
             job.ExportJobId, job.RequestedByAccountId, job.ExportType, job.FileName!, job.FilePath!,
             job.Status, job.RequestedAt, job.CompletedAt, job.DownloadExpiredAt, job.ETRCourseRecordId);
@@ -353,7 +365,7 @@ public partial class ExportService : IExportService
                             var subject = subjects.GetValueOrDefault(sr.SubjectId);
                             table.Cell().Padding(3).Text(subject?.SubjectCode ?? sr.SubjectId.ToString());
                             table.Cell().Padding(3).Text(subject?.SubjectName ?? "-");
-                            table.Cell().Padding(3).Text(sr.Status);
+                            table.Cell().Padding(3).Text(sr.Status.ToString());
                             table.Cell().Padding(3).Text(sr.Score?.ToString("0.##") ?? "-");
                             table.Cell().Padding(3).Text(sr.AttendanceRate?.ToString("0.##") ?? "-");
                         }

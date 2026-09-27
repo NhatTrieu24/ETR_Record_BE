@@ -16,6 +16,8 @@ public class AuthSecurityServiceTests
     private readonly Mock<IUnitOfWork> _unitOfWorkMock = new();
     private readonly Mock<IGenericRepository<Account>> _accountRepoMock = new();
     private readonly Mock<IGenericRepository<UserProfile>> _profileRepoMock = new();
+    private readonly Mock<IAuditLogRepository> _auditLogRepoMock = new();
+    private readonly Mock<ITokenService> _tokenServiceMock = new();
     private readonly Mock<IEmailService> _emailServiceMock = new();
     private readonly IMemoryCache _cache = new MemoryCache(new MemoryCacheOptions());
     private readonly Mock<IConfiguration> _configMock = new();
@@ -25,6 +27,9 @@ public class AuthSecurityServiceTests
     {
         _unitOfWorkMock.Setup(u => u.AccountRepository).Returns(_accountRepoMock.Object);
         _unitOfWorkMock.Setup(u => u.UserProfileRepository).Returns(_profileRepoMock.Object);
+        _unitOfWorkMock.Setup(u => u.AuditLogRepository).Returns(_auditLogRepoMock.Object);
+        _auditLogRepoMock.Setup(r => r.AddAsync(It.IsAny<AuditLog>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
         _unitOfWorkMock.Setup(u => u.SaveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
     }
 
@@ -32,6 +37,7 @@ public class AuthSecurityServiceTests
     {
         return new AuthSecurityService(
             _unitOfWorkMock.Object,
+            _tokenServiceMock.Object,
             _emailServiceMock.Object,
             _cache,
             _configMock.Object,
@@ -201,5 +207,65 @@ public class AuthSecurityServiceTests
 
         // Check verified
         Assert.True(service.IsEmailVerified("verify@example.com"));
+    }
+
+    [Fact]
+    public async Task AuthenticateAsync_ReturnsAuthResponse_WhenCredentialsAreValid()
+    {
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword("SecretPassword123");
+        var account = new Account
+        {
+            AccountId = 10,
+            Username = "pilot1@aviation.com",
+            PasswordHash = passwordHash,
+            RoleId = 2,
+            Status = AccountStatus.Active
+        };
+        var role = new Role { RoleId = 2, RoleName = "Instructor" };
+        var profile = new UserProfile { AccountId = 10, FullName = "Captain Miller" };
+
+        var roleRepoMock = new Mock<IGenericRepository<Role>>();
+        _unitOfWorkMock.Setup(u => u.RoleRepository).Returns(roleRepoMock.Object);
+        roleRepoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Role> { role });
+
+        _accountRepoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Account> { account });
+        _profileRepoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<UserProfile> { profile });
+        _tokenServiceMock.Setup(t => t.GenerateToken(account, role))
+            .Returns("valid-jwt-token");
+
+        var service = CreateService();
+
+        var result = await service.AuthenticateAsync(new LoginRequestDto("pilot1@aviation.com", "SecretPassword123"), CancellationToken.None);
+
+        Assert.Equal(10, result.AccountId);
+        Assert.Equal("pilot1@aviation.com", result.Username);
+        Assert.Equal("Captain Miller", result.FullName);
+        Assert.Equal("Instructor", result.Role);
+        Assert.Equal("valid-jwt-token", result.Token);
+    }
+
+    [Fact]
+    public async Task AuthenticateAsync_ThrowsUnauthorized_WhenPasswordIsIncorrect()
+    {
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword("SecretPassword123");
+        var account = new Account
+        {
+            AccountId = 10,
+            Username = "pilot1@aviation.com",
+            PasswordHash = passwordHash,
+            RoleId = 2,
+            Status = AccountStatus.Active
+        };
+
+        _accountRepoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Account> { account });
+
+        var service = CreateService();
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            service.AuthenticateAsync(new LoginRequestDto("pilot1@aviation.com", "WrongPassword!"), CancellationToken.None));
     }
 }

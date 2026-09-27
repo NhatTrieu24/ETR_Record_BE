@@ -96,13 +96,14 @@ public class ApprovalService : IApprovalService
             throw new ValidationException("A comment is required when rejecting or returning an ApprovalRequest.");
         }
 
+        var request = await _unitOfWork.ApprovalRequestRepository.GetByIdAsync(approvalRequestId, cancellationToken)
+            ?? throw new BusinessRuleViolationException("ApprovalRequest not found.");
+
         return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
         {
             await _unitOfWork.BeginTransactionAsync(ct);
             try
             {
-                var request = await _unitOfWork.ApprovalRequestRepository.GetByIdAsync(approvalRequestId, ct);
-                if (request == null) throw new BusinessRuleViolationException("ApprovalRequest not found.");
 
                 var prevStatus = request.CurrentStatus;
                 string newStatus = action switch

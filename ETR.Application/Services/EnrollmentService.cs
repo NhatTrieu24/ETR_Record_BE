@@ -199,6 +199,17 @@ public class EnrollmentService : IEnrollmentService
                 await _unitOfWork.ETRCourseRecordRepository.AddAsync(etrRecord, ct);
                 await _unitOfWork.SaveAsync(ct);
 
+                await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                {
+                    AccountId = createdByAccountId,
+                    ActionType = AuditActionType.INSERT.ToString(),
+                    EntityName = nameof(CourseEnrollment),
+                    RecordId = enrollment.EnrollmentId,
+                    ETRRecordId = etrRecord.ETRCourseRecordId,
+                    NewValue = $"ClassId: {classId}, AccountId: {accountId}",
+                    Description = $"Enrolled student #{accountId} into class #{classId}, auto-provisioned ETR #{etrRecord.ETRCourseRecordId}"
+                }, ct);
+
                 // NOTE: re-enrolling does NOT clear Grounded by itself — merely being back in a
                 // class is not "fit for duty" for aviation certification purposes. Grounded is only
                 // cleared once this new ETR is actually Completed — see EtrService.CompleteEtrAsync.

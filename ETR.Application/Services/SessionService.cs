@@ -1,6 +1,7 @@
 using ETR.Application.DTOs.Session;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 using System.ComponentModel.DataAnnotations;
 
 namespace ETR.Application.Services;
@@ -146,6 +147,17 @@ public class SessionService : ISessionService
         session.UpdatedByAccountId = updatedByAccountId;
 
         _unitOfWork.SessionRepository.Update(session);
+        await _unitOfWork.SaveAsync(cancellationToken);
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = updatedByAccountId,
+            ActionType = AuditActionType.UPDATE.ToString(),
+            EntityName = nameof(Session),
+            RecordId = id,
+            NewValue = $"Title: {session.SessionTitle}, Date: {session.SessionDate:yyyy-MM-dd HH:mm}",
+            Description = $"Updated session schedule #{id} ('{session.SessionTitle}')"
+        }, cancellationToken);
         await _unitOfWork.SaveAsync(cancellationToken);
 
         Class? cls = await _unitOfWork.ClassRepository.GetByIdAsync(session.ClassId, cancellationToken);

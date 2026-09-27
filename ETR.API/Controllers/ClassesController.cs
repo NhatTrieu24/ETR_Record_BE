@@ -30,7 +30,7 @@ public class ClassesController : ControllerBase
     /// [Target Audience]: Admin, Academic
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> GetAllClasses(CancellationToken cancellationToken)
+    public async Task<ActionResult<IEnumerable<TrainingClassResponse>>> GetAllClasses(CancellationToken cancellationToken)
     {
         var classes = await _classService.GetAllClassesAsync(cancellationToken);
         return Ok(classes);
@@ -42,7 +42,7 @@ public class ClassesController : ControllerBase
     /// [Target Audience]: Admin, Academic
     /// </summary>
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetClass(int id, CancellationToken cancellationToken)
+    public async Task<ActionResult<TrainingClassResponse>> GetClass(int id, CancellationToken cancellationToken)
     {
         var cls = await _classService.GetClassByIdAsync(id, cancellationToken);
         return Ok(cls);
@@ -55,7 +55,7 @@ public class ClassesController : ControllerBase
     /// </summary>
     [HttpPost]
     [Authorize(Roles = "Admin,Academic")]
-    public async Task<IActionResult> CreateClass([FromBody] CreateClassRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<TrainingClassResponse>> CreateClass([FromBody] CreateClassRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
         var cls = await _classService.CreateClassAsync(request, accountId, cancellationToken);
@@ -69,7 +69,7 @@ public class ClassesController : ControllerBase
     /// </summary>
     [HttpPut("{id}")]
     [Authorize(Roles = "Admin,Academic")]
-    public async Task<IActionResult> UpdateClass(int id, [FromBody] UpdateClassRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<TrainingClassResponse>> UpdateClass(int id, [FromBody] UpdateClassRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
         var cls = await _classService.UpdateClassAsync(id, request, accountId, cancellationToken);

@@ -313,27 +313,55 @@ public class EtrService : IEtrService
             }
         }
 
-        // === AUDIT LOG ===
-        var auditLog = new AuditLog
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
+        try
         {
-            ETRRecordId = etrCourseRecordId,
-            AccountId = accountId,
-            ActionType = AuditActionType.SUBMIT.ToString(),
-            EntityName = nameof(ETRCourseRecord),
-            RecordId = etrCourseRecordId,
-            OldValue = etr.Status.ToString(),
-            NewValue = "Submitted",
-            Description = $"ETR #{etrCourseRecordId} submitted for QA verification"
-        };
-        await _unitOfWork.AuditLogRepository.AddAsync(auditLog, cancellationToken);
+            // === AUDIT LOG ===
+            var auditLog = new AuditLog
+            {
+                ETRRecordId = etrCourseRecordId,
+                AccountId = accountId,
+                ActionType = AuditActionType.SUBMIT.ToString(),
+                EntityName = nameof(ETRCourseRecord),
+                RecordId = etrCourseRecordId,
+                OldValue = etr.Status.ToString(),
+                NewValue = "Submitted",
+                Description = $"ETR #{etrCourseRecordId} submitted for QA verification"
+            };
+            await _unitOfWork.AuditLogRepository.AddAsync(auditLog, cancellationToken);
 
-        etr.Status = EtrStatus.Submitted;
-        etr.SubmittedAt = DateTime.UtcNow;
-        etr.UpdatedAt = DateTime.UtcNow;
-        etr.UpdatedByAccountId = accountId;
+            etr.Status = EtrStatus.Submitted;
+            etr.SubmittedAt = DateTime.UtcNow;
+            etr.UpdatedAt = DateTime.UtcNow;
+            etr.UpdatedByAccountId = accountId;
 
-        _unitOfWork.ETRCourseRecordRepository.Update(etr);
-        await _unitOfWork.SaveAsync(cancellationToken);
+            _unitOfWork.ETRCourseRecordRepository.Update(etr);
+
+            // Auto-provision ApprovalRequest for QA / TrainingManager workflow in the same transaction
+            var existingApproval = (await _unitOfWork.ApprovalRequestRepository.GetAllAsync(cancellationToken))
+                .FirstOrDefault(a => a.ETRCourseRecordId == etrCourseRecordId && a.CurrentStatus == "Pending");
+            if (existingApproval == null)
+            {
+                var approvalRequest = new ApprovalRequest
+                {
+                    ETRCourseRecordId = etrCourseRecordId,
+                    CurrentStatus = "Pending",
+                    SubmittedByAccountId = accountId,
+                    SubmittedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedByAccountId = accountId
+                };
+                await _unitOfWork.ApprovalRequestRepository.AddAsync(approvalRequest, cancellationToken);
+            }
+
+            await _unitOfWork.SaveAsync(cancellationToken);
+            await _unitOfWork.CommitTransactionAsync(cancellationToken);
+        }
+        catch
+        {
+            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+            throw;
+        }
 
         return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt, etr.IssuedDate, etr.ExpiryDate, etr.PreviousRecordId);
     }

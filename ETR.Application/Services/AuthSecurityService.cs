@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using ETR.Application.Compliance;
+using ETR.Application.DTOs;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
 using ETR.Domain.Enums;
@@ -11,7 +12,10 @@ namespace ETR.Application.Services;
 
 public class AuthSecurityService : IAuthSecurityService
 {
+    private static readonly string DummyPasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString());
+
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ITokenService _tokenService;
     private readonly IEmailService _emailService;
     private readonly IMemoryCache _cache;
     private readonly IConfiguration _configuration;
@@ -19,16 +23,42 @@ public class AuthSecurityService : IAuthSecurityService
 
     public AuthSecurityService(
         IUnitOfWork unitOfWork,
+        ITokenService tokenService,
         IEmailService emailService,
         IMemoryCache cache,
         IConfiguration configuration,
         ILogger<AuthSecurityService> logger)
     {
         _unitOfWork = unitOfWork;
+        _tokenService = tokenService;
         _emailService = emailService;
         _cache = cache;
         _configuration = configuration;
         _logger = logger;
+    }
+
+    public async Task<AuthResponse> AuthenticateAsync(LoginRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var accounts = await _unitOfWork.AccountRepository.GetAllAsync(cancellationToken);
+        var account = accounts.FirstOrDefault(a => a.Username.Equals(request.Username, StringComparison.OrdinalIgnoreCase));
+
+        var passwordIsValid = BCrypt.Net.BCrypt.Verify(request.Password, account?.PasswordHash ?? DummyPasswordHash);
+
+        if (account == null || account.Status != AccountStatus.Active || !passwordIsValid)
+        {
+            throw new UnauthorizedAccessException("Invalid credentials or account is inactive.");
+        }
+
+        var roles = await _unitOfWork.RoleRepository.GetAllAsync(cancellationToken);
+        var role = roles.FirstOrDefault(r => r.RoleId == account.RoleId)
+            ?? throw new BusinessRuleViolationException("Account role is missing or inactive.");
+
+        var profiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
+        var profile = profiles.FirstOrDefault(p => p.AccountId == account.AccountId);
+
+        var token = _tokenService.GenerateToken(account, role);
+
+        return new AuthResponse(account.AccountId, account.Username, profile?.FullName ?? "Unknown", role.RoleName, token, "mock-refresh-token");
     }
 
     public async Task ForgotPasswordAsync(string email, string? clientBaseUrl = null, CancellationToken cancellationToken = default)
@@ -166,6 +196,15 @@ public class AuthSecurityService : IAuthSecurityService
         account.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
         account.UpdatedAt = DateTime.UtcNow;
 
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = account.AccountId,
+            ActionType = AuditActionType.UPDATE.ToString(),
+            EntityName = nameof(Account),
+            RecordId = account.AccountId,
+            Description = $"Password reset completed for Account #{account.AccountId}"
+        }, cancellationToken);
+
         await _unitOfWork.SaveAsync(cancellationToken);
 
         // Hủy bỏ các entry trong cache để không thể dùng lại
@@ -230,6 +269,15 @@ public class AuthSecurityService : IAuthSecurityService
 
         account.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
         account.UpdatedAt = DateTime.UtcNow;
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = accountId,
+            ActionType = AuditActionType.UPDATE.ToString(),
+            EntityName = nameof(Account),
+            RecordId = accountId,
+            Description = $"Password changed by user for Account #{accountId}"
+        }, cancellationToken);
 
         await _unitOfWork.SaveAsync(cancellationToken);
 

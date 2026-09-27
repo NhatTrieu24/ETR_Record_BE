@@ -2,6 +2,7 @@ using ETR.Application.Compliance;
 using ETR.Application.DTOs.PracticalChecklistResult;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 using Microsoft.Extensions.Logging;
 
 namespace ETR.Application.Services;
@@ -140,6 +141,18 @@ public class PracticalChecklistResultService : IPracticalChecklistResultService
         await _unitOfWork.PracticalChecklistResultRepository.AddAsync(result, cancellationToken);
         await _unitOfWork.SaveAsync(cancellationToken);
 
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = verifiedByAccountId,
+            ActionType = AuditActionType.INSERT.ToString(),
+            EntityName = nameof(PracticalChecklistResult),
+            RecordId = result.PracticalChecklistResultId,
+            ETRRecordId = subjectResult.EtrId,
+            NewValue = $"Score: {request.Score}, Status: {result.ResultStatus}",
+            Description = $"Recorded practical checklist result for SubjectResult #{request.SubjectResultId}, Checklist #{checklist.PracticalChecklistId} (Score: {request.Score}, Status: {result.ResultStatus})"
+        }, cancellationToken);
+        await _unitOfWork.SaveAsync(cancellationToken);
+
         _logger.LogInformation("PracticalChecklistResult created by Account {AccountId}: Id={Id}", verifiedByAccountId, result.PracticalChecklistResultId);
 
         var accountId = await GetAccountIdAsync(result.SubjectResultId, cancellationToken);
@@ -168,6 +181,9 @@ public class PracticalChecklistResultService : IPracticalChecklistResultService
             throw new KeyNotFoundException($"PracticalChecklistResult with ID {id} not found.");
         }
 
+        var oldScore = result.Score;
+        var oldStatus = result.ResultStatus;
+
         if (request.SessionId.HasValue)
         {
             result.SessionId = request.SessionId;
@@ -183,8 +199,23 @@ public class PracticalChecklistResultService : IPracticalChecklistResultService
         result.VerificationComment = request.VerificationComment;
         result.VerifiedByAccountId = verifiedByAccountId;
         result.CompletedAt = request.Score >= passingScore ? DateTime.UtcNow : null;
+        result.UpdatedAt = DateTime.UtcNow;
+        result.UpdatedByAccountId = verifiedByAccountId;
 
         _unitOfWork.PracticalChecklistResultRepository.Update(result);
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = verifiedByAccountId,
+            ActionType = AuditActionType.UPDATE.ToString(),
+            EntityName = nameof(PracticalChecklistResult),
+            RecordId = id,
+            ETRRecordId = subjectResult?.EtrId,
+            OldValue = $"Score: {oldScore}, Status: {oldStatus}",
+            NewValue = $"Score: {request.Score}, Status: {result.ResultStatus}",
+            Description = $"Updated practical checklist result #{id} (Score: {oldScore} -> {request.Score}, Status: {oldStatus} -> {result.ResultStatus})"
+        }, cancellationToken);
+
         await _unitOfWork.SaveAsync(cancellationToken);
 
         _logger.LogInformation("PracticalChecklistResult {Id} updated by Account {AccountId}", id, verifiedByAccountId);
@@ -226,6 +257,20 @@ public class PracticalChecklistResultService : IPracticalChecklistResultService
         result.UpdatedByAccountId = publishedByAccountId;
 
         _unitOfWork.PracticalChecklistResultRepository.Update(result);
+
+        var subjectResult = await _unitOfWork.SubjectResultRepository.GetByIdAsync(result.SubjectResultId, cancellationToken);
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = publishedByAccountId,
+            ActionType = AuditActionType.UPDATE.ToString(),
+            EntityName = nameof(PracticalChecklistResult),
+            RecordId = id,
+            ETRRecordId = subjectResult?.EtrId,
+            NewValue = "IsPublished: true",
+            Description = $"Published PracticalChecklistResult #{id}"
+        }, cancellationToken);
+
         await _unitOfWork.SaveAsync(cancellationToken);
 
         _logger.LogInformation("PracticalChecklistResult {Id} published by Account {AccountId}", id, publishedByAccountId);

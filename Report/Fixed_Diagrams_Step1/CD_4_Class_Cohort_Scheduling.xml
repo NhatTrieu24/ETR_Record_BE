@@ -1,0 +1,114 @@
+<mxfile host="app.diagrams.net" modified="2026-09-28T01:30:00.000Z" agent="Antigravity" version="24.7.5">
+  <diagram id="diagram_1" name="CD-4 Class Cohort Scheduling">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="750" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="c_ctrl" parent="1" style="verticalAlign=top;align=left;overflow=fill;fontSize=11;fontFamily=Helvetica;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#000000;rounded=0;" value="&lt;&lt;Controller&gt;&gt;
+ClassesController
+--
+-_classService : IClassService
+-_currentUserService : ICurrentUserService
+--
++GetAllClasses(ct : CancellationToken) : Task&lt;ActionResult&lt;IEnumerable&lt;ClassResponse&gt;&gt;&gt;
++GetClassById(id : int, ct : CancellationToken) : Task&lt;ActionResult&lt;ClassResponse&gt;&gt;
++CreateClass(req : CreateClassRequest, ct : CancellationToken) : Task&lt;ActionResult&lt;ClassResponse&gt;&gt;
++UpdateClass(id : int, req : UpdateClassRequest, ct : CancellationToken) : Task&lt;ActionResult&lt;ClassResponse&gt;&gt;
++DeleteClass(id : int, ct : CancellationToken) : Task&lt;ActionResult&gt;" vertex="1"><mxGeometry x="50" y="50" width="460" height="150" as="geometry" /></mxCell>
+        <mxCell id="c_isvc" parent="1" style="verticalAlign=top;align=left;overflow=fill;fontSize=11;fontFamily=Helvetica;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#000000;rounded=0;" value="&lt;&lt;Interface&gt;&gt;
+IClassService
+--
+--
++GetAllClassesAsync(ct : CancellationToken) : Task&lt;IEnumerable&lt;ClassResponse&gt;&gt;
++GetClassByIdAsync(id : int, ct : CancellationToken) : Task&lt;ClassResponse&gt;
++CreateClassAsync(req : CreateClassRequest, ct : CancellationToken) : Task&lt;ClassResponse&gt;
++CreateClassCoreAsync(req : CreateClassRequest, createdBy : int, ct : CancellationToken) : Task&lt;ClassResponse&gt;
++UpdateClassAsync(id : int, req : UpdateClassRequest, ct : CancellationToken) : Task&lt;ClassResponse&gt;
++DeleteClassAsync(id : int, ct : CancellationToken) : Task" vertex="1"><mxGeometry x="50" y="270" width="460" height="150" as="geometry" /></mxCell>
+        <mxCell id="c_svc" parent="1" style="verticalAlign=top;align=left;overflow=fill;fontSize=11;fontFamily=Helvetica;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#000000;rounded=0;" value="&lt;&lt;Service&gt;&gt;
+ClassService
+--
+-_unitOfWork : IUnitOfWork
+-_classDurationValidator : IClassDurationValidator
+--
++GetAllClassesAsync(ct : CancellationToken) : Task&lt;IEnumerable&lt;ClassResponse&gt;&gt;
++GetClassByIdAsync(id : int, ct : CancellationToken) : Task&lt;ClassResponse&gt;
++CreateClassAsync(req : CreateClassRequest, ct : CancellationToken) : Task&lt;ClassResponse&gt;
++CreateClassCoreAsync(req : CreateClassRequest, createdBy : int, ct : CancellationToken) : Task&lt;ClassResponse&gt;
++UpdateClassAsync(id : int, req : UpdateClassRequest, ct : CancellationToken) : Task&lt;ClassResponse&gt;
++DeleteClassAsync(id : int, ct : CancellationToken) : Task" vertex="1"><mxGeometry x="50" y="490" width="460" height="170" as="geometry" /></mxCell>
+        <mxCell id="c_class" parent="1" style="verticalAlign=top;align=left;overflow=fill;fontSize=11;fontFamily=Helvetica;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#000000;rounded=0;" value="&lt;&lt;Entity&gt;&gt;
+Class
+--
++ClassId : int
++ClassCode : string
++ClassName : string
++CourseId : int
++StartDate : DateTime
++EndDate : DateTime
++Location : string?
++Capacity : int
++Status : ClassStatus
+--
+" vertex="1"><mxGeometry x="580" y="270" width="230" height="190" as="geometry" /></mxCell>
+        <mxCell id="c_sess" parent="1" style="verticalAlign=top;align=left;overflow=fill;fontSize=11;fontFamily=Helvetica;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#000000;rounded=0;" value="&lt;&lt;Entity&gt;&gt;
+Session
+--
++SessionId : int
++ClassId : int
++SubjectId : int
++SessionTitle : string
++SessionDate : DateTime?
++Location : string?
++IsConfirmed : bool
++ConfirmedByAccountId : int?
++ConfirmedAt : DateTime?
++IsAssessmentRequired : bool
++IsChecklistRequired : bool
++AssessmentId : int?
++PracticalChecklistId : int?
+--
+" vertex="1"><mxGeometry x="880" y="270" width="250" height="240" as="geometry" /></mxCell>
+        <mxCell id="c_enum" parent="1" style="verticalAlign=top;align=left;overflow=fill;fontSize=11;fontFamily=Helvetica;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#000000;rounded=0;" value="&lt;&lt;Enumeration&gt;&gt;
+ClassStatus
+--
+Draft
+Planned
+Scheduled
+InProgress
+Completed
+Cancelled" vertex="1"><mxGeometry x="580" y="500" width="160" height="130" as="geometry" /></mxCell>
+        <mxCell id="c_dto1" parent="1" style="verticalAlign=top;align=left;overflow=fill;fontSize=11;fontFamily=Helvetica;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#000000;rounded=0;" value="&lt;&lt;DTO&gt;&gt;
+CreateClassRequest
+--
++ClassCode : string
++ClassName : string
++CourseId : int
++StartDate : DateTime
++EndDate : DateTime
++Location : string?
++Capacity : int
++Status : ClassStatus" vertex="1"><mxGeometry x="580" y="50" width="220" height="160" as="geometry" /></mxCell>
+        <mxCell id="c_dto2" parent="1" style="verticalAlign=top;align=left;overflow=fill;fontSize=11;fontFamily=Helvetica;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#000000;rounded=0;" value="&lt;&lt;DTO&gt;&gt;
+ClassResponse
+--
++ClassId : int
++ClassCode : string
++ClassName : string
++CourseId : int
++CourseCode : string
++StartDate : DateTime
++EndDate : DateTime
++Capacity : int
++Status : string
++EnrolledCount : int" vertex="1"><mxGeometry x="840" y="50" width="210" height="180" as="geometry" /></mxCell>
+        <mxCell id="e_ctrl_isvc" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=open;endFill=0;strokeColor=#000000;" edge="1" source="c_ctrl" target="c_isvc"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_svc_isvc" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=block;endFill=0;strokeColor=#000000;" edge="1" source="c_svc" target="c_isvc"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_class_sess" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=diamond;endFill=1;strokeColor=#000000;" edge="1" source="c_sess" target="c_class"><mxGeometry relative="1" as="geometry"><mxPoint as="offset" /><mxPoint x="880" y="360" as="sourcePoint"/><mxPoint x="810" y="360" as="targetPoint"/></mxGeometry></mxCell>
+        <mxCell id="lbl_assoc" parent="1" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;" value="1          contains          *" vertex="1"><mxGeometry x="800" y="335" width="80" height="20" as="geometry"/></mxCell>
+        <mxCell id="e_class_enum" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=open;endFill=0;strokeColor=#000000;" edge="1" source="c_class" target="c_enum"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_svc_class" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=open;endFill=0;strokeColor=#000000;" edge="1" source="c_svc" target="c_class"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

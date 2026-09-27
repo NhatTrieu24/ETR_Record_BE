@@ -22,13 +22,11 @@ namespace ETR.API.Controllers;
 public class EtrController : ControllerBase
 {
     private readonly IEtrService _etrService;
-    private readonly IApprovalService _approvalService;
     private readonly ICurrentUserService _currentUserService;
 
-    public EtrController(IEtrService etrService, IApprovalService approvalService, ICurrentUserService currentUserService)
+    public EtrController(IEtrService etrService, ICurrentUserService currentUserService)
     {
         _etrService = etrService;
-        _approvalService = approvalService;
         _currentUserService = currentUserService;
     }
 
@@ -115,11 +113,6 @@ public class EtrController : ControllerBase
             ?? throw new UnauthorizedAccessException("User is not authenticated.");
 
         var response = await _etrService.SubmitEtrAsync(id, accountId, cancellationToken);
-
-        // Tự động tạo ApprovalRequest cho TrainingManager duyệt — trước đây phải tạo thủ công qua
-        // POST /api/Approvals, khiến ETR "kẹt" ở Submitted mà không ai biết cần duyệt.
-        await _approvalService.CreateApprovalRequestAsync(id, currentApproverId: null, accountId, cancellationToken);
-
         return Ok(response);
     }
 

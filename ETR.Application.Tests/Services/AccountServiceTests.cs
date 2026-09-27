@@ -13,12 +13,16 @@ public class AccountServiceTests
     {
         var unitOfWork = new Mock<IUnitOfWork>();
         var accountRepo = new Mock<IGenericRepository<Account>>();
+        var auditLogRepo = new Mock<IAuditLogRepository>();
         accountRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Account>());
         accountRepo.Setup(r => r.AddAsync(It.IsAny<Account>(), It.IsAny<CancellationToken>()))
             .Callback<Account, CancellationToken>((a, _) => a.AccountId = 99)
             .Returns(Task.CompletedTask);
+        auditLogRepo.Setup(r => r.AddAsync(It.IsAny<AuditLog>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
         unitOfWork.Setup(u => u.AccountRepository).Returns(accountRepo.Object);
+        unitOfWork.Setup(u => u.AuditLogRepository).Returns(auditLogRepo.Object);
         unitOfWork.Setup(u => u.SaveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
         return unitOfWork;
     }

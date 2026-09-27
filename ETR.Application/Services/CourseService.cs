@@ -46,8 +46,9 @@ public class CourseService : ICourseService
             throw new ArgumentException("A course must have at least one subject configured upon creation.");
         }
 
-        var existingCourses = await _unitOfWork.CourseRepository.GetAllAsync(cancellationToken);
-        if (existingCourses.Any(c => c.CourseCode == request.CourseCode))
+        var isDuplicate = _unitOfWork.CourseRepository.GetQueryable()
+            .Any(c => c.CourseCode == request.CourseCode && !c.IsDeleted);
+        if (isDuplicate)
         {
             throw new BusinessRuleViolationException($"A course with code '{request.CourseCode}' already exists.");
         }
@@ -149,8 +150,9 @@ public class CourseService : ICourseService
 
                 if (course.IsDeleted) throw new KeyNotFoundException("Course not found.");
 
-                var existingCourses = await _unitOfWork.CourseRepository.GetAllAsync(ct);
-                if (existingCourses.Any(c => c.CourseId != id && c.CourseCode == request.CourseCode))
+                var isDuplicate = _unitOfWork.CourseRepository.GetQueryable()
+                    .Any(c => c.CourseId != id && c.CourseCode == request.CourseCode && !c.IsDeleted);
+                if (isDuplicate)
                 {
                     throw new BusinessRuleViolationException($"A course with code '{request.CourseCode}' already exists.");
                 }

@@ -30,12 +30,13 @@ public class UserProfileService : IUserProfileService
 
     public async Task<IEnumerable<UserProfileResponse>> GetAllProfilesAsync(CancellationToken cancellationToken = default)
     {
-        var profiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
+        var allProfiles = await _unitOfWork.UserProfileRepository.GetAllIncludingDeletedAsync(cancellationToken);
+        var profiles = allProfiles.AsEnumerable();
         
         if (_currentUserService.RoleName == "Instructor" && _currentUserService.AccountId.HasValue)
         {
             var studentIds = await GetInstructorStudentIdsAsync(_currentUserService.AccountId.Value, cancellationToken);
-            profiles = profiles.Where(p => studentIds.Contains(p.AccountId)).ToList();
+            profiles = profiles.Where(p => studentIds.Contains(p.AccountId));
         }
 
         return profiles.Select(MapToResponse);
@@ -47,10 +48,10 @@ public class UserProfileService : IUserProfileService
         var studentRole = roles.FirstOrDefault(r => r.RoleName == "Student");
         if (studentRole == null) return Enumerable.Empty<UserProfileResponse>();
 
-        var accounts = await _unitOfWork.AccountRepository.GetAllAsync(cancellationToken);
+        var accounts = await _unitOfWork.AccountRepository.GetAllIncludingDeletedAsync(cancellationToken);
         var studentAccountIds = accounts.Where(a => a.RoleId == studentRole.RoleId).Select(a => a.AccountId).ToHashSet();
 
-        var profiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
+        var profiles = await _unitOfWork.UserProfileRepository.GetAllIncludingDeletedAsync(cancellationToken);
         var learnerProfiles = profiles.Where(p => studentAccountIds.Contains(p.AccountId));
 
         if (_currentUserService.RoleName == "Instructor" && _currentUserService.AccountId.HasValue)
@@ -64,7 +65,7 @@ public class UserProfileService : IUserProfileService
 
     public async Task<UserProfileResponse> GetProfileByAccountIdAsync(int accountId, CancellationToken cancellationToken = default)
     {
-        var profiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
+        var profiles = await _unitOfWork.UserProfileRepository.GetAllIncludingDeletedAsync(cancellationToken);
         var profile = profiles.FirstOrDefault(p => p.AccountId == accountId)
             ?? throw new KeyNotFoundException($"UserProfile for Account {accountId} not found.");
             

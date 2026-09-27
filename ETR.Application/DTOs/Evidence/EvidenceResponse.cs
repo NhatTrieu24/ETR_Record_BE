@@ -13,6 +13,7 @@ public class EvidenceResponse
     public string FileUrl { get; set; } = string.Empty;
     public string? MimeType { get; set; }
     public long? FileSize { get; set; }
+    public string? FileHash { get; set; }
     public string VerificationStatus { get; set; } = string.Empty;
     public int? VerifiedByAccountId { get; set; }
     public DateTime? VerifiedAt { get; set; }

@@ -34,8 +34,9 @@ public class SubjectService : ISubjectService
 
     public async Task<SubjectResponse> CreateSubjectAsync(CreateSubjectRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
     {
-        var existingSubjects = await _unitOfWork.SubjectRepository.GetAllAsync(cancellationToken);
-        if (existingSubjects.Any(s => s.SubjectCode == request.SubjectCode))
+        var codeExists = _unitOfWork.SubjectRepository.GetQueryable()
+            .Any(s => !s.IsDeleted && s.SubjectCode == request.SubjectCode);
+        if (codeExists)
         {
             throw new BusinessRuleViolationException($"A subject with code '{request.SubjectCode}' already exists.");
         }
@@ -56,6 +57,17 @@ public class SubjectService : ISubjectService
         await _unitOfWork.SubjectRepository.AddAsync(subject, cancellationToken);
         await _unitOfWork.SaveAsync(cancellationToken);
 
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = createdByAccountId,
+            ActionType = AuditActionType.INSERT.ToString(),
+            EntityName = nameof(Subject),
+            RecordId = subject.SubjectId,
+            NewValue = $"{subject.SubjectCode} - {subject.SubjectName}",
+            Description = $"Created Subject #{subject.SubjectId} ({subject.SubjectCode} - {subject.SubjectName})"
+        }, cancellationToken);
+        await _unitOfWork.SaveAsync(cancellationToken);
+
         return new SubjectResponse(subject.SubjectId, subject.SubjectCode, subject.SubjectName, subject.SubjectType, subject.DefaultHours, subject.AssessmentMethod, subject.Description, subject.Status);
     }
 
@@ -66,11 +78,15 @@ public class SubjectService : ISubjectService
 
         if (subject.IsDeleted) throw new KeyNotFoundException("Subject not found.");
 
-        var existingSubjects = await _unitOfWork.SubjectRepository.GetAllAsync(cancellationToken);
-        if (existingSubjects.Any(s => s.SubjectId != id && s.SubjectCode == request.SubjectCode))
+        var codeExists = _unitOfWork.SubjectRepository.GetQueryable()
+            .Any(s => s.SubjectId != id && !s.IsDeleted && s.SubjectCode == request.SubjectCode);
+        if (codeExists)
         {
             throw new BusinessRuleViolationException($"A subject with code '{request.SubjectCode}' already exists.");
         }
+
+        var oldCode = subject.SubjectCode;
+        var oldName = subject.SubjectName;
 
         subject.SubjectCode = request.SubjectCode;
         subject.SubjectName = request.SubjectName;
@@ -83,6 +99,18 @@ public class SubjectService : ISubjectService
         subject.UpdatedByAccountId = updatedByAccountId;
 
         _unitOfWork.SubjectRepository.Update(subject);
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = updatedByAccountId,
+            ActionType = AuditActionType.UPDATE.ToString(),
+            EntityName = nameof(Subject),
+            RecordId = subject.SubjectId,
+            OldValue = $"{oldCode} - {oldName}",
+            NewValue = $"{subject.SubjectCode} - {subject.SubjectName}",
+            Description = $"Updated Subject #{subject.SubjectId} ({subject.SubjectCode} - {subject.SubjectName})"
+        }, cancellationToken);
+
         await _unitOfWork.SaveAsync(cancellationToken);
 
         return new SubjectResponse(subject.SubjectId, subject.SubjectCode, subject.SubjectName, subject.SubjectType, subject.DefaultHours, subject.AssessmentMethod, subject.Description, subject.Status);

@@ -138,6 +138,7 @@ public class EvidenceService : IEvidenceService
             FileName = request.FileName,
             MimeType = mimeType,
             FileSize = request.FileSize,
+            FileHash = request.FileHash,
             UploadedByAccountId = uploadedByAccountId,
             UploadedAt = DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow,
@@ -145,6 +146,18 @@ public class EvidenceService : IEvidenceService
         };
 
         await _unitOfWork.AttachmentRepository.AddAsync(attachment, cancellationToken);
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = uploadedByAccountId,
+            ActionType = "UPLOAD",
+            EntityName = nameof(EvidenceFile),
+            RecordId = evidence.EvidenceFileId,
+            ETRRecordId = etrForEvidence?.ETRCourseRecordId,
+            NewValue = request.FileHash ?? request.FileUrl,
+            Description = $"Uploaded evidence file '{request.FileName}' with hash '{request.FileHash}'"
+        }, cancellationToken);
+
         await _unitOfWork.SaveAsync(cancellationToken);
 
         return MapToResponse(evidence, attachment);
@@ -353,6 +366,7 @@ public class EvidenceService : IEvidenceService
             FileUrl = attachment?.Url ?? string.Empty,
             MimeType = attachment?.MimeType,
             FileSize = attachment?.FileSize,
+            FileHash = attachment?.FileHash,
             VerificationStatus = file.VerificationStatus,
             VerifiedByAccountId = file.VerifiedByAccountId,
             VerifiedAt = file.VerifiedAt,

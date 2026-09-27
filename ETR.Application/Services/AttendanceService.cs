@@ -115,6 +115,17 @@ public class AttendanceService : IAttendanceService
                     }
                 }
 
+                await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                {
+                    AccountId = recordedByAccountId,
+                    ActionType = AuditActionType.INSERT.ToString(),
+                    EntityName = nameof(AttendanceRecord),
+                    RecordId = record.AttendanceRecordId,
+                    ETRRecordId = etrRecord?.ETRCourseRecordId,
+                    NewValue = request.Status.ToString(),
+                    Description = $"Recorded attendance status '{request.Status}' for Student Enrollment #{request.EnrollmentId} in Session #{request.SessionId}"
+                }, ct);
+
                 await _unitOfWork.SaveAsync(ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
 
@@ -166,6 +177,17 @@ public class AttendanceService : IAttendanceService
 
                     await RecalculateAttendanceRateAsync(sr, enrollment.EnrollmentId, session.SubjectId, session.ClassId, ct);
                 }
+
+                await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                {
+                    AccountId = confirmedByAccountId,
+                    ActionType = AuditActionType.UPDATE.ToString(),
+                    EntityName = nameof(Session),
+                    RecordId = sessionId,
+                    OldValue = "IsConfirmed: False",
+                    NewValue = "IsConfirmed: True",
+                    Description = $"Session #{sessionId} ('{session.SessionTitle}') confirmed and attendance rates recalculated for class #{session.ClassId}"
+                }, ct);
 
                 await _unitOfWork.SaveAsync(ct);
                 await _unitOfWork.CommitTransactionAsync(ct);

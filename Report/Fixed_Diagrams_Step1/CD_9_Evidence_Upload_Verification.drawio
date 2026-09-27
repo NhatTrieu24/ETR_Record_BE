@@ -1,0 +1,106 @@
+<mxfile host="app.diagrams.net" modified="2026-09-28T01:30:00.000Z" agent="Antigravity" version="24.7.5">
+  <diagram id="diagram_1" name="CD-9 Evidence Upload & Verification">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1180" pageHeight="780" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="c_note" parent="1" style="shape=note;whiteSpace=wrap;html=1;size=14;verticalAlign=top;align=left;spacingTop=-6;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" value="&lt;&lt;Architecture Note&gt;&gt;
+Direct Client-to-Cloudinary Upload:
+Frontend uploads evidence binaries directly to Cloudinary CDN.
+Backend receives URL and metadata only (no file streams or SHA-256 hashing).
+IStorageService removed in favor of Cloudinary REST storage." vertex="1"><mxGeometry x="50" y="40" width="370" height="80" as="geometry" /></mxCell>
+        <mxCell id="c_ctrl" parent="1" style="verticalAlign=top;align=left;overflow=fill;fontSize=11;fontFamily=Helvetica;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#000000;rounded=0;" value="&lt;&lt;Controller&gt;&gt;
+EvidencesController
+--
+-_evidenceService : IEvidenceService
+-_currentUserService : ICurrentUserService
+--
++UploadEvidence(req : UploadEvidenceRequest, ct : CancellationToken) : Task&lt;ActionResult&lt;EvidenceResponse&gt;&gt;
++VerifyEvidence(id : int, req : VerifyEvidenceRequest, ct : CancellationToken) : Task&lt;ActionResult&lt;EvidenceResponse&gt;&gt;
++BulkVerifyEvidence(req : BulkVerifyEvidenceRequest, ct : CancellationToken) : Task&lt;ActionResult&lt;BulkVerifyEvidenceResponse&gt;&gt;
++GetEvidences(subjectResultId : int, ct : CancellationToken) : Task&lt;ActionResult&lt;IEnumerable&lt;EvidenceResponse&gt;&gt;&gt;
++DeleteEvidence(id : int, ct : CancellationToken) : Task&lt;ActionResult&gt;" vertex="1"><mxGeometry x="50" y="150" width="500" height="150" as="geometry" /></mxCell>
+        <mxCell id="c_isvc" parent="1" style="verticalAlign=top;align=left;overflow=fill;fontSize=11;fontFamily=Helvetica;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#000000;rounded=0;" value="&lt;&lt;Interface&gt;&gt;
+IEvidenceService
+--
+--
++UploadEvidenceAsync(req : UploadEvidenceRequest, accountId : int, ct : CancellationToken) : Task&lt;EvidenceResponse&gt;
++VerifyEvidenceAsync(id : int, req : VerifyEvidenceRequest, verifierId : int, role : string, ct : CancellationToken) : Task&lt;EvidenceResponse&gt;
++BulkVerifyEvidencesAsync(req : BulkVerifyEvidenceRequest, verifierId : int, role : string, ct : CancellationToken) : Task&lt;BulkVerifyEvidenceResponse&gt;
++GetEvidencesBySubjectResultAsync(subjectResultId : int, ct : CancellationToken) : Task&lt;IEnumerable&lt;EvidenceResponse&gt;&gt;
++DeleteEvidenceAsync(id : int, accountId : int, role : string, ct : CancellationToken) : Task" vertex="1"><mxGeometry x="50" y="340" width="500" height="150" as="geometry" /></mxCell>
+        <mxCell id="c_svc" parent="1" style="verticalAlign=top;align=left;overflow=fill;fontSize=11;fontFamily=Helvetica;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#000000;rounded=0;" value="&lt;&lt;Service&gt;&gt;
+EvidenceService
+--
+-_unitOfWork : IUnitOfWork
+-_logger : ILogger&lt;EvidenceService&gt;
+--
++UploadEvidenceAsync(req : UploadEvidenceRequest, accountId : int, ct : CancellationToken) : Task&lt;EvidenceResponse&gt;
++VerifyEvidenceAsync(id : int, req : VerifyEvidenceRequest, verifierId : int, role : string, ct : CancellationToken) : Task&lt;EvidenceResponse&gt;
++BulkVerifyEvidencesAsync(req : BulkVerifyEvidenceRequest, verifierId : int, role : string, ct : CancellationToken) : Task&lt;BulkVerifyEvidenceResponse&gt;
++GetEvidencesBySubjectResultAsync(subjectResultId : int, ct : CancellationToken) : Task&lt;IEnumerable&lt;EvidenceResponse&gt;&gt;
++DeleteEvidenceAsync(id : int, accountId : int, role : string, ct : CancellationToken) : Task
+-EnsureVerifierDidNotUploadEvidence(evidence : EvidenceFile, verifierId : int) : void" vertex="1"><mxGeometry x="50" y="530" width="500" height="190" as="geometry" /></mxCell>
+        <mxCell id="c_ent" parent="1" style="verticalAlign=top;align=left;overflow=fill;fontSize=11;fontFamily=Helvetica;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#000000;rounded=0;" value="&lt;&lt;Entity&gt;&gt;
+EvidenceFile
+--
++EvidenceFileId : int
++EvidenceTypeId : int
++UploadedByAccountId : int
++AccountId : int
++SubjectResultId : int
++AttendanceRecordId : int?
++AssessmentResultId : int?
++VerificationStatus : string
++VerifiedByAccountId : int?
++VerifiedAt : DateTime?
++VerificationComment : string?
++UploadedAt : DateTime
+--
+" vertex="1"><mxGeometry x="610" y="340" width="240" height="230" as="geometry" /></mxCell>
+        <mxCell id="c_dto1" parent="1" style="verticalAlign=top;align=left;overflow=fill;fontSize=11;fontFamily=Helvetica;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#000000;rounded=0;" value="&lt;&lt;DTO&gt;&gt;
+UploadEvidenceRequest
+--
++EvidenceTypeId : int
++AccountId : int
++SubjectResultId : int
++AttendanceRecordId : int?
++AssessmentResultId : int?
++FileUrl : string
++PublicId : string?
++FileName : string
++MimeType : string?
++FileSize : long?" vertex="1"><mxGeometry x="610" y="110" width="240" height="190" as="geometry" /></mxCell>
+        <mxCell id="c_dto2" parent="1" style="verticalAlign=top;align=left;overflow=fill;fontSize=11;fontFamily=Helvetica;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#000000;rounded=0;" value="&lt;&lt;DTO&gt;&gt;
+EvidenceResponse
+--
++EvidenceFileId : int
++EvidenceTypeId : int
++UploadedByAccountId : int
++AccountId : int
++SubjectResultId : int
++AttendanceRecordId : int?
++AssessmentResultId : int?
++FileName : string
++FileUrl : string
++MimeType : string?
++FileSize : long?
++VerificationStatus : string
++VerifiedByAccountId : int?
++VerifiedAt : DateTime?
++VerificationComment : string?
++UploadedAt : DateTime" vertex="1"><mxGeometry x="890" y="110" width="230" height="270" as="geometry" /></mxCell>
+        <mxCell id="c_dto3" parent="1" style="verticalAlign=top;align=left;overflow=fill;fontSize=11;fontFamily=Helvetica;html=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#000000;rounded=0;" value="&lt;&lt;DTO&gt;&gt;
+VerifyEvidenceRequest
+--
++VerificationStatus : string
++Comment : string?" vertex="1"><mxGeometry x="890" y="420" width="230" height="90" as="geometry" /></mxCell>
+        <mxCell id="e_ctrl_isvc" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=open;endFill=0;strokeColor=#000000;" edge="1" source="c_ctrl" target="c_isvc"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_svc_isvc" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=block;endFill=0;strokeColor=#000000;" edge="1" source="c_svc" target="c_isvc"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_svc_ent" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=open;endFill=0;strokeColor=#000000;" edge="1" source="c_svc" target="c_ent"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_ctrl_dto1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=open;endFill=0;strokeColor=#000000;" edge="1" source="c_ctrl" target="c_dto1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_ctrl_dto2" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=open;endFill=0;strokeColor=#000000;" edge="1" source="c_ctrl" target="c_dto2"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

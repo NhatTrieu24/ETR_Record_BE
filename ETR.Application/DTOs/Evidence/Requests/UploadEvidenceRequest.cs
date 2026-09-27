@@ -33,4 +33,7 @@ public class UploadEvidenceRequest
     public string? MimeType { get; set; }
 
     public long? FileSize { get; set; }
+    
+    [MaxLength(128)]
+    public string? FileHash { get; set; }
 }

@@ -162,11 +162,15 @@ public class ImportService : IImportService
     {
         var rows = await ParseAttendanceRowsAsync(fileStream, ct);
         var errors = await ValidateAttendanceRowsAsync(sessionId, rows, ct);
+        if (rows.Count == 0)
+        {
+            errors.Add(new ImportRowError(0, "File", "File không chứa dòng dữ liệu nào để nhập (0 dòng)."));
+        }
         return new ImportValidationResult(
             TotalRows: rows.Count,
             ValidRows: rows.Count - errors.Select(e => e.Row).Distinct().Count(),
             ErrorRows: errors.Select(e => e.Row).Distinct().Count(),
-            CanCommit: errors.Count == 0,
+            CanCommit: errors.Count == 0 && rows.Count > 0,
             Errors: errors);
     }
 
@@ -176,6 +180,9 @@ public class ImportService : IImportService
         CancellationToken ct = default)
     {
         var rows = await ParseAttendanceRowsAsync(fileStream, ct);
+        if (rows.Count == 0)
+            return new ImportCommitResult(Imported: 0, Skipped: 0, Errors: [new ImportRowError(0, "File", "File không chứa dòng dữ liệu nào để nhập (0 dòng).")]);
+
         var errors = await ValidateAttendanceRowsAsync(sessionId, rows, ct);
         if (errors.Count > 0)
             return new ImportCommitResult(Imported: 0, Skipped: rows.Count, Errors: errors);
@@ -380,11 +387,15 @@ public class ImportService : IImportService
     {
         var rows = await ParseAssessmentRowsAsync(fileStream, ct);
         var errors = await ValidateAssessmentRowsAsync(assessmentId, rows, ct);
+        if (rows.Count == 0)
+        {
+            errors.Add(new ImportRowError(0, "File", "File không chứa dòng dữ liệu nào để nhập (0 dòng)."));
+        }
         return new ImportValidationResult(
             TotalRows: rows.Count,
             ValidRows: rows.Count - errors.Select(e => e.Row).Distinct().Count(),
             ErrorRows: errors.Select(e => e.Row).Distinct().Count(),
-            CanCommit: errors.Count == 0,
+            CanCommit: errors.Count == 0 && rows.Count > 0,
             Errors: errors);
     }
 
@@ -394,6 +405,9 @@ public class ImportService : IImportService
         CancellationToken ct = default)
     {
         var rows = await ParseAssessmentRowsAsync(fileStream, ct);
+        if (rows.Count == 0)
+            return new ImportCommitResult(Imported: 0, Skipped: 0, Errors: [new ImportRowError(0, "File", "File không chứa dòng dữ liệu nào để nhập (0 dòng).")]);
+
         var errors = await ValidateAssessmentRowsAsync(assessmentId, rows, ct);
         if (errors.Count > 0)
             return new ImportCommitResult(Imported: 0, Skipped: rows.Count, Errors: errors);
@@ -767,11 +781,15 @@ public class ImportService : IImportService
     {
         var rows = await ParseAccountRowsAsync(fileStream, ct);
         var errors = await ValidateAccountRowsAsync(rows, isCallerAdmin, ct);
+        if (rows.Count == 0)
+        {
+            errors.Add(new ImportRowError(0, "File", "File không chứa dòng dữ liệu nào để nhập (0 dòng)."));
+        }
         return new ImportValidationResult(
             TotalRows: rows.Count,
             ValidRows: rows.Count - errors.Select(e => e.Row).Distinct().Count(),
             ErrorRows: errors.Select(e => e.Row).Distinct().Count(),
-            CanCommit: errors.Count == 0,
+            CanCommit: errors.Count == 0 && rows.Count > 0,
             Errors: errors);
     }
 
@@ -779,6 +797,9 @@ public class ImportService : IImportService
         Stream fileStream, int createdByAccountId, bool isCallerAdmin, CancellationToken ct = default)
     {
         var rows = await ParseAccountRowsAsync(fileStream, ct);
+        if (rows.Count == 0)
+            return new ImportCommitResult(Imported: 0, Skipped: 0, Errors: [new ImportRowError(0, "File", "File không chứa dòng dữ liệu nào để nhập (0 dòng).")]);
+
         var errors = await ValidateAccountRowsAsync(rows, isCallerAdmin, ct);
         if (errors.Count > 0)
             return new ImportCommitResult(Imported: 0, Skipped: rows.Count, Errors: errors);
@@ -1102,11 +1123,15 @@ public class ImportService : IImportService
     {
         var rows = await ParseStudentAccountRowsAsync(fileStream, ct);
         var errors = await ValidateStudentAccountRowsAsync(rows, ct);
+        if (rows.Count == 0)
+        {
+            errors.Add(new ImportRowError(0, "File", "File không chứa dòng dữ liệu nào để nhập (0 dòng)."));
+        }
         return new ImportValidationResult(
             TotalRows: rows.Count,
             ValidRows: rows.Count - errors.Select(e => e.Row).Distinct().Count(),
             ErrorRows: errors.Select(e => e.Row).Distinct().Count(),
-            CanCommit: errors.Count == 0,
+            CanCommit: errors.Count == 0 && rows.Count > 0,
             Errors: errors);
     }
 
@@ -1114,6 +1139,9 @@ public class ImportService : IImportService
         Stream fileStream, int createdByAccountId, CancellationToken ct = default)
     {
         var rows = await ParseStudentAccountRowsAsync(fileStream, ct);
+        if (rows.Count == 0)
+            return new ImportCommitResult(Imported: 0, Skipped: 0, Errors: [new ImportRowError(0, "File", "File không chứa dòng dữ liệu nào để nhập (0 dòng).")]);
+
         var errors = await ValidateStudentAccountRowsAsync(rows, ct);
         if (errors.Count > 0)
             return new ImportCommitResult(Imported: 0, Skipped: rows.Count, Errors: errors);
@@ -1451,26 +1479,34 @@ public class ImportService : IImportService
         var errors = classErrors.Concat(instructorErrors).Concat(studentErrors).ToList();
 
         var totalRows = classRows.Count + instructorRows.Count + studentRows.Count;
+        if (totalRows == 0)
+        {
+            errors.Add(new ImportRowError(0, "File", "File không chứa dòng dữ liệu nào để nhập (0 dòng)."));
+        }
         var errorRowKeys = errors.Select(e => e.Column.Split('.')[0] + ":" + e.Row).Distinct().Count();
 
         return new ImportValidationResult(
             TotalRows: totalRows,
             ValidRows: totalRows - errorRowKeys,
             ErrorRows: errorRowKeys,
-            CanCommit: errors.Count == 0,
+            CanCommit: errors.Count == 0 && totalRows > 0,
             Errors: errors);
     }
 
     public async Task<ImportCommitResult> CommitClassRosterImportAsync(Stream fileStream, int createdByAccountId, CancellationToken ct = default)
     {
         var (classRows, instructorRows, studentRows) = ParseClassRosterWorkbook(fileStream);
+        var totalRows = classRows.Count + instructorRows.Count + studentRows.Count;
+        if (totalRows == 0)
+            return new ImportCommitResult(Imported: 0, Skipped: 0, Errors: [new ImportRowError(0, "File", "File không chứa dòng dữ liệu nào để nhập (0 dòng).")]);
+
         var (classErrors, courseCodeToId) = await ValidateClassRosterRowsAsync(classRows, ct);
         var instructorErrors = await ValidateInstructorRosterRowsAsync(instructorRows, classRows, courseCodeToId, ct);
         var studentErrors = await ValidateStudentRosterRowsAsync(studentRows, classRows, courseCodeToId, ct);
         var errors = classErrors.Concat(instructorErrors).Concat(studentErrors).ToList();
 
         if (errors.Count > 0)
-            return new ImportCommitResult(Imported: 0, Skipped: classRows.Count + instructorRows.Count + studentRows.Count, Errors: errors);
+            return new ImportCommitResult(Imported: 0, Skipped: totalRows, Errors: errors);
 
         return await _unitOfWork.ExecuteInStrategyAsync(async (innerCt) =>
         {

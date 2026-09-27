@@ -352,4 +352,72 @@ public class ImportServiceAccountTests
         var dataValidations = ws.DataValidations.GetAllInRange(ws.Range(3, 8, 503, 8).RangeAddress);
         Assert.NotEmpty(dataValidations);
     }
+
+    [Fact]
+    public async Task ValidateStudentImportAsync_RejectsEmptyFileWithZeroRows()
+    {
+        var (uow, clsSvc, enrSvc) = BuildMocks();
+        var service = new ImportService(uow.Object, clsSvc.Object, enrSvc.Object);
+
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Học viên");
+        ws.Cell(1, 1).Value = "Header";
+        ws.Cell(2, 1).Value = "Username";
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+
+        var result = await service.ValidateStudentImportAsync(stream);
+
+        Assert.False(result.CanCommit);
+        Assert.Equal(0, result.TotalRows);
+        Assert.NotEmpty(result.Errors);
+        Assert.Contains(result.Errors, e => e.Column == "File");
+    }
+
+    [Fact]
+    public async Task CommitStudentImportAsync_RejectsEmptyFileWithZeroRows()
+    {
+        var (uow, clsSvc, enrSvc) = BuildMocks();
+        var service = new ImportService(uow.Object, clsSvc.Object, enrSvc.Object);
+
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Học viên");
+        ws.Cell(1, 1).Value = "Header";
+        ws.Cell(2, 1).Value = "Username";
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+
+        var result = await service.CommitStudentImportAsync(stream, createdByAccountId: 1);
+
+        Assert.Equal(0, result.Imported);
+        Assert.NotEmpty(result.Errors);
+        Assert.Contains(result.Errors, e => e.Column == "File");
+    }
+
+    [Fact]
+    public async Task ValidateAccountImportAsync_RejectsEmptyFileWithZeroRows()
+    {
+        var (uow, clsSvc, enrSvc) = BuildMocks();
+        var service = new ImportService(uow.Object, clsSvc.Object, enrSvc.Object);
+
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Tài khoản");
+        ws.Cell(1, 1).Value = "Header";
+        ws.Cell(2, 1).Value = "Username";
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+
+        var result = await service.ValidateAccountImportAsync(stream, isCallerAdmin: true);
+
+        Assert.False(result.CanCommit);
+        Assert.Equal(0, result.TotalRows);
+        Assert.NotEmpty(result.Errors);
+        Assert.Contains(result.Errors, e => e.Column == "File");
+    }
 }

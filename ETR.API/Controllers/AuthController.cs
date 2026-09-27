@@ -47,28 +47,10 @@ public class AuthController : ControllerBase
     /// </summary>
     [HttpPost("login")]
     [EnableRateLimiting("AuthPolicy")]
-    public async Task<ActionResult> Login([FromBody] LoginRequestDto request, CancellationToken cancellationToken)
+    public async Task<ActionResult<AuthResponse>> Login([FromBody] LoginRequestDto request, CancellationToken cancellationToken)
     {
-        var accounts = await _unitOfWork.AccountRepository.GetAllAsync(cancellationToken);
-        var account = accounts.FirstOrDefault(a => a.Username == request.Username);
-
-        var passwordIsValid = BCrypt.Net.BCrypt.Verify(request.Password, account?.PasswordHash ?? DummyPasswordHash);
-
-        if (account == null || account.Status != AccountStatus.Active || !passwordIsValid)
-        {
-            return Unauthorized("Invalid credentials or account is inactive.");
-        }
-
-        var roles = await _unitOfWork.RoleRepository.GetAllAsync(cancellationToken);
-        var role = roles.FirstOrDefault(r => r.RoleId == account.RoleId)
-            ?? throw new BusinessRuleViolationException("Account role is missing or inactive.");
-
-        var profiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
-        var profile = profiles.FirstOrDefault(p => p.AccountId == account.AccountId);
-
-        var token = _tokenService.GenerateToken(account, role);
-
-        return Ok(new AuthResponse(account.AccountId, account.Username, profile?.FullName ?? "Unknown", role.RoleName, token, "mock-refresh-token"));
+        var response = await _authSecurityService.AuthenticateAsync(request, cancellationToken);
+        return Ok(response);
     }
 
     [HttpGet("mock-admin-token")]
