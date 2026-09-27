@@ -1,3 +1,4 @@
+using ETR.API.Converters;
 using ETR.API.Middleware;
 using ETR.API.Services;
 using ETR.Application;
@@ -21,10 +22,14 @@ try
     // JsonStringEnumConverter: Status fields are now C# enums (see ETR.Domain.Enums) instead of raw
     // strings — this keeps their JSON wire format as the enum's name ("Active", not 0) so the existing
     // frontend contract is unaffected by the change.
+    // UtcDateTimeJsonConverter: Guarantees every DateTime is formatted with trailing 'Z' (ISO 8601 UTC)
+    // so client browsers across any timezone parse the timestamp accurately without timezone drift.
     builder.Services.AddControllers()
         .AddJsonOptions(options =>
         {
             options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+            options.JsonSerializerOptions.Converters.Add(new UtcDateTimeJsonConverter());
+            options.JsonSerializerOptions.Converters.Add(new NullableUtcDateTimeJsonConverter());
         });
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddMemoryCache();
