@@ -111,8 +111,23 @@ public class UserProfileService : IUserProfileService
             }
         }
 
+        if (string.IsNullOrWhiteSpace(request.FullName) || !System.Text.RegularExpressions.Regex.IsMatch(request.FullName.Trim(), @"^[\p{L}\s]+$"))
+        {
+            throw new BusinessRuleViolationException("Họ và tên chỉ được chứa chữ cái và khoảng trắng, không được bắt đầu bằng số hoặc chứa ký tự đặc biệt.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Phone) && !System.Text.RegularExpressions.Regex.IsMatch(request.Phone.Trim(), @"^0[0-9]{9,10}$"))
+        {
+            throw new BusinessRuleViolationException("Số điện thoại phải bắt đầu bằng số 0 và gồm 10-11 chữ số, không chứa ký tự đặc biệt.");
+        }
+
         if (!string.IsNullOrWhiteSpace(request.Email))
         {
+            if (!System.Text.RegularExpressions.Regex.IsMatch(request.Email.Trim(), @"^[a-zA-Z][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"))
+            {
+                throw new BusinessRuleViolationException("Email phải là địa chỉ email hợp lệ và bắt đầu bằng chữ cái.");
+            }
+
             var existingProfiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
             if (existingProfiles.Any(p => p.Email == request.Email))
             {
@@ -146,10 +161,27 @@ public class UserProfileService : IUserProfileService
         var profile = profiles.FirstOrDefault(p => p.AccountId == accountId)
             ?? throw new KeyNotFoundException($"UserProfile for Account {accountId} not found.");
 
-        if (!string.IsNullOrWhiteSpace(request.Email) &&
-            profiles.Any(p => p.AccountId != accountId && p.Email == request.Email))
+        if (string.IsNullOrWhiteSpace(request.FullName) || !System.Text.RegularExpressions.Regex.IsMatch(request.FullName.Trim(), @"^[\p{L}\s]+$"))
         {
-            throw new BusinessRuleViolationException($"A profile with email '{request.Email}' already exists.");
+            throw new BusinessRuleViolationException("Họ và tên chỉ được chứa chữ cái và khoảng trắng, không được bắt đầu bằng số hoặc chứa ký tự đặc biệt.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Phone) && !System.Text.RegularExpressions.Regex.IsMatch(request.Phone.Trim(), @"^0[0-9]{9,10}$"))
+        {
+            throw new BusinessRuleViolationException("Số điện thoại phải bắt đầu bằng số 0 và gồm 10-11 chữ số, không chứa ký tự đặc biệt.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Email))
+        {
+            if (!System.Text.RegularExpressions.Regex.IsMatch(request.Email.Trim(), @"^[a-zA-Z][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"))
+            {
+                throw new BusinessRuleViolationException("Email phải là địa chỉ email hợp lệ và bắt đầu bằng chữ cái.");
+            }
+
+            if (profiles.Any(p => p.AccountId != accountId && p.Email == request.Email))
+            {
+                throw new BusinessRuleViolationException($"A profile with email '{request.Email}' already exists.");
+            }
         }
 
         profile.FullName = request.FullName;

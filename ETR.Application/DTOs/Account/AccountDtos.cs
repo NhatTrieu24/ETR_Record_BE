@@ -12,7 +12,7 @@ public record AccountResponse(
     bool IsActive);
 
 public record CreateAccountRequest(
-    [Required, EmailAddress, MaxLength(255)] string Username,
+    [Required, EmailAddress, MaxLength(255), RegularExpression(@"^[a-zA-Z][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", ErrorMessage = "Tên đăng nhập phải là email hợp lệ, bắt đầu bằng chữ cái, không được bắt đầu bằng số hoặc ký tự đặc biệt không hợp lệ.")] string Username,
     [Required, MinLength(6), MaxLength(100)] string Password,
     [Required] int RoleId,
     [Required] int DepartmentId);

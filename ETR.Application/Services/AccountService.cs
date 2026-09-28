@@ -89,6 +89,12 @@ public class AccountService : IAccountService
             }
         }
 
+        if (string.IsNullOrWhiteSpace(request.Username) ||
+            !System.Text.RegularExpressions.Regex.IsMatch(request.Username.Trim(), @"^[a-zA-Z][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"))
+        {
+            throw new BusinessRuleViolationException("Tên đăng nhập phải là email hợp lệ, bắt đầu bằng chữ cái, không bắt đầu bằng số hoặc dấu gạch ngang.");
+        }
+
         if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 6)
         {
             throw new BusinessRuleViolationException("Mật khẩu phải có ít nhất 6 ký tự để đảm bảo an toàn.");

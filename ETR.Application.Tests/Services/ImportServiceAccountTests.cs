@@ -285,6 +285,9 @@ public class ImportServiceAccountTests
     [InlineData("abcdefghij")] // Non-numeric
     [InlineData("0123")] // Too short
     [InlineData("01234567890123456")] // Too long
+    [InlineData("+84912345678")] // Contains '+'
+    [InlineData("0912-345-678")] // Contains '-'
+    [InlineData("84912345678")] // Does not start with 0
     public async Task ValidateAccountImportAsync_FlagsInvalidPhone(string invalidPhone)
     {
         var (uow, clsSvc, enrSvc) = BuildMocks();
@@ -311,9 +314,8 @@ public class ImportServiceAccountTests
 
     [Theory]
     [InlineData("0912345678")] // Standard 10 digits
-    [InlineData("+84912345678")] // Standard international
     [InlineData("02812345678")] // 11 digits
-    [InlineData("0912-345-678")] // With hyphens
+    [InlineData("0987654321")] // 10 digits
     public async Task ValidateAccountImportAsync_AcceptsValidPhone(string validPhone)
     {
         var (uow, clsSvc, enrSvc) = BuildMocks();
@@ -336,6 +338,63 @@ public class ImportServiceAccountTests
 
         Assert.True(result.CanCommit);
         Assert.DoesNotContain(result.Errors, e => e.Column == "Phone");
+    }
+
+    [Theory]
+    [InlineData("1student@etr.com")] // Starts with number
+    [InlineData("-student@etr.com")] // Starts with hyphen
+    [InlineData("!student@etr.com")] // Starts with special char
+    [InlineData("student")] // Not email
+    public async Task ValidateAccountImportAsync_FlagsInvalidUsername(string invalidUsername)
+    {
+        var (uow, clsSvc, enrSvc) = BuildMocks();
+        var service = new ImportService(uow.Object, clsSvc.Object, enrSvc.Object);
+
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Tài khoản");
+        ws.Cell(3, 1).Value = invalidUsername;
+        ws.Cell(3, 2).Value = "P@ssw0rd123";
+        ws.Cell(3, 3).Value = "Student";
+        ws.Cell(3, 4).Value = "Training";
+        ws.Cell(3, 5).Value = "Nguyen Van A";
+        ws.Cell(3, 8).Value = "0912345678";
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+
+        var result = await service.ValidateAccountImportAsync(stream, isCallerAdmin: true);
+
+        Assert.False(result.CanCommit);
+        Assert.Contains(result.Errors, e => e.Column == "Username");
+    }
+
+    [Theory]
+    [InlineData("123 Nguyen")] // Starts with number
+    [InlineData("Nguyen Van @")] // Special character
+    [InlineData("Nguyen_Van")] // Underscore
+    public async Task ValidateAccountImportAsync_FlagsInvalidFullName(string invalidFullName)
+    {
+        var (uow, clsSvc, enrSvc) = BuildMocks();
+        var service = new ImportService(uow.Object, clsSvc.Object, enrSvc.Object);
+
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Tài khoản");
+        ws.Cell(3, 1).Value = "student1@etr.com";
+        ws.Cell(3, 2).Value = "P@ssw0rd123";
+        ws.Cell(3, 3).Value = "Student";
+        ws.Cell(3, 4).Value = "Training";
+        ws.Cell(3, 5).Value = invalidFullName;
+        ws.Cell(3, 8).Value = "0912345678";
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+
+        var result = await service.ValidateAccountImportAsync(stream, isCallerAdmin: true);
+
+        Assert.False(result.CanCommit);
+        Assert.Contains(result.Errors, e => e.Column == "FullName");
     }
 
     [Fact]

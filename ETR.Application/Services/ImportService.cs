@@ -1000,14 +1000,17 @@ public class ImportService : IImportService
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var seenInFile = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var usernameRegex = new System.Text.RegularExpressions.Regex(@"^[a-zA-Z][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$");
+        var fullNameRegex = new System.Text.RegularExpressions.Regex(@"^[\p{L}\s]+$");
+        var phoneRegex = new System.Text.RegularExpressions.Regex(@"^0[0-9]{9,10}$");
 
         foreach (var row in rows)
         {
-            if (!new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(row.Username) || row.Username.Length > 255)
-                errors.Add(new ImportRowError(row.RowNumber, "Username", $"Username '{row.Username}' phải là email hợp lệ, tối đa 255 ký tự."));
+            if (string.IsNullOrWhiteSpace(row.Username) || !usernameRegex.IsMatch(row.Username) || row.Username.Length > 255)
+                errors.Add(new ImportRowError(row.RowNumber, "Username", $"Username '{row.Username}' phải là email hợp lệ, bắt đầu bằng chữ cái và tối đa 255 ký tự."));
 
-            if (string.IsNullOrWhiteSpace(row.Password))
-                errors.Add(new ImportRowError(row.RowNumber, "Password", "Mật khẩu không được để trống."));
+            if (string.IsNullOrWhiteSpace(row.Password) || row.Password.Length < 6)
+                errors.Add(new ImportRowError(row.RowNumber, "Password", "Mật khẩu không được để trống và phải có ít nhất 6 ký tự."));
 
             if (!roles.ContainsKey(row.RoleName))
                 errors.Add(new ImportRowError(row.RowNumber, "RoleName", $"Vai trò '{row.RoleName}' không tồn tại."));
@@ -1031,6 +1034,8 @@ public class ImportService : IImportService
                 errors.Add(new ImportRowError(row.RowNumber, "FullName", "Họ và tên không được để trống."));
             else if (row.FullName.Length > 255)
                 errors.Add(new ImportRowError(row.RowNumber, "FullName", "Họ và tên tối đa 255 ký tự."));
+            else if (!fullNameRegex.IsMatch(row.FullName.Trim()))
+                errors.Add(new ImportRowError(row.RowNumber, "FullName", "Họ và tên chỉ được chứa chữ cái và khoảng trắng, không được chứa số hoặc ký tự đặc biệt."));
 
             if (row.DateOfBirth.HasValue)
             {
@@ -1044,9 +1049,8 @@ public class ImportService : IImportService
 
             if (!string.IsNullOrWhiteSpace(row.Phone))
             {
-                var cleanPhone = System.Text.RegularExpressions.Regex.Replace(row.Phone.Trim(), @"[\s().-]", "");
-                if (!System.Text.RegularExpressions.Regex.IsMatch(cleanPhone, @"^(0|\+84)[0-9]{9,10}$"))
-                    errors.Add(new ImportRowError(row.RowNumber, "Phone", "Số điện thoại không hợp lệ (phải gồm 10 hoặc 11 chữ số, bắt đầu bằng 0 hoặc +84)."));
+                if (!phoneRegex.IsMatch(row.Phone.Trim()))
+                    errors.Add(new ImportRowError(row.RowNumber, "Phone", "Số điện thoại không hợp lệ (phải bắt đầu bằng số 0, gồm 10 hoặc 11 chữ số và không chứa ký tự đặc biệt)."));
             }
 
             if (!string.IsNullOrWhiteSpace(row.Gender) && row.Gender.Length > 50)
@@ -1324,14 +1328,17 @@ public class ImportService : IImportService
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var seenInFile = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var usernameRegex = new System.Text.RegularExpressions.Regex(@"^[a-zA-Z][a-zA-Z0-9._%+-]*@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$");
+        var fullNameRegex = new System.Text.RegularExpressions.Regex(@"^[\p{L}\s]+$");
+        var phoneRegex = new System.Text.RegularExpressions.Regex(@"^0[0-9]{9,10}$");
 
         foreach (var row in rows)
         {
-            if (!new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(row.Username) || row.Username.Length > 255)
-                errors.Add(new ImportRowError(row.RowNumber, "Username", $"Username '{row.Username}' phải là email hợp lệ, tối đa 255 ký tự."));
+            if (string.IsNullOrWhiteSpace(row.Username) || !usernameRegex.IsMatch(row.Username) || row.Username.Length > 255)
+                errors.Add(new ImportRowError(row.RowNumber, "Username", $"Username '{row.Username}' phải là email hợp lệ, bắt đầu bằng chữ cái và tối đa 255 ký tự."));
 
-            if (string.IsNullOrWhiteSpace(row.Password))
-                errors.Add(new ImportRowError(row.RowNumber, "Password", "Mật khẩu không được để trống."));
+            if (string.IsNullOrWhiteSpace(row.Password) || row.Password.Length < 6)
+                errors.Add(new ImportRowError(row.RowNumber, "Password", "Mật khẩu không được để trống và phải có ít nhất 6 ký tự."));
 
             if (!departments.Contains(row.DepartmentName))
                 errors.Add(new ImportRowError(row.RowNumber, "DepartmentName", $"Phòng ban '{row.DepartmentName}' không tồn tại."));
@@ -1350,6 +1357,8 @@ public class ImportService : IImportService
                 errors.Add(new ImportRowError(row.RowNumber, "FullName", "Họ và tên không được để trống."));
             else if (row.FullName.Length > 255)
                 errors.Add(new ImportRowError(row.RowNumber, "FullName", "Họ và tên tối đa 255 ký tự."));
+            else if (!fullNameRegex.IsMatch(row.FullName.Trim()))
+                errors.Add(new ImportRowError(row.RowNumber, "FullName", "Họ và tên chỉ được chứa chữ cái và khoảng trắng, không được chứa số hoặc ký tự đặc biệt."));
 
             if (row.DateOfBirth.HasValue)
             {
@@ -1363,9 +1372,8 @@ public class ImportService : IImportService
 
             if (!string.IsNullOrWhiteSpace(row.Phone))
             {
-                var cleanPhone = System.Text.RegularExpressions.Regex.Replace(row.Phone.Trim(), @"[\s().-]", "");
-                if (!System.Text.RegularExpressions.Regex.IsMatch(cleanPhone, @"^(0|\+84)[0-9]{9,10}$"))
-                    errors.Add(new ImportRowError(row.RowNumber, "Phone", "Số điện thoại không hợp lệ (phải gồm 10 hoặc 11 chữ số, bắt đầu bằng 0 hoặc +84)."));
+                if (!phoneRegex.IsMatch(row.Phone.Trim()))
+                    errors.Add(new ImportRowError(row.RowNumber, "Phone", "Số điện thoại không hợp lệ (phải bắt đầu bằng số 0, gồm 10 hoặc 11 chữ số và không chứa ký tự đặc biệt)."));
             }
 
             if (!string.IsNullOrWhiteSpace(row.Gender) && row.Gender.Length > 50)
