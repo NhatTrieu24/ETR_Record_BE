@@ -71,10 +71,14 @@ public class UserProfileService : IUserProfileService
             
         if (_currentUserService.RoleName == "Instructor" && _currentUserService.AccountId.HasValue)
         {
-            var myStudentIds = await GetInstructorStudentIdsAsync(_currentUserService.AccountId.Value, cancellationToken);
-            if (!myStudentIds.Contains(accountId))
+            bool isOwnProfile = _currentUserService.AccountId.Value == accountId;
+            if (!isOwnProfile)
             {
-                throw new KeyNotFoundException($"UserProfile for Account {accountId} not found."); // Masking 403 as 404
+                var myStudentIds = await GetInstructorStudentIdsAsync(_currentUserService.AccountId.Value, cancellationToken);
+                if (!myStudentIds.Contains(accountId))
+                {
+                    throw new KeyNotFoundException($"UserProfile for Account {accountId} not found."); // Masking 403 as 404
+                }
             }
         }
             

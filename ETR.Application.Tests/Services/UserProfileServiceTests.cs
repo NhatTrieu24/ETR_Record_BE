@@ -716,4 +716,50 @@ public class UserProfileServiceTests
         Assert.Equal(5, result.IcaoElpLevel);
         Assert.Equal("A320", result.TypeRatings);
     }
+
+    [Fact]
+    public async Task GetProfileByAccountIdAsync_InstructorViewingOwnProfile_ReturnsFullProfile()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        var currentUserService = new Mock<ICurrentUserService>();
+        currentUserService.Setup(c => c.AccountId).Returns(2);
+        currentUserService.Setup(c => c.RoleName).Returns("Instructor");
+
+        var instructorProfile = new UserProfile
+        {
+            AccountId = 2,
+            UserCode = "INS-002",
+            FullName = "Captain Instructor",
+            Email = "captain@etr.com",
+            LicenseType = "ATPL",
+            LicenseNumber = "VN-ATPL-8888",
+            LicenseExpiryDate = new DateTime(2030, 1, 1),
+            MedicalClass = "Class 1",
+            MedicalExpiryDate = new DateTime(2027, 1, 1),
+            IcaoElpLevel = 6,
+            IcaoElpExpiryDate = new DateTime(2035, 1, 1),
+            TypeRatings = "A320, A350",
+            IsCredentialsVerified = true
+        };
+
+        var profileRepo = new Mock<IGenericRepository<UserProfile>>();
+        profileRepo.Setup(r => r.GetAllIncludingDeletedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<UserProfile> { instructorProfile });
+        uow.Setup(u => u.UserProfileRepository).Returns(profileRepo.Object);
+
+        var service = new UserProfileService(uow.Object, currentUserService.Object);
+
+        // Act: Instructor calls GetProfileByAccountIdAsync for their own account (e.g. GET /me)
+        var result = await service.GetProfileByAccountIdAsync(2);
+
+        // Assert: Instructor viewing own profile MUST succeed and receive their full credentials
+        Assert.Equal("Captain Instructor", result.FullName);
+        Assert.Equal("INS-002", result.UserCode);
+        Assert.Equal("ATPL", result.LicenseType);
+        Assert.Equal("VN-ATPL-8888", result.LicenseNumber);
+        Assert.Equal("Class 1", result.MedicalClass);
+        Assert.Equal(6, result.IcaoElpLevel);
+        Assert.Equal("A320, A350", result.TypeRatings);
+        Assert.True(result.IsCredentialsVerified);
+    }
 }
