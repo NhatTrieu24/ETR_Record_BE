@@ -51,15 +51,18 @@ public class TrainingTypeClassifierTests
     }
 
     [Theory]
-    [InlineData("PRAC-01", "Thực hành quy trình buồng lái", "Practical", TrainingType.Simulator)]
-    [InlineData("PRAC-02", "Thực hành buồng lái mô phỏng", "Thực hành", TrainingType.Simulator)]
-    [InlineData("CHK-01", "Thực hành tình huống khẩn cấp", "Thực tập", TrainingType.Simulator)]
-    [InlineData("SKL-01", "Kỹ năng buồng lái nhiều người", "Skill", TrainingType.Simulator)]
-    [InlineData("WKS-01", "Xử lý hệ thống điều khiển", "Workshop", TrainingType.Simulator)]
-    [InlineData("PRAC-FLT", "Thực hành bay vòng kín", "Practical", TrainingType.Flight)]
-    [InlineData("PRAC-SOLO", "Thực hành bay Solo đơn", "Thực hành", TrainingType.Flight)]
-    [InlineData("PPL-NAV", "Thực hành bay định chuẩn VFR", "Practical", TrainingType.Flight)]
-    public void Classify_PracticalSubjects_ShouldBeMappedAccuratelyWithoutDefaultingToTheory(
+    [InlineData("A320-SYS", "A320 Aircraft Systems & Avionics", "Theory", TrainingType.Theory)]
+    [InlineData("A320-SIM", "A320 Full Flight Simulator (FFS) Procedures", "Practical", TrainingType.Simulator)]
+    [InlineData("A320-FLT", "A320 Base Flight Training & Touch-and-Go", "Practical", TrainingType.Flight)]
+    [InlineData("B737-SYS", "Boeing 737 Systems Architecture", "Theory", TrainingType.Theory)]
+    [InlineData("B737-SIM", "Boeing 737 FFS Emergency Maneuvers", "Practical", TrainingType.Simulator)]
+    [InlineData("CABIN-EMERGENCY", "Cabin Evacuation & Smoke/Fire Drill", "Practical", TrainingType.Theory)]
+    [InlineData("MAINT-01", "Aircraft Maintenance Practical Workshop", "Practical", TrainingType.Theory)]
+    [InlineData("MAINT-ENG", "Thực hành bảo dưỡng động cơ phản lực", "Thực hành", TrainingType.Theory)]
+    [InlineData("AVIONICS-LAB", "Avionics System Lab & Testing", "Practical", TrainingType.Theory)]
+    [InlineData("FIRST-AID", "Hàng không: Sơ cấp cứu y tế & Cứu sinh", "Practical", TrainingType.Theory)]
+    [InlineData("WKS-MECH", "Thực hành cơ khí hàng không", "Workshop", TrainingType.Theory)]
+    public void Classify_RealWorldSystemSubjectsAndNonFstdDisciplines_ShouldMapCorrectly(
         string? code, string? name, string? type, TrainingType expected)
     {
         var result = TrainingTypeClassifier.Classify(code, name, type);

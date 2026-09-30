@@ -40,21 +40,56 @@ public static class TrainingTypeClassifier
             return TrainingType.Theory;
         }
 
-        // 3. Explicit Simulator keywords
+        // 3. Explicit Non-FSTD practical disciplines (Maintenance, Workshop, Cabin Emergency, Ground Safety Drills) -> Theory
+        if (code.StartsWith("MAINT", StringComparison.OrdinalIgnoreCase) ||
+            code.StartsWith("CABIN", StringComparison.OrdinalIgnoreCase) ||
+            code.StartsWith("AVIONICS", StringComparison.OrdinalIgnoreCase) ||
+            code.StartsWith("ENG-LAB", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Maintenance", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Bảo dưỡng", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Cabin", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Evacuation", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Fire Drill", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Smoke", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("First Aid", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Sơ cấp cứu", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Cứu hỏa", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Thoát hiểm", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Xưởng", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Workshop", StringComparison.OrdinalIgnoreCase) ||
+            type.Contains("Maintenance", StringComparison.OrdinalIgnoreCase) ||
+            type.Contains("Bảo dưỡng", StringComparison.OrdinalIgnoreCase) ||
+            type.Contains("Cabin", StringComparison.OrdinalIgnoreCase) ||
+            type.Contains("Workshop", StringComparison.OrdinalIgnoreCase) ||
+            type.Contains("Xưởng", StringComparison.OrdinalIgnoreCase))
+        {
+            return TrainingType.Theory;
+        }
+
+        // 4. Explicit Simulator keywords (FSTD, FNPT, FFS, Simulator, Buồng lái mô phỏng, MCC)
         if (type.Contains("Simulator", StringComparison.OrdinalIgnoreCase) ||
             type.Contains("Mô phỏng", StringComparison.OrdinalIgnoreCase) ||
             type.Contains("FSTD", StringComparison.OrdinalIgnoreCase) ||
             type.Contains("FNPT", StringComparison.OrdinalIgnoreCase) ||
+            type.Contains("FFS", StringComparison.OrdinalIgnoreCase) ||
             type.Equals("SIM", StringComparison.OrdinalIgnoreCase) ||
             name.Contains("Simulator", StringComparison.OrdinalIgnoreCase) ||
             name.Contains("Mô phỏng", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("FSTD", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("FNPT", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("FFS", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Buồng lái mô phỏng", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Full Flight Sim", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("MCC", StringComparison.OrdinalIgnoreCase) ||
             code.StartsWith("SIM", StringComparison.OrdinalIgnoreCase) ||
-            code.StartsWith("FSTD", StringComparison.OrdinalIgnoreCase))
+            code.StartsWith("FSTD", StringComparison.OrdinalIgnoreCase) ||
+            code.StartsWith("FNPT", StringComparison.OrdinalIgnoreCase) ||
+            code.Contains("-SIM", StringComparison.OrdinalIgnoreCase))
         {
             return TrainingType.Simulator;
         }
 
-        // 4. Explicit Flight Training keywords (exact or compound, avoiding single substring 'Air')
+        // 5. Explicit Flight Training keywords (Aircraft Flight, Circuits, Touch-and-Go, Solo, Dual, Cross-Country)
         if (type.Equals("Flight", StringComparison.OrdinalIgnoreCase) ||
             type.Equals("Bay", StringComparison.OrdinalIgnoreCase) ||
             type.Contains("Flight Training", StringComparison.OrdinalIgnoreCase) ||
@@ -68,42 +103,18 @@ public static class TrainingTypeClassifier
             name.Contains("Bay vòng kín", StringComparison.OrdinalIgnoreCase) ||
             name.Contains("Bay đường dài", StringComparison.OrdinalIgnoreCase) ||
             name.Contains("Bay đêm", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Touch-and-Go", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Base Flight Training", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Solo", StringComparison.OrdinalIgnoreCase) ||
             code.StartsWith("FLT", StringComparison.OrdinalIgnoreCase) ||
-            code.StartsWith("FLY", StringComparison.OrdinalIgnoreCase))
+            code.StartsWith("FLY", StringComparison.OrdinalIgnoreCase) ||
+            code.Contains("-FLT", StringComparison.OrdinalIgnoreCase))
         {
             return TrainingType.Flight;
         }
 
-        // 5. Practical / Thực hành / Workshop / Skill classification
-        // If SubjectType is Practical/Thực hành without explicit theory precedence:
-        if (type.Contains("Practical", StringComparison.OrdinalIgnoreCase) ||
-            type.Contains("Thực hành", StringComparison.OrdinalIgnoreCase) ||
-            type.Contains("Thực tập", StringComparison.OrdinalIgnoreCase) ||
-            type.Contains("Skill", StringComparison.OrdinalIgnoreCase) ||
-            type.Contains("Workshop", StringComparison.OrdinalIgnoreCase) ||
-            name.Contains("Thực hành", StringComparison.OrdinalIgnoreCase) ||
-            name.Contains("Practical", StringComparison.OrdinalIgnoreCase))
-        {
-            // If practical name/code specifies flight markers -> Flight
-            if (name.Contains("Bay", StringComparison.OrdinalIgnoreCase) ||
-                name.Contains("Flight", StringComparison.OrdinalIgnoreCase) ||
-                name.Contains("Solo", StringComparison.OrdinalIgnoreCase) ||
-                name.Contains("PIC", StringComparison.OrdinalIgnoreCase) ||
-                name.Contains("Dual", StringComparison.OrdinalIgnoreCase) ||
-                name.Contains("VFR", StringComparison.OrdinalIgnoreCase) ||
-                name.Contains("Navigation", StringComparison.OrdinalIgnoreCase) ||
-                name.Contains("Circuit", StringComparison.OrdinalIgnoreCase) ||
-                code.StartsWith("PPL", StringComparison.OrdinalIgnoreCase) ||
-                code.StartsWith("CPL", StringComparison.OrdinalIgnoreCase))
-            {
-                return TrainingType.Flight;
-            }
-
-            // Otherwise, default practical training (cockpit procedures, MCC, generic practical checklists) to Simulator
-            return TrainingType.Simulator;
-        }
-
-        // 6. Default to Theory
+        // 6. Generic Practical / Thực hành / Skill without explicit Flight/SIM keywords
+        // Non-flight, non-simulator practical training (workshops, classroom labs) defaults safely to Theory
         return TrainingType.Theory;
     }
 }
