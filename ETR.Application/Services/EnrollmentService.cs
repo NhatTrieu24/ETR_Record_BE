@@ -273,6 +273,7 @@ public class EnrollmentService : IEnrollmentService
                         RequiredSessionsSnapshot = cs.RequiredSessions,
                         IsMandatorySnapshot = cs.IsMandatory,
                         SequenceNoSnapshot = cs.SequenceNo,
+                        SubjectVersionSnapshot = cs.SubjectVersion,
                         CreatedAt = DateTime.UtcNow,
                         CreatedByAccountId = createdByAccountId
                     };

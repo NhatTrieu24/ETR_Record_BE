@@ -7,5 +7,6 @@ public record CourseSubjectResponse(
     int RequiredHours,
     int RequiredSessions,
     bool IsMandatory,
-    decimal PassingScore
+    decimal PassingScore,
+    string? SubjectVersion = null
 );

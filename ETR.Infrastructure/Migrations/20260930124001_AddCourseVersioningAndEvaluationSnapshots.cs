@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -56,6 +56,12 @@ namespace ETR.Infrastructure.Migrations
                 type: "nvarchar(max)",
                 nullable: true);
 
+            migrationBuilder.AddColumn<string>(
+                name: "SubjectVersionSnapshot",
+                table: "SubjectResults",
+                type: "nvarchar(max)",
+                nullable: true);
+
             migrationBuilder.AddColumn<bool>(
                 name: "IsMandatorySnapshot",
                 table: "PracticalChecklistResults",
@@ -73,7 +79,9 @@ namespace ETR.Infrastructure.Migrations
                 table: "Classes",
                 type: "int",
                 nullable: false,
-                defaultValue: 0);
+                defaultValue: 1);
+
+            migrationBuilder.Sql("UPDATE Classes SET CourseVersionNo = 1 WHERE CourseVersionNo = 0 OR CourseVersionNo IS NULL;");
 
             migrationBuilder.AddColumn<bool>(
                 name: "IsMandatorySnapshot",
@@ -125,6 +133,10 @@ namespace ETR.Infrastructure.Migrations
                 table: "SubjectResults");
 
             migrationBuilder.DropColumn(
+                name: "SubjectVersionSnapshot",
+                table: "SubjectResults");
+
+            migrationBuilder.DropColumn(
                 name: "IsMandatorySnapshot",
                 table: "PracticalChecklistResults");
 
@@ -139,6 +151,8 @@ namespace ETR.Infrastructure.Migrations
             migrationBuilder.DropColumn(
                 name: "IsMandatorySnapshot",
                 table: "AssessmentResults");
+
+            migrationBuilder.Sql("UPDATE Courses SET IsDeleted = 1, DeletedAt = GETUTCDATE() WHERE VersionNo > 1 AND [IsDeleted] = 0;");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Courses_CourseCode",

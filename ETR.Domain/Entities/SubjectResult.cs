@@ -43,6 +43,9 @@ public class SubjectResult : BaseEntity
     /// <summary>Snapshot of CourseSubject.SequenceNo at Enroll time.</summary>
     public int? SequenceNoSnapshot { get; set; }
 
+    /// <summary>Snapshot of CourseSubject.SubjectVersion at Enroll time.</summary>
+    public string? SubjectVersionSnapshot { get; set; }
+
     /// <summary>Set when this SubjectResult was carried over unchanged from a prior enrollment
     /// attempt at Enroll time (see EnrollmentService.CreateEnrollmentAsync) because the learner had
     /// already Passed/Exempted this subject — points at the SOURCE SubjectResult from the previous

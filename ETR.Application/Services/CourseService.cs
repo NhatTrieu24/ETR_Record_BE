@@ -68,7 +68,7 @@ public class CourseService : ICourseService
             .Where(cs => cs.CourseId == id && !cs.IsDeleted)
             .OrderBy(cs => cs.SequenceNo)
             .Select(cs => new CourseSubjectResponse(
-                cs.CourseId, cs.SubjectId, cs.SequenceNo, cs.RequiredHours, cs.RequiredSessions, cs.IsMandatory, cs.PassingScore
+                cs.CourseId, cs.SubjectId, cs.SequenceNo, cs.RequiredHours, cs.RequiredSessions, cs.IsMandatory, cs.PassingScore, cs.SubjectVersion
             )).ToList();
 
         return new CourseResponse(c.CourseId, c.CourseCode, c.CourseName, c.Description, c.DurationHours, c.Status, c.ValidityMonths, c.CourseType, subjects, c.VersionNo, c.PreviousVersionId);
@@ -134,6 +134,7 @@ public class CourseService : ICourseService
                         RequiredSessions = s.RequiredSessions,
                         IsMandatory = s.IsMandatory,
                         PassingScore = s.PassingScore,
+                        SubjectVersion = s.SubjectVersion,
                         CreatedAt = DateTime.UtcNow,
                         CreatedByAccountId = createdByAccountId
                     };
@@ -151,7 +152,7 @@ public class CourseService : ICourseService
                     }, ct);
 
                     responseSubjects.Add(new CourseSubjectResponse(
-                        course.CourseId, s.SubjectId, s.SequenceNo, s.RequiredHours, s.RequiredSessions, s.IsMandatory, s.PassingScore
+                        course.CourseId, s.SubjectId, s.SequenceNo, s.RequiredHours, s.RequiredSessions, s.IsMandatory, s.PassingScore, s.SubjectVersion
                     ));
                 }
 
@@ -205,7 +206,8 @@ public class CourseService : ICourseService
                             && match.RequiredHours == reqSub.RequiredHours
                             && match.RequiredSessions == reqSub.RequiredSessions
                             && match.IsMandatory == reqSub.IsMandatory
-                            && match.PassingScore == reqSub.PassingScore;
+                            && match.PassingScore == reqSub.PassingScore
+                            && match.SubjectVersion == reqSub.SubjectVersion;
                     });
 
                 bool isOnlyStatusChange = isCurriculumUnchanged && areSubjectsUnchanged;
@@ -345,10 +347,11 @@ public class CourseService : ICourseService
                         existing.RequiredSessions = reqSub.RequiredSessions;
                         existing.IsMandatory = reqSub.IsMandatory;
                         existing.PassingScore = reqSub.PassingScore;
+                        existing.SubjectVersion = reqSub.SubjectVersion;
                         _unitOfWork.CourseSubjectRepository.Update(existing);
 
                         finalSubjects.Add(new CourseSubjectResponse(
-                            id, existing.SubjectId, existing.SequenceNo, existing.RequiredHours, existing.RequiredSessions, existing.IsMandatory, existing.PassingScore
+                            id, existing.SubjectId, existing.SequenceNo, existing.RequiredHours, existing.RequiredSessions, existing.IsMandatory, existing.PassingScore, existing.SubjectVersion
                         ));
                     }
                     else
@@ -366,6 +369,7 @@ public class CourseService : ICourseService
                             softDeleted.RequiredSessions = reqSub.RequiredSessions;
                             softDeleted.IsMandatory = reqSub.IsMandatory;
                             softDeleted.PassingScore = reqSub.PassingScore;
+                            softDeleted.SubjectVersion = reqSub.SubjectVersion;
                             _unitOfWork.CourseSubjectRepository.Update(softDeleted);
 
                             await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
@@ -379,7 +383,7 @@ public class CourseService : ICourseService
                             }, ct);
 
                             finalSubjects.Add(new CourseSubjectResponse(
-                                id, reqSub.SubjectId, reqSub.SequenceNo, reqSub.RequiredHours, reqSub.RequiredSessions, reqSub.IsMandatory, reqSub.PassingScore
+                                id, reqSub.SubjectId, reqSub.SequenceNo, reqSub.RequiredHours, reqSub.RequiredSessions, reqSub.IsMandatory, reqSub.PassingScore, reqSub.SubjectVersion
                             ));
                         }
                         else
@@ -397,6 +401,7 @@ public class CourseService : ICourseService
                                 RequiredSessions = reqSub.RequiredSessions,
                                 IsMandatory = reqSub.IsMandatory,
                                 PassingScore = reqSub.PassingScore,
+                                SubjectVersion = reqSub.SubjectVersion,
                                 CreatedAt = DateTime.UtcNow,
                                 CreatedByAccountId = updatedByAccountId
                             };
@@ -413,7 +418,7 @@ public class CourseService : ICourseService
                             }, ct);
 
                             finalSubjects.Add(new CourseSubjectResponse(
-                                id, reqSub.SubjectId, reqSub.SequenceNo, reqSub.RequiredHours, reqSub.RequiredSessions, reqSub.IsMandatory, reqSub.PassingScore
+                                id, reqSub.SubjectId, reqSub.SequenceNo, reqSub.RequiredHours, reqSub.RequiredSessions, reqSub.IsMandatory, reqSub.PassingScore, reqSub.SubjectVersion
                             ));
                         }
                     }
@@ -487,12 +492,13 @@ public class CourseService : ICourseService
                         RequiredSessions = s.RequiredSessions,
                         IsMandatory = s.IsMandatory,
                         PassingScore = s.PassingScore,
+                        SubjectVersion = s.SubjectVersion,
                         CreatedAt = DateTime.UtcNow,
                         CreatedByAccountId = createdByAccountId
                     };
                     await _unitOfWork.CourseSubjectRepository.AddAsync(newCourseSubject, ct);
                     clonedSubjects.Add(new CourseSubjectResponse(
-                        newCourse.CourseId, s.SubjectId, s.SequenceNo, s.RequiredHours, s.RequiredSessions, s.IsMandatory, s.PassingScore));
+                        newCourse.CourseId, s.SubjectId, s.SequenceNo, s.RequiredHours, s.RequiredSessions, s.IsMandatory, s.PassingScore, s.SubjectVersion));
                 }
 
                 // 2. Clone Assessment
@@ -667,6 +673,7 @@ public class CourseService : ICourseService
             existingMapping.RequiredSessions = request.RequiredSessions;
             existingMapping.IsMandatory = request.IsMandatory;
             existingMapping.PassingScore = request.PassingScore;
+            existingMapping.SubjectVersion = request.SubjectVersion;
 
             _unitOfWork.CourseSubjectRepository.Update(existingMapping);
             courseSubject = existingMapping;
@@ -692,6 +699,7 @@ public class CourseService : ICourseService
                 RequiredSessions = request.RequiredSessions,
                 IsMandatory = request.IsMandatory,
                 PassingScore = request.PassingScore,
+                SubjectVersion = request.SubjectVersion,
                 CreatedAt = DateTime.UtcNow,
                 CreatedByAccountId = addedByAccountId
             };
@@ -718,7 +726,8 @@ public class CourseService : ICourseService
             courseSubject.RequiredHours,
             courseSubject.RequiredSessions,
             courseSubject.IsMandatory,
-            courseSubject.PassingScore
+            courseSubject.PassingScore,
+            courseSubject.SubjectVersion
         );
     }
 
@@ -735,7 +744,8 @@ public class CourseService : ICourseService
                 cs.RequiredHours,
                 cs.RequiredSessions,
                 cs.IsMandatory,
-                cs.PassingScore
+                cs.PassingScore,
+                cs.SubjectVersion
             ));
     }
 
@@ -779,6 +789,7 @@ public class CourseService : ICourseService
         existingMapping.RequiredSessions = request.RequiredSessions;
         existingMapping.IsMandatory = request.IsMandatory;
         existingMapping.PassingScore = request.PassingScore;
+        existingMapping.SubjectVersion = request.SubjectVersion;
 
         _unitOfWork.CourseSubjectRepository.Update(existingMapping);
 
@@ -801,7 +812,8 @@ public class CourseService : ICourseService
             existingMapping.RequiredHours,
             existingMapping.RequiredSessions,
             existingMapping.IsMandatory,
-            existingMapping.PassingScore
+            existingMapping.PassingScore,
+            existingMapping.SubjectVersion
         );
     }
 

@@ -1,0 +1,160 @@
+using ETR.Application.Compliance;
+using ETR.Application.DTOs;
+using ETR.Application.Interfaces;
+using ETR.Application.Services;
+using ETR.Domain.Entities;
+using ETR.Domain.Enums;
+using Moq;
+
+namespace ETR.Application.Tests.Services;
+
+public class EnrollmentServiceTests
+{
+    private readonly Mock<IUnitOfWork> _mockUow;
+    private readonly Mock<ICurrentUserService> _mockCurrentUserService;
+    private readonly Mock<IGenericRepository<Account>> _mockAccountRepo;
+    private readonly Mock<IGenericRepository<Class>> _mockClassRepo;
+    private readonly Mock<IGenericRepository<Course>> _mockCourseRepo;
+    private readonly Mock<IGenericRepository<CourseEnrollment>> _mockEnrollmentRepo;
+    private readonly Mock<IETRCourseRecordRepository> _mockEtrRepo;
+    private readonly Mock<IGenericRepository<CourseSubject>> _mockCourseSubjectRepo;
+    private readonly Mock<IGenericRepository<Subject>> _mockSubjectRepo;
+    private readonly Mock<IGenericRepository<SubjectResult>> _mockSubjectResultRepo;
+    private readonly Mock<IGenericRepository<Assessment>> _mockAssessmentRepo;
+    private readonly Mock<IGenericRepository<AssessmentResult>> _mockAssessmentResultRepo;
+    private readonly Mock<IGenericRepository<PracticalChecklist>> _mockChecklistRepo;
+    private readonly Mock<IGenericRepository<PracticalChecklistResult>> _mockChecklistResultRepo;
+    private readonly Mock<IAuditLogRepository> _mockAuditRepo;
+    private readonly EnrollmentService _service;
+
+    public EnrollmentServiceTests()
+    {
+        _mockUow = new Mock<IUnitOfWork>();
+        _mockCurrentUserService = new Mock<ICurrentUserService>();
+        _mockAccountRepo = new Mock<IGenericRepository<Account>>();
+        _mockClassRepo = new Mock<IGenericRepository<Class>>();
+        _mockCourseRepo = new Mock<IGenericRepository<Course>>();
+        _mockEnrollmentRepo = new Mock<IGenericRepository<CourseEnrollment>>();
+        _mockEtrRepo = new Mock<IETRCourseRecordRepository>();
+        _mockCourseSubjectRepo = new Mock<IGenericRepository<CourseSubject>>();
+        _mockSubjectRepo = new Mock<IGenericRepository<Subject>>();
+        _mockSubjectResultRepo = new Mock<IGenericRepository<SubjectResult>>();
+        _mockAssessmentRepo = new Mock<IGenericRepository<Assessment>>();
+        _mockAssessmentResultRepo = new Mock<IGenericRepository<AssessmentResult>>();
+        _mockChecklistRepo = new Mock<IGenericRepository<PracticalChecklist>>();
+        _mockChecklistResultRepo = new Mock<IGenericRepository<PracticalChecklistResult>>();
+        _mockAuditRepo = new Mock<IAuditLogRepository>();
+
+        _mockUow.Setup(u => u.AccountRepository).Returns(_mockAccountRepo.Object);
+        _mockUow.Setup(u => u.ClassRepository).Returns(_mockClassRepo.Object);
+        _mockUow.Setup(u => u.CourseRepository).Returns(_mockCourseRepo.Object);
+        _mockUow.Setup(u => u.CourseEnrollmentRepository).Returns(_mockEnrollmentRepo.Object);
+        _mockUow.Setup(u => u.ETRCourseRecordRepository).Returns(_mockEtrRepo.Object);
+        _mockUow.Setup(u => u.CourseSubjectRepository).Returns(_mockCourseSubjectRepo.Object);
+        _mockUow.Setup(u => u.SubjectRepository).Returns(_mockSubjectRepo.Object);
+        _mockUow.Setup(u => u.SubjectResultRepository).Returns(_mockSubjectResultRepo.Object);
+        _mockUow.Setup(u => u.AssessmentRepository).Returns(_mockAssessmentRepo.Object);
+        _mockUow.Setup(u => u.AssessmentResultRepository).Returns(_mockAssessmentResultRepo.Object);
+        _mockUow.Setup(u => u.PracticalChecklistRepository).Returns(_mockChecklistRepo.Object);
+        _mockUow.Setup(u => u.PracticalChecklistResultRepository).Returns(_mockChecklistResultRepo.Object);
+        _mockUow.Setup(u => u.AuditLogRepository).Returns(_mockAuditRepo.Object);
+
+        _service = new EnrollmentService(_mockUow.Object, _mockCurrentUserService.Object);
+    }
+
+    [Fact]
+    public async Task CreateEnrollmentAsync_ShouldSnapshotSubjectVersionAndCourseVersionNo()
+    {
+        int studentAccountId = 50;
+        int classId = 100;
+        int courseId = 200;
+
+        _mockAccountRepo.Setup(r => r.GetByIdAsync(studentAccountId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Account { AccountId = studentAccountId, RoleId = 4, Status = AccountStatus.Active });
+
+        var trainingClass = new Class
+        {
+            ClassId = classId,
+            CourseId = courseId,
+            ClassName = "B737 Type Rating 2026-A",
+            StartDate = DateTime.UtcNow.AddDays(7),
+            Status = ClassStatus.Planned,
+            Capacity = 20,
+            CourseVersionNo = 2
+        };
+
+        _mockClassRepo.Setup(r => r.GetByIdAsync(classId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(trainingClass);
+
+        _mockCourseRepo.Setup(r => r.GetByIdAsync(courseId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Course { CourseId = courseId, CourseCode = "B737", CourseName = "Boeing 737", Status = CourseStatus.Active });
+
+        _mockClassRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Class> { trainingClass });
+
+        _mockEnrollmentRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CourseEnrollment>());
+
+        _mockEtrRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ETRCourseRecord>());
+
+        var courseSubjects = new List<CourseSubject>
+        {
+            new()
+            {
+                CourseId = courseId,
+                SubjectId = 10,
+                SequenceNo = 1,
+                RequiredHours = 40,
+                RequiredSessions = 10,
+                IsMandatory = true,
+                PassingScore = 75,
+                SubjectVersion = "v2.1"
+            }
+        };
+
+        _mockCourseSubjectRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(courseSubjects);
+
+        _mockSubjectRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Subject>
+            {
+                new() { SubjectId = 10, SubjectCode = "GS-101", SubjectName = "Ground School", SubjectType = "Ground" }
+            });
+
+        _mockAssessmentRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Assessment>());
+
+        _mockChecklistRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<PracticalChecklist>());
+
+        ETRCourseRecord? createdEtr = null;
+        _mockEtrRepo.Setup(r => r.AddAsync(It.IsAny<ETRCourseRecord>(), It.IsAny<CancellationToken>()))
+            .Callback<ETRCourseRecord, CancellationToken>((etr, _) => createdEtr = etr)
+            .Returns(Task.CompletedTask);
+
+        var createdSubjectResults = new List<SubjectResult>();
+        _mockSubjectResultRepo.Setup(r => r.AddAsync(It.IsAny<SubjectResult>(), It.IsAny<CancellationToken>()))
+            .Callback<SubjectResult, CancellationToken>((sr, _) => createdSubjectResults.Add(sr))
+            .Returns(Task.CompletedTask);
+
+        var mockUserProfileRepo = new Mock<IGenericRepository<UserProfile>>();
+        mockUserProfileRepo.Setup(r => r.GetByIdAsync(studentAccountId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UserProfile { AccountId = studentAccountId, FullName = "Test Student" });
+        _mockUow.Setup(u => u.UserProfileRepository).Returns(mockUserProfileRepo.Object);
+
+        _mockUow.Setup(u => u.ExecuteInStrategyAsync(It.IsAny<Func<CancellationToken, Task<CreateEnrollmentResponse>>>(), It.IsAny<CancellationToken>()))
+            .Returns<Func<CancellationToken, Task<CreateEnrollmentResponse>>, CancellationToken>((op, ct) => op(ct));
+
+        var response = await _service.CreateEnrollmentAsync(studentAccountId, classId, createdByAccountId: 99);
+
+        Assert.NotNull(response);
+        Assert.NotNull(createdEtr);
+        Assert.Equal(2, createdEtr.CourseVersionNo);
+        Assert.Single(createdSubjectResults);
+        Assert.Equal("v2.1", createdSubjectResults[0].SubjectVersionSnapshot);
+        Assert.Equal("GS-101", createdSubjectResults[0].SubjectCodeSnapshot);
+        Assert.Equal("Ground School", createdSubjectResults[0].SubjectNameSnapshot);
+        Assert.Equal(75, createdSubjectResults[0].PassingScoreSnapshot);
+    }
+}

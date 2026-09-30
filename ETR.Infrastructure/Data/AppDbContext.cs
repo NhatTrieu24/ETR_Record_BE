@@ -91,6 +91,7 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<Subject>().HasKey(e => e.SubjectId);
         modelBuilder.Entity<CourseSubject>().HasKey(e => new { e.CourseId, e.SubjectId });
         modelBuilder.Entity<Class>().HasKey(e => e.ClassId);
+        modelBuilder.Entity<Class>().Property(c => c.CourseVersionNo).HasDefaultValue(1);
         modelBuilder.Entity<ClassSubject>().HasKey(e => e.ClassSubjectId);
         modelBuilder.Entity<Session>().HasKey(e => e.SessionId);
         modelBuilder.Entity<CourseEnrollment>().HasKey(e => e.EnrollmentId);

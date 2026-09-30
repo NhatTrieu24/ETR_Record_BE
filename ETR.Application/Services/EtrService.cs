@@ -218,15 +218,15 @@ public class EtrService : IEtrService
         var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken))
             .Where(cs => cs.CourseId == trainingClass.CourseId && cs.IsMandatory).ToList();
 
+        var subjectResults = etr.SubjectResults ?? Enumerable.Empty<SubjectResult>();
+        bool hasSnapshots = subjectResults.Any(sr => sr.IsMandatorySnapshot.HasValue);
+
         // === PRE-VALIDATION ===
 
         // 1. Check all mandatory subjects are Passed or Exempted
-        var mandatorySubjectResults = (etr.SubjectResults ?? Enumerable.Empty<SubjectResult>())
-            .Where(sr => sr.IsMandatorySnapshot ?? courseSubjects.Any(cs => cs.SubjectId == sr.SubjectId))
-            .ToList();
-
-        if (mandatorySubjectResults.Any())
+        if (hasSnapshots)
         {
+            var mandatorySubjectResults = subjectResults.Where(sr => sr.IsMandatorySnapshot == true).ToList();
             foreach (var sr in mandatorySubjectResults)
             {
                 if (sr.Status != SubjectResultStatus.Passed && sr.Status != SubjectResultStatus.Exempted)
@@ -240,7 +240,7 @@ public class EtrService : IEtrService
         {
             foreach (var cs in courseSubjects)
             {
-                var sr = etr.SubjectResults?.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
+                var sr = subjectResults.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
                 if (sr == null || (sr.Status != SubjectResultStatus.Passed && sr.Status != SubjectResultStatus.Exempted))
                 {
                     throw new BusinessRuleViolationException($"Cannot submit ETR. Mandatory subject (ID: {cs.SubjectId}) is not Passed or Exempted.");
@@ -304,9 +304,10 @@ public class EtrService : IEtrService
                     break;
 
                 case "AllAssessmentsPassed":
-                    if (mandatorySubjectResults.Any())
+                    if (hasSnapshots)
                     {
-                        if (!mandatorySubjectResults.All(sr => sr.Status == SubjectResultStatus.Passed || sr.Status == SubjectResultStatus.Exempted))
+                        var mandatorySRs = subjectResults.Where(sr => sr.IsMandatorySnapshot == true).ToList();
+                        if (!mandatorySRs.All(sr => sr.Status == SubjectResultStatus.Passed || sr.Status == SubjectResultStatus.Exempted))
                         {
                             throw new BusinessRuleViolationException($"Cannot submit ETR. Completion requirement '{requirement.RequirementName}' not met: not all mandatory subjects are Passed or Exempted.");
                         }
@@ -315,7 +316,7 @@ public class EtrService : IEtrService
                     {
                         foreach (var cs in courseSubjects)
                         {
-                            var sr = etr.SubjectResults?.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
+                            var sr = subjectResults.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
                             if (sr == null || (sr.Status != SubjectResultStatus.Passed && sr.Status != SubjectResultStatus.Exempted))
                             {
                                 throw new BusinessRuleViolationException($"Cannot submit ETR. Completion requirement '{requirement.RequirementName}' not met: not all mandatory subjects are Passed or Exempted.");
@@ -325,19 +326,32 @@ public class EtrService : IEtrService
                     break;
 
                 case "AllChecklistsSignedOff":
-                    var subjectResultIds = etr.SubjectResults?.Select(sr => sr.SubjectResultId).ToList() ?? new List<int>();
-                    var mandatoryChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(cancellationToken))
-                        .Where(pc => pc.CourseId == trainingClass.CourseId && pc.IsRequired).ToList();
+                    var subjectResultIds = subjectResults.Select(sr => sr.SubjectResultId).ToList();
                     var checklistResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(cancellationToken))
                         .Where(r => subjectResultIds.Contains(r.SubjectResultId)).ToList();
+                    bool hasChecklistSnapshots = checklistResults.Any(r => r.IsMandatorySnapshot.HasValue);
 
-                    var hasUnpassedMandatoryChecklist = checklistResults.Any(r =>
-                        (r.IsMandatorySnapshot ?? mandatoryChecklists.Any(c => c.PracticalChecklistId == r.PracticalChecklistId))
-                        && r.ResultStatus != "Passed");
-
-                    if (hasUnpassedMandatoryChecklist || mandatoryChecklists.Any(c => !checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.ResultStatus == "Passed")))
+                    if (hasChecklistSnapshots)
                     {
-                        throw new BusinessRuleViolationException($"Cannot submit ETR. Completion requirement '{requirement.RequirementName}' not met: not all mandatory practical checklists are signed off.");
+                        var mandatoryChecklistResults = checklistResults.Where(r => r.IsMandatorySnapshot == true).ToList();
+                        if (mandatoryChecklistResults.Any(r => r.ResultStatus != "Passed"))
+                        {
+                            throw new BusinessRuleViolationException($"Cannot submit ETR. Completion requirement '{requirement.RequirementName}' not met: not all mandatory practical checklists are signed off.");
+                        }
+                    }
+                    else
+                    {
+                        var mandatoryChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(cancellationToken))
+                            .Where(pc => pc.CourseId == trainingClass.CourseId && pc.IsRequired).ToList();
+
+                        var hasUnpassedMandatoryChecklist = checklistResults.Any(r =>
+                            mandatoryChecklists.Any(c => c.PracticalChecklistId == r.PracticalChecklistId)
+                            && r.ResultStatus != "Passed");
+
+                        if (hasUnpassedMandatoryChecklist || mandatoryChecklists.Any(c => !checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.ResultStatus == "Passed")))
+                        {
+                            throw new BusinessRuleViolationException($"Cannot submit ETR. Completion requirement '{requirement.RequirementName}' not met: not all mandatory practical checklists are signed off.");
+                        }
                     }
                     break;
 
@@ -422,10 +436,11 @@ public class EtrService : IEtrService
 
         // 1. Mandatory subjects Passed/Exempted (one check per subject)
         var subjectResultsList = etr.SubjectResults?.ToList() ?? new List<SubjectResult>();
-        var mandatorySubjectsList = subjectResultsList.Where(sr => sr.IsMandatorySnapshot ?? courseSubjects.Any(cs => cs.SubjectId == sr.SubjectId)).ToList();
+        bool hasSnapshots = subjectResultsList.Any(sr => sr.IsMandatorySnapshot.HasValue);
 
-        if (mandatorySubjectsList.Any())
+        if (hasSnapshots)
         {
+            var mandatorySubjectsList = subjectResultsList.Where(sr => sr.IsMandatorySnapshot == true).ToList();
             foreach (var sr in mandatorySubjectsList)
             {
                 var subjectName = sr.SubjectNameSnapshot ?? subjects.GetValueOrDefault(sr.SubjectId)?.SubjectName ?? $"Subject #{sr.SubjectId}";
@@ -437,7 +452,7 @@ public class EtrService : IEtrService
         {
             foreach (var cs in courseSubjects)
             {
-                var sr = etr.SubjectResults?.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
+                var sr = subjectResultsList.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
                 var subjectName = subjects.GetValueOrDefault(cs.SubjectId)?.SubjectName ?? $"Subject #{cs.SubjectId}";
                 var isMet = sr != null && (sr.Status == SubjectResultStatus.Passed || sr.Status == SubjectResultStatus.Exempted);
                 checks.Add(new CompletionCheckItem($"Subject Passed/Exempted: {subjectName}", true, isMet, sr?.Status.ToString() ?? "(no result yet)"));
@@ -487,22 +502,32 @@ public class EtrService : IEtrService
                     break;
 
                 case "AllAssessmentsPassed":
-                    isMet = mandatorySubjectsList.Any()
-                        ? mandatorySubjectsList.All(sr => sr.Status == SubjectResultStatus.Passed || sr.Status == SubjectResultStatus.Exempted)
+                    isMet = hasSnapshots
+                        ? subjectResultsList.Where(sr => sr.IsMandatorySnapshot == true).All(sr => sr.Status == SubjectResultStatus.Passed || sr.Status == SubjectResultStatus.Exempted)
                         : courseSubjects.All(cs =>
                         {
-                            var sr = etr.SubjectResults?.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
+                            var sr = subjectResultsList.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
                             return sr != null && (sr.Status == SubjectResultStatus.Passed || sr.Status == SubjectResultStatus.Exempted);
                         });
                     break;
 
                 case "AllChecklistsSignedOff":
-                    var subjectResultIds = etr.SubjectResults?.Select(sr => sr.SubjectResultId).ToList() ?? new List<int>();
-                    var mandatoryChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(cancellationToken))
-                        .Where(pc => pc.CourseId == trainingClass.CourseId && pc.IsRequired).ToList();
+                    var subjectResultIds = subjectResultsList.Select(sr => sr.SubjectResultId).ToList();
                     var checklistResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(cancellationToken))
                         .Where(r => subjectResultIds.Contains(r.SubjectResultId)).ToList();
-                    isMet = mandatoryChecklists.All(c => checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.ResultStatus == "Passed"));
+                    bool hasChecklistSnapshots = checklistResults.Any(r => r.IsMandatorySnapshot.HasValue);
+
+                    if (hasChecklistSnapshots)
+                    {
+                        var mandatoryChecklistResults = checklistResults.Where(r => r.IsMandatorySnapshot == true).ToList();
+                        isMet = mandatoryChecklistResults.All(r => r.ResultStatus == "Passed");
+                    }
+                    else
+                    {
+                        var mandatoryChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(cancellationToken))
+                            .Where(pc => pc.CourseId == trainingClass.CourseId && pc.IsRequired).ToList();
+                        isMet = mandatoryChecklists.All(c => checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.ResultStatus == "Passed"));
+                    }
                     break;
 
                 default:
@@ -537,19 +562,37 @@ public class EtrService : IEtrService
         var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken))
             .Where(cs => cs.CourseId == trainingClass.CourseId && cs.IsMandatory).ToList();
 
+        var subjectResults = etr.SubjectResults ?? Enumerable.Empty<SubjectResult>();
+        bool hasSnapshots = subjectResults.Any(sr => sr.IsMandatorySnapshot.HasValue);
+
         // 1. Check all mandatory subjects are Passed or Exempted
-        foreach (var cs in courseSubjects)
+        if (hasSnapshots)
         {
-            var sr = etr.SubjectResults?.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
-            if (sr == null || (sr.Status != SubjectResultStatus.Passed && sr.Status != SubjectResultStatus.Exempted))
+            var mandatorySubjectResults = subjectResults.Where(sr => sr.IsMandatorySnapshot == true).ToList();
+            foreach (var sr in mandatorySubjectResults)
             {
-                throw new BusinessRuleViolationException($"Cannot verify ETR. Mandatory subject (ID: {cs.SubjectId}) is not Passed or Exempted.");
+                if (sr.Status != SubjectResultStatus.Passed && sr.Status != SubjectResultStatus.Exempted)
+                {
+                    var subName = sr.SubjectNameSnapshot ?? $"ID: {sr.SubjectId}";
+                    throw new BusinessRuleViolationException($"Cannot verify ETR. Mandatory subject ({subName}) is not Passed or Exempted.");
+                }
+            }
+        }
+        else
+        {
+            foreach (var cs in courseSubjects)
+            {
+                var sr = subjectResults.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
+                if (sr == null || (sr.Status != SubjectResultStatus.Passed && sr.Status != SubjectResultStatus.Exempted))
+                {
+                    throw new BusinessRuleViolationException($"Cannot verify ETR. Mandatory subject (ID: {cs.SubjectId}) is not Passed or Exempted.");
+                }
             }
         }
 
         // 2. Check all evidence is Verified
         var allEvidences = await _unitOfWork.EvidenceFileRepository.GetAllAsync(cancellationToken);
-        var etrSubjectIds = etr.SubjectResults?.Select(sr => sr.SubjectResultId).ToList() ?? new List<int>();
+        var etrSubjectIds = subjectResults.Select(sr => sr.SubjectResultId).ToList();
         var pendingEvidences = allEvidences
             .Where(e => etrSubjectIds.Contains(e.SubjectResultId) && e.VerificationStatus != "Verified" && !e.IsDeleted)
             .ToList();
@@ -561,7 +604,7 @@ public class EtrService : IEtrService
 
         // 3. Check all subject signoffs exist
         var allSignoffs = await _unitOfWork.SubjectSignoffRepository.GetAllAsync(cancellationToken);
-        foreach (var sr in etr.SubjectResults ?? Enumerable.Empty<SubjectResult>())
+        foreach (var sr in subjectResults)
         {
             var hasSignoff = allSignoffs.Any(s => s.SubjectResultId == sr.SubjectResultId && !s.IsDeleted);
             if (!hasSignoff)
@@ -647,15 +690,33 @@ public class EtrService : IEtrService
         var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken))
             .Where(cs => cs.CourseId == trainingClass.CourseId && cs.IsMandatory).ToList();
 
+        var subjectResults = etr.SubjectResults ?? Enumerable.Empty<SubjectResult>();
+        bool hasSnapshots = subjectResults.Any(sr => sr.IsMandatorySnapshot.HasValue);
+
         // === PRE-VALIDATION ===
 
         // 1. Check all mandatory subjects are Passed or Exempted
-        foreach (var cs in courseSubjects)
+        if (hasSnapshots)
         {
-            var sr = etr.SubjectResults.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
-            if (sr == null || (sr.Status != SubjectResultStatus.Passed && sr.Status != SubjectResultStatus.Exempted))
+            var mandatorySubjectResults = subjectResults.Where(sr => sr.IsMandatorySnapshot == true).ToList();
+            foreach (var sr in mandatorySubjectResults)
             {
-                throw new BusinessRuleViolationException($"Cannot complete ETR. Mandatory subject (ID: {cs.SubjectId}) is not Passed or Exempted.");
+                if (sr.Status != SubjectResultStatus.Passed && sr.Status != SubjectResultStatus.Exempted)
+                {
+                    var subName = sr.SubjectNameSnapshot ?? $"ID: {sr.SubjectId}";
+                    throw new BusinessRuleViolationException($"Cannot complete ETR. Mandatory subject ({subName}) is not Passed or Exempted.");
+                }
+            }
+        }
+        else
+        {
+            foreach (var cs in courseSubjects)
+            {
+                var sr = subjectResults.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
+                if (sr == null || (sr.Status != SubjectResultStatus.Passed && sr.Status != SubjectResultStatus.Exempted))
+                {
+                    throw new BusinessRuleViolationException($"Cannot complete ETR. Mandatory subject (ID: {cs.SubjectId}) is not Passed or Exempted.");
+                }
             }
         }
 

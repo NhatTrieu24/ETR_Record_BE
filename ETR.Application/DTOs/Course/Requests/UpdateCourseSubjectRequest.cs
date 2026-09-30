@@ -16,4 +16,7 @@ public class UpdateCourseSubjectRequest
     
     [Range(0, 100)]
     public decimal PassingScore { get; set; } = 5.0m;
+
+    [MaxLength(50)]
+    public string? SubjectVersion { get; set; }
 }
