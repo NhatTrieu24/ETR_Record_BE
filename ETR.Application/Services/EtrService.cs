@@ -329,11 +329,15 @@ public class EtrService : IEtrService
                     var subjectResultIds = subjectResults.Select(sr => sr.SubjectResultId).ToList();
                     var checklistResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<PracticalChecklistResult>())
                         .Where(r => subjectResultIds.Contains(r.SubjectResultId) && !r.IsDeleted).ToList();
-                    bool hasChecklistSnapshots = checklistResults.Any(r => r.IsMandatorySnapshot.HasValue);
+                    var latestChecklistResults = checklistResults
+                        .GroupBy(r => r.PracticalChecklistId)
+                        .Select(g => g.OrderByDescending(r => r.CompletedAt ?? r.CreatedAt).ThenByDescending(r => r.PracticalChecklistResultId).First())
+                        .ToList();
+                    bool hasChecklistSnapshots = latestChecklistResults.Any(r => r.IsMandatorySnapshot.HasValue);
 
                     if (hasChecklistSnapshots)
                     {
-                        var mandatoryChecklistResults = checklistResults.Where(r => r.IsMandatorySnapshot == true).ToList();
+                        var mandatoryChecklistResults = latestChecklistResults.Where(r => r.IsMandatorySnapshot == true).ToList();
                         if (mandatoryChecklistResults.Any(r => r.ResultStatus != "Passed"))
                         {
                             throw new BusinessRuleViolationException($"Cannot submit ETR. Completion requirement '{requirement.RequirementName}' not met: not all mandatory practical checklists are signed off.");
@@ -344,11 +348,11 @@ public class EtrService : IEtrService
                         var mandatoryChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<PracticalChecklist>())
                             .Where(pc => pc.CourseId == trainingClass.CourseId && pc.IsRequired && !pc.IsDeleted).ToList();
 
-                        var hasUnpassedMandatoryChecklist = checklistResults.Any(r =>
+                        var hasUnpassedMandatoryChecklist = latestChecklistResults.Any(r =>
                             mandatoryChecklists.Any(c => c.PracticalChecklistId == r.PracticalChecklistId)
                             && r.ResultStatus != "Passed");
 
-                        if (hasUnpassedMandatoryChecklist || mandatoryChecklists.Any(c => !checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.ResultStatus == "Passed")))
+                        if (hasUnpassedMandatoryChecklist || mandatoryChecklists.Any(c => !latestChecklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.ResultStatus == "Passed")))
                         {
                             throw new BusinessRuleViolationException($"Cannot submit ETR. Completion requirement '{requirement.RequirementName}' not met: not all mandatory practical checklists are signed off.");
                         }
@@ -521,18 +525,22 @@ public class EtrService : IEtrService
                     var subjectResultIds = subjectResultsList.Select(sr => sr.SubjectResultId).ToList();
                     var checklistResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<PracticalChecklistResult>())
                         .Where(r => subjectResultIds.Contains(r.SubjectResultId) && !r.IsDeleted).ToList();
-                    bool hasChecklistSnapshots = checklistResults.Any(r => r.IsMandatorySnapshot.HasValue);
+                    var latestChecklistResults = checklistResults
+                        .GroupBy(r => r.PracticalChecklistId)
+                        .Select(g => g.OrderByDescending(r => r.CompletedAt ?? r.CreatedAt).ThenByDescending(r => r.PracticalChecklistResultId).First())
+                        .ToList();
+                    bool hasChecklistSnapshots = latestChecklistResults.Any(r => r.IsMandatorySnapshot.HasValue);
 
                     if (hasChecklistSnapshots)
                     {
-                        var mandatoryChecklistResults = checklistResults.Where(r => r.IsMandatorySnapshot == true).ToList();
+                        var mandatoryChecklistResults = latestChecklistResults.Where(r => r.IsMandatorySnapshot == true).ToList();
                         isMet = mandatoryChecklistResults.All(r => r.ResultStatus == "Passed");
                     }
                     else
                     {
                         var mandatoryChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<PracticalChecklist>())
                             .Where(pc => pc.CourseId == trainingClass.CourseId && pc.IsRequired && !pc.IsDeleted).ToList();
-                        isMet = mandatoryChecklists.All(c => checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.ResultStatus == "Passed"));
+                        isMet = mandatoryChecklists.All(c => latestChecklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.ResultStatus == "Passed"));
                     }
                     break;
 

@@ -494,18 +494,22 @@ public class AssessmentResultService : IAssessmentResultService
                     throw new BusinessRuleViolationException($"Không thể ký chốt môn học. Tỷ lệ điểm danh của học viên ({subjectResult.AttendanceRate.Value:F1}%) chưa đạt mức tối thiểu bắt buộc ({BusinessRuleEngine.MinimumAttendanceThreshold}%).");
                 }
 
-                // 2. Validation: Assessments - All mandatory assessments configured for this subject must be Passed
+                // 2. Validation: Assessments - All mandatory assessments configured for this subject must be Passed (evaluate latest attempt per assessment)
                 var studentResults = (await _unitOfWork.AssessmentResultRepository.GetAllAsync(ct) ?? Enumerable.Empty<AssessmentResult>())
                     .Where(r => r.SubjectResultId == request.SubjectResultId && !r.IsDeleted)
+                    .ToList();
+                var latestAssessmentResults = studentResults
+                    .GroupBy(r => r.AssessmentId)
+                    .Select(g => g.OrderByDescending(r => r.RecordedAt).ThenByDescending(r => r.AttemptNo).ThenByDescending(r => r.AssessmentResultId).First())
                     .ToList();
                 var allCourseAssessments = (await _unitOfWork.AssessmentRepository.GetAllAsync(ct) ?? Enumerable.Empty<Assessment>())
                     .Where(a => a.CourseId == subjectResult.CourseId && a.SubjectId == subjectResult.SubjectId && !a.IsDeleted)
                     .ToList();
 
-                bool hasAssessmentSnapshots = studentResults.Any(r => r.IsMandatorySnapshot.HasValue);
+                bool hasAssessmentSnapshots = latestAssessmentResults.Any(r => r.IsMandatorySnapshot.HasValue);
                 if (hasAssessmentSnapshots)
                 {
-                    var failedAssessments = studentResults
+                    var failedAssessments = latestAssessmentResults
                         .Where(r => r.IsMandatorySnapshot == true && r.ResultStatus == "Failed")
                         .ToList();
                     if (failedAssessments.Count > 0)
@@ -514,7 +518,7 @@ public class AssessmentResultService : IAssessmentResultService
                         throw new BusinessRuleViolationException($"Không thể ký chốt môn học. Còn bài kiểm tra bắt buộc chưa đạt (Failed): {ids}. Học viên phải thi lại và đạt trước khi ký chốt.");
                     }
 
-                    var pendingAssessments = studentResults
+                    var pendingAssessments = latestAssessmentResults
                         .Where(r => r.IsMandatorySnapshot == true && (r.ResultStatus == "Pending" || string.IsNullOrEmpty(r.ResultStatus)))
                         .ToList();
                     if (pendingAssessments.Count > 0)
@@ -529,7 +533,7 @@ public class AssessmentResultService : IAssessmentResultService
                     if (mandatoryAssessments.Count > 0)
                     {
                         var unpassedAssessments = mandatoryAssessments
-                            .Where(a => !studentResults.Any(r => r.AssessmentId == a.AssessmentId && r.ResultStatus == "Passed"))
+                            .Where(a => !latestAssessmentResults.Any(r => r.AssessmentId == a.AssessmentId && r.ResultStatus == "Passed"))
                             .ToList();
 
                         if (unpassedAssessments.Count > 0)
@@ -540,18 +544,22 @@ public class AssessmentResultService : IAssessmentResultService
                     }
                 }
 
-                // 3. Validation: Mandatory Practical Checklists
+                // 3. Validation: Mandatory Practical Checklists (evaluate latest result per checklist)
                 var checklistResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(ct) ?? Enumerable.Empty<PracticalChecklistResult>())
                     .Where(r => r.SubjectResultId == request.SubjectResultId && !r.IsDeleted)
+                    .ToList();
+                var latestChecklistResults = checklistResults
+                    .GroupBy(r => r.PracticalChecklistId)
+                    .Select(g => g.OrderByDescending(r => r.CompletedAt ?? r.CreatedAt).ThenByDescending(r => r.PracticalChecklistResultId).First())
                     .ToList();
                 var allCourseChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(ct) ?? Enumerable.Empty<PracticalChecklist>())
                     .Where(p => p.CourseId == subjectResult.CourseId && p.SubjectId == subjectResult.SubjectId && !p.IsDeleted)
                     .ToList();
 
-                bool hasChecklistSnapshots = checklistResults.Any(r => r.IsMandatorySnapshot.HasValue);
+                bool hasChecklistSnapshots = latestChecklistResults.Any(r => r.IsMandatorySnapshot.HasValue);
                 if (hasChecklistSnapshots)
                 {
-                    var failedChecklists = checklistResults
+                    var failedChecklists = latestChecklistResults
                         .Where(r => r.IsMandatorySnapshot == true && r.ResultStatus == "Failed")
                         .ToList();
                     if (failedChecklists.Count > 0)
@@ -560,7 +568,7 @@ public class AssessmentResultService : IAssessmentResultService
                         throw new BusinessRuleViolationException($"Không thể ký chốt môn học. Còn danh mục thực hành bắt buộc chưa đạt (Failed): {ids}.");
                     }
 
-                    var pendingChecklists = checklistResults
+                    var pendingChecklists = latestChecklistResults
                         .Where(r => r.IsMandatorySnapshot == true && (r.ResultStatus == "Pending" || string.IsNullOrEmpty(r.ResultStatus)))
                         .ToList();
                     if (pendingChecklists.Count > 0)
@@ -575,7 +583,7 @@ public class AssessmentResultService : IAssessmentResultService
                     if (mandatoryChecklists.Count > 0)
                     {
                         var unpassedChecklists = mandatoryChecklists
-                            .Where(c => !checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.ResultStatus == "Passed"))
+                            .Where(c => !latestChecklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.ResultStatus == "Passed"))
                             .ToList();
 
                         if (unpassedChecklists.Count > 0)
@@ -688,19 +696,23 @@ public class AssessmentResultService : IAssessmentResultService
         var attendanceFailed = (subjectResult.AttendanceRate ?? 0) < BusinessRuleEngine.MinimumAttendanceThreshold;
         var scoreFailed = (subjectResult.Score ?? 0) < passingScore;
 
-        // 2. Mandatory Assessment Results Check
+        // 2. Mandatory Assessment Results Check (evaluate latest attempt per assessment)
         var studentAssessmentResults = (await _unitOfWork.AssessmentResultRepository.GetAllAsync(ct) ?? Enumerable.Empty<AssessmentResult>())
             .Where(r => r.SubjectResultId == subjectResultId && !r.IsDeleted).ToList();
+        var latestAssessmentResults = studentAssessmentResults
+            .GroupBy(r => r.AssessmentId)
+            .Select(g => g.OrderByDescending(r => r.RecordedAt).ThenByDescending(r => r.AttemptNo).ThenByDescending(r => r.AssessmentResultId).First())
+            .ToList();
         var allCourseAssessments = (await _unitOfWork.AssessmentRepository.GetAllAsync(ct) ?? Enumerable.Empty<Assessment>())
             .Where(a => a.CourseId == subjectResult.CourseId && a.SubjectId == subjectResult.SubjectId && !a.IsDeleted).ToList();
 
-        bool hasAssessmentSnapshots = studentAssessmentResults.Any(r => r.IsMandatorySnapshot.HasValue);
+        bool hasAssessmentSnapshots = latestAssessmentResults.Any(r => r.IsMandatorySnapshot.HasValue);
         bool assessmentFailed;
         bool assessmentsAllPassed;
 
         if (hasAssessmentSnapshots)
         {
-            var mandatoryAssessments = studentAssessmentResults.Where(r => r.IsMandatorySnapshot == true).ToList();
+            var mandatoryAssessments = latestAssessmentResults.Where(r => r.IsMandatorySnapshot == true).ToList();
             assessmentFailed = mandatoryAssessments.Any(r => r.ResultStatus == "Failed" || (r.PassingScoreSnapshot.HasValue && r.Score < r.PassingScoreSnapshot.Value));
             assessmentsAllPassed = mandatoryAssessments.Count == 0 || mandatoryAssessments.All(r => r.ResultStatus == "Passed");
         }
@@ -709,8 +721,8 @@ public class AssessmentResultService : IAssessmentResultService
             var mandatoryAssessments = allCourseAssessments.Where(a => a.IsRequired).ToList();
             if (mandatoryAssessments.Count > 0)
             {
-                assessmentFailed = mandatoryAssessments.Any(a => studentAssessmentResults.Any(r => r.AssessmentId == a.AssessmentId && (r.ResultStatus == "Failed" || r.Score < a.PassingScore)));
-                assessmentsAllPassed = mandatoryAssessments.All(a => studentAssessmentResults.Any(r => r.AssessmentId == a.AssessmentId && r.ResultStatus == "Passed" && r.Score >= a.PassingScore));
+                assessmentFailed = mandatoryAssessments.Any(a => latestAssessmentResults.Any(r => r.AssessmentId == a.AssessmentId && (r.ResultStatus == "Failed" || r.Score < a.PassingScore)));
+                assessmentsAllPassed = mandatoryAssessments.All(a => latestAssessmentResults.Any(r => r.AssessmentId == a.AssessmentId && r.ResultStatus == "Passed" && r.Score >= a.PassingScore));
             }
             else
             {
@@ -719,19 +731,23 @@ public class AssessmentResultService : IAssessmentResultService
             }
         }
 
-        // 3. Practical Checklist
+        // 3. Practical Checklist (evaluate latest result per checklist)
         var checklistResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(ct) ?? Enumerable.Empty<PracticalChecklistResult>())
             .Where(r => r.SubjectResultId == subjectResultId && !r.IsDeleted).ToList();
+        var latestChecklistResults = checklistResults
+            .GroupBy(r => r.PracticalChecklistId)
+            .Select(g => g.OrderByDescending(r => r.CompletedAt ?? r.CreatedAt).ThenByDescending(r => r.PracticalChecklistResultId).First())
+            .ToList();
         var allCourseChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(ct) ?? Enumerable.Empty<PracticalChecklist>())
             .Where(p => p.CourseId == subjectResult.CourseId && p.SubjectId == subjectResult.SubjectId && !p.IsDeleted).ToList();
 
-        bool hasChecklistSnapshots = checklistResults.Any(r => r.IsMandatorySnapshot.HasValue);
+        bool hasChecklistSnapshots = latestChecklistResults.Any(r => r.IsMandatorySnapshot.HasValue);
         bool checklistFailed;
         bool checklistsAllPassed;
 
         if (hasChecklistSnapshots)
         {
-            var mandatoryChecklists = checklistResults.Where(r => r.IsMandatorySnapshot == true).ToList();
+            var mandatoryChecklists = latestChecklistResults.Where(r => r.IsMandatorySnapshot == true).ToList();
             checklistFailed = mandatoryChecklists.Any(r => r.ResultStatus == "Failed" || r.Score < passingScore);
             checklistsAllPassed = mandatoryChecklists.Count == 0 || mandatoryChecklists.All(r => r.ResultStatus == "Passed" && r.Score >= passingScore);
         }
@@ -740,8 +756,8 @@ public class AssessmentResultService : IAssessmentResultService
             var mandatoryChecklists = allCourseChecklists.Where(p => p.IsRequired).ToList();
             if (mandatoryChecklists.Count > 0)
             {
-                checklistFailed = mandatoryChecklists.Any(c => checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && (r.Score < passingScore || r.ResultStatus == "Failed")));
-                checklistsAllPassed = mandatoryChecklists.All(c => checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.Score >= passingScore && r.ResultStatus == "Passed"));
+                checklistFailed = mandatoryChecklists.Any(c => latestChecklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && (r.Score < passingScore || r.ResultStatus == "Failed")));
+                checklistsAllPassed = mandatoryChecklists.All(c => latestChecklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.Score >= passingScore && r.ResultStatus == "Passed"));
             }
             else
             {
