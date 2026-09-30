@@ -116,7 +116,8 @@ public class EtrService : IEtrService
         var evidences = allEvidences.Where(ev => subjectResultIds.Contains(ev.SubjectResultId) && !ev.IsDeleted).ToList();
         var evidenceAttachments = (await _unitOfWork.AttachmentRepository.GetAllAsync(cancellationToken))
             .Where(a => a.OwnerType == nameof(EvidenceFile) && evidences.Select(ev => ev.EvidenceFileId).Contains(a.OwnerId))
-            .ToDictionary(a => a.OwnerId);
+            .GroupBy(a => a.OwnerId)
+            .ToDictionary(g => g.Key, g => g.First());
 
         var subjectResultResponses = e.SubjectResults?.Select(sr => {
             var signoff = signoffs.FirstOrDefault(s => s.SubjectResultId == sr.SubjectResultId);

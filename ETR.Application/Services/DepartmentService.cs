@@ -105,11 +105,11 @@ public class DepartmentService : IDepartmentService
             throw new BusinessRuleViolationException("Không thể xóa các phòng ban mặc định cốt lõi của hệ thống (Administration / Training).");
         }
 
-        var hasActiveAccounts = (await _unitOfWork.AccountRepository.GetAllAsync(cancellationToken))
-            .Any(a => a.DepartmentId == id && a.Status == ETR.Domain.Enums.AccountStatus.Active && !a.IsDeleted);
-        if (hasActiveAccounts)
+        var assignedAccountsCount = (await _unitOfWork.AccountRepository.GetAllAsync(cancellationToken))
+            .Count(a => a.DepartmentId == id && !a.IsDeleted);
+        if (assignedAccountsCount > 0)
         {
-            throw new BusinessRuleViolationException($"Không thể xóa phòng ban '{department.DepartmentName}' vì vẫn còn tài khoản người dùng đang trực thuộc. Vui lòng chuyển phòng ban cho nhân sự trước khi xóa.");
+            throw new BusinessRuleViolationException($"Không thể xóa phòng ban '{department.DepartmentName}' vì hiện đang có {assignedAccountsCount} nhân sự/tài khoản trực thuộc. Vui lòng điều chuyển toàn bộ nhân sự sang phòng ban khác trước khi thực hiện xóa.");
         }
 
         department.IsDeleted = true;

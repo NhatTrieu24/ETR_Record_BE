@@ -52,7 +52,8 @@ public partial class ExportService : IExportService
             .ToList();
         var evidenceAttachments = (await _unitOfWork.AttachmentRepository.GetAllAsync(cancellationToken))
             .Where(a => a.OwnerType == nameof(EvidenceFile) && evidenceFiles.Select(e => e.EvidenceFileId).Contains(a.OwnerId))
-            .ToDictionary(a => a.OwnerId);
+            .GroupBy(a => a.OwnerId)
+            .ToDictionary(g => g.Key, g => g.First());
 
         var approvalRequest = (await _unitOfWork.ApprovalRequestRepository.GetAllAsync(cancellationToken))
             .FirstOrDefault(a => a.ETRCourseRecordId == etrCourseRecordId);

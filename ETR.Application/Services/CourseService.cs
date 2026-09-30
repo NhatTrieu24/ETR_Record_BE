@@ -204,33 +204,95 @@ public class CourseService : ICourseService
 
                 var requestedSubjectIds = request.Subjects.Select(s => s.SubjectId).ToList();
 
-                // 1. Remove subjects not in the request
+                // 1. Validate and remove subjects not in the request
                 var subjectsToRemove = existingSubjects.Where(cs => !requestedSubjectIds.Contains(cs.SubjectId)).ToList();
-                foreach (var toRemove in subjectsToRemove)
+                if (subjectsToRemove.Any())
                 {
-                    toRemove.IsDeleted = true;
-                    toRemove.DeletedAt = DateTime.UtcNow;
-                    _unitOfWork.CourseSubjectRepository.Update(toRemove);
+                    var nonCancelledClasses = (await _unitOfWork.ClassRepository.GetAllAsync(ct))
+                        .Where(c => c.CourseId == id && !c.IsDeleted && c.Status != ClassStatus.Cancelled)
+                        .ToList();
 
-                    await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                    if (nonCancelledClasses.Any())
                     {
-                        AccountId = updatedByAccountId,
-                        ActionType = AuditActionType.DELETE.ToString(),
-                        EntityName = nameof(CourseSubject),
-                        RecordId = course.CourseId,
-                        OldValue = $"SubjectId: {toRemove.SubjectId}",
-                        NewValue = "Deleted",
-                        Description = $"Removed Subject #{toRemove.SubjectId} from Course #{course.CourseId} during full sync"
-                    }, ct);
+                        var classIds = nonCancelledClasses.Select(c => c.ClassId).ToHashSet();
+                        var toRemoveIds = subjectsToRemove.Select(s => s.SubjectId).ToHashSet();
+
+                        var conflictingClassSubjects = (await _unitOfWork.ClassSubjectRepository.GetAllAsync(ct))
+                            .Where(cs => classIds.Contains(cs.ClassId) && toRemoveIds.Contains(cs.SubjectId) && !cs.IsDeleted)
+                            .ToList();
+
+                        if (conflictingClassSubjects.Any())
+                        {
+                            var conflictSubjectIds = conflictingClassSubjects.Select(cs => cs.SubjectId).Distinct().ToList();
+                            var conflictClassIds = conflictingClassSubjects.Select(cs => cs.ClassId).ToHashSet();
+                            var ongoingClassCodes = nonCancelledClasses
+                                .Where(c => conflictClassIds.Contains(c.ClassId) && (c.Status == ClassStatus.InProgress || c.Status == ClassStatus.Scheduled))
+                                .Select(c => c.ClassCode)
+                                .Distinct()
+                                .ToList();
+
+                            if (ongoingClassCodes.Any())
+                            {
+                                throw new BusinessRuleViolationException(
+                                    $"Không thể gỡ các môn học [ID: {string.Join(", ", conflictSubjectIds)}] khỏi khóa học vì đang có lớp học chưa kết thúc ({string.Join(", ", ongoingClassCodes)}) đang giảng dạy môn học này.");
+                            }
+
+                            throw new BusinessRuleViolationException(
+                                $"Không thể gỡ các môn học [ID: {string.Join(", ", conflictSubjectIds)}] khỏi khóa học vì đã có lớp học thuộc khóa được thiết lập môn học này.");
+                        }
+                    }
+
+                    foreach (var toRemove in subjectsToRemove)
+                    {
+                        toRemove.IsDeleted = true;
+                        toRemove.DeletedAt = DateTime.UtcNow;
+                        _unitOfWork.CourseSubjectRepository.Update(toRemove);
+
+                        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                        {
+                            AccountId = updatedByAccountId,
+                            ActionType = AuditActionType.DELETE.ToString(),
+                            EntityName = nameof(CourseSubject),
+                            RecordId = course.CourseId,
+                            OldValue = $"SubjectId: {toRemove.SubjectId}",
+                            NewValue = "Deleted",
+                            Description = $"Removed Subject #{toRemove.SubjectId} from Course #{course.CourseId} during full sync"
+                        }, ct);
+                    }
                 }
 
                 // 2. Add or Update subjects
+                var ongoingClasses = (await _unitOfWork.ClassRepository.GetAllAsync(ct))
+                    .Where(c => c.CourseId == id && !c.IsDeleted && (c.Status == ClassStatus.InProgress || c.Status == ClassStatus.Scheduled))
+                    .ToList();
+                var ongoingClassIds = ongoingClasses.Select(c => c.ClassId).ToHashSet();
+                var ongoingClassSubjects = ongoingClassIds.Any()
+                    ? (await _unitOfWork.ClassSubjectRepository.GetAllAsync(ct))
+                        .Where(cs => ongoingClassIds.Contains(cs.ClassId) && !cs.IsDeleted)
+                        .ToList()
+                    : new List<ClassSubject>();
+
                 var finalSubjects = new List<CourseSubjectResponse>();
                 foreach (var reqSub in request.Subjects)
                 {
                     var existing = existingSubjects.FirstOrDefault(cs => cs.SubjectId == reqSub.SubjectId);
                     if (existing != null)
                     {
+                        bool isChangingCriteria = existing.PassingScore != reqSub.PassingScore ||
+                                                  existing.RequiredHours != reqSub.RequiredHours ||
+                                                  existing.RequiredSessions != reqSub.RequiredSessions ||
+                                                  existing.IsMandatory != reqSub.IsMandatory;
+
+                        if (isChangingCriteria && ongoingClassSubjects.Any(cs => cs.SubjectId == existing.SubjectId))
+                        {
+                            var affectedClasses = string.Join(", ", ongoingClasses
+                                .Where(c => ongoingClassSubjects.Any(cs => cs.ClassId == c.ClassId && cs.SubjectId == existing.SubjectId))
+                                .Select(c => c.ClassCode));
+
+                            throw new BusinessRuleViolationException(
+                                $"Không thể thay đổi tiêu chí môn học #{existing.SubjectId} (Điểm đạt/Số giờ/Tính bắt buộc) khi đang có lớp học chưa kết thúc ({affectedClasses}) đang giảng dạy môn này.");
+                        }
+
                         // Update
                         existing.SequenceNo = reqSub.SequenceNo;
                         existing.RequiredHours = reqSub.RequiredHours;
@@ -245,37 +307,69 @@ public class CourseService : ICourseService
                     }
                     else
                     {
-                        // Add
-                        var subject = await _unitOfWork.SubjectRepository.GetByIdAsync(reqSub.SubjectId, ct)
-                            ?? throw new KeyNotFoundException($"Subject {reqSub.SubjectId} not found.");
+                        // Check if soft-deleted mapping exists to reactivate
+                        var softDeleted = (await _unitOfWork.CourseSubjectRepository.GetAllIncludingDeletedAsync(ct))
+                            .FirstOrDefault(cs => cs.CourseId == id && cs.SubjectId == reqSub.SubjectId && cs.IsDeleted);
 
-                        var newCourseSub = new CourseSubject
+                        if (softDeleted != null)
                         {
-                            CourseId = id,
-                            SubjectId = reqSub.SubjectId,
-                            SequenceNo = reqSub.SequenceNo,
-                            RequiredHours = reqSub.RequiredHours,
-                            RequiredSessions = reqSub.RequiredSessions,
-                            IsMandatory = reqSub.IsMandatory,
-                            PassingScore = reqSub.PassingScore,
-                            CreatedAt = DateTime.UtcNow,
-                            CreatedByAccountId = updatedByAccountId
-                        };
-                        await _unitOfWork.CourseSubjectRepository.AddAsync(newCourseSub, ct);
+                            softDeleted.IsDeleted = false;
+                            softDeleted.DeletedAt = null;
+                            softDeleted.SequenceNo = reqSub.SequenceNo;
+                            softDeleted.RequiredHours = reqSub.RequiredHours;
+                            softDeleted.RequiredSessions = reqSub.RequiredSessions;
+                            softDeleted.IsMandatory = reqSub.IsMandatory;
+                            softDeleted.PassingScore = reqSub.PassingScore;
+                            _unitOfWork.CourseSubjectRepository.Update(softDeleted);
 
-                        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                            await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                            {
+                                AccountId = updatedByAccountId,
+                                ActionType = AuditActionType.UPDATE.ToString(),
+                                EntityName = nameof(CourseSubject),
+                                RecordId = course.CourseId,
+                                NewValue = $"SubjectId: {reqSub.SubjectId}, Seq: {reqSub.SequenceNo} (Reactivated)",
+                                Description = $"Reactivated Subject #{reqSub.SubjectId} in Course #{course.CourseId} during full sync"
+                            }, ct);
+
+                            finalSubjects.Add(new CourseSubjectResponse(
+                                id, reqSub.SubjectId, reqSub.SequenceNo, reqSub.RequiredHours, reqSub.RequiredSessions, reqSub.IsMandatory, reqSub.PassingScore
+                            ));
+                        }
+                        else
                         {
-                            AccountId = updatedByAccountId,
-                            ActionType = AuditActionType.INSERT.ToString(),
-                            EntityName = nameof(CourseSubject),
-                            RecordId = course.CourseId,
-                            NewValue = $"SubjectId: {reqSub.SubjectId}, Seq: {reqSub.SequenceNo}",
-                            Description = $"Assigned Subject #{reqSub.SubjectId} to Course #{course.CourseId} during full sync"
-                        }, ct);
+                            // Add new
+                            var subject = await _unitOfWork.SubjectRepository.GetByIdAsync(reqSub.SubjectId, ct)
+                                ?? throw new KeyNotFoundException($"Subject {reqSub.SubjectId} not found.");
 
-                        finalSubjects.Add(new CourseSubjectResponse(
-                            id, reqSub.SubjectId, reqSub.SequenceNo, reqSub.RequiredHours, reqSub.RequiredSessions, reqSub.IsMandatory, reqSub.PassingScore
-                        ));
+                            var newCourseSub = new CourseSubject
+                            {
+                                CourseId = id,
+                                SubjectId = reqSub.SubjectId,
+                                SequenceNo = reqSub.SequenceNo,
+                                RequiredHours = reqSub.RequiredHours,
+                                RequiredSessions = reqSub.RequiredSessions,
+                                IsMandatory = reqSub.IsMandatory,
+                                PassingScore = reqSub.PassingScore,
+                                CreatedAt = DateTime.UtcNow,
+                                CreatedByAccountId = updatedByAccountId
+                            };
+                            await _unitOfWork.CourseSubjectRepository.AddAsync(newCourseSub, ct);
+
+                            await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                            {
+                                AccountId = updatedByAccountId,
+                                ActionType = AuditActionType.INSERT.ToString(),
+                                EntityName = nameof(CourseSubject),
+                                RecordId = course.CourseId,
+                                NewValue = $"SubjectId: {reqSub.SubjectId}, Seq: {reqSub.SequenceNo}",
+                                Description = $"Assigned Subject #{reqSub.SubjectId} to Course #{course.CourseId} during full sync"
+                            }, ct);
+
+                            finalSubjects.Add(new CourseSubjectResponse(
+                                id, reqSub.SubjectId, reqSub.SequenceNo, reqSub.RequiredHours, reqSub.RequiredSessions, reqSub.IsMandatory, reqSub.PassingScore
+                            ));
+                        }
                     }
                 }
 
@@ -338,39 +432,65 @@ public class CourseService : ICourseService
         var subject = await _unitOfWork.SubjectRepository.GetByIdAsync(request.SubjectId, cancellationToken)
             ?? throw new KeyNotFoundException("Subject not found.");
 
-        var existingMapping = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken))
+        var existingMapping = (await _unitOfWork.CourseSubjectRepository.GetAllIncludingDeletedAsync(cancellationToken))
             .FirstOrDefault(cs => cs.CourseId == courseId && cs.SubjectId == request.SubjectId);
 
-        if (existingMapping != null)
+        if (existingMapping != null && !existingMapping.IsDeleted)
         {
             throw new InvalidOperationException($"Subject {request.SubjectId} is already assigned to Course {courseId}.");
         }
 
-        var courseSubject = new CourseSubject
+        CourseSubject courseSubject;
+        if (existingMapping != null && existingMapping.IsDeleted)
         {
-            CourseId = courseId,
-            SubjectId = request.SubjectId,
-            SequenceNo = request.SequenceNo,
-            RequiredHours = request.RequiredHours,
-            RequiredSessions = request.RequiredSessions,
-            IsMandatory = request.IsMandatory,
-            PassingScore = request.PassingScore,
-            CreatedAt = DateTime.UtcNow,
-            CreatedByAccountId = addedByAccountId
-        };
+            existingMapping.IsDeleted = false;
+            existingMapping.DeletedAt = null;
+            existingMapping.SequenceNo = request.SequenceNo;
+            existingMapping.RequiredHours = request.RequiredHours;
+            existingMapping.RequiredSessions = request.RequiredSessions;
+            existingMapping.IsMandatory = request.IsMandatory;
+            existingMapping.PassingScore = request.PassingScore;
 
-        await _unitOfWork.CourseSubjectRepository.AddAsync(courseSubject, cancellationToken);
-        await _unitOfWork.SaveAsync(cancellationToken);
+            _unitOfWork.CourseSubjectRepository.Update(existingMapping);
+            courseSubject = existingMapping;
 
-        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+            await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+            {
+                AccountId = addedByAccountId,
+                ActionType = AuditActionType.UPDATE.ToString(),
+                EntityName = nameof(CourseSubject),
+                RecordId = courseId,
+                NewValue = $"SubjectId: {request.SubjectId}, Seq: {request.SequenceNo} (Reactivated)",
+                Description = $"Reactivated Subject #{request.SubjectId} in Course #{courseId}"
+            }, cancellationToken);
+        }
+        else
         {
-            AccountId = addedByAccountId,
-            ActionType = AuditActionType.INSERT.ToString(),
-            EntityName = nameof(CourseSubject),
-            RecordId = courseId, // Using CourseId as RecordId since it's a mapping
-            NewValue = $"SubjectId: {request.SubjectId}, Seq: {request.SequenceNo}",
-            Description = $"Assigned Subject #{request.SubjectId} to Course #{courseId}"
-        }, cancellationToken);
+            courseSubject = new CourseSubject
+            {
+                CourseId = courseId,
+                SubjectId = request.SubjectId,
+                SequenceNo = request.SequenceNo,
+                RequiredHours = request.RequiredHours,
+                RequiredSessions = request.RequiredSessions,
+                IsMandatory = request.IsMandatory,
+                PassingScore = request.PassingScore,
+                CreatedAt = DateTime.UtcNow,
+                CreatedByAccountId = addedByAccountId
+            };
+
+            await _unitOfWork.CourseSubjectRepository.AddAsync(courseSubject, cancellationToken);
+
+            await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+            {
+                AccountId = addedByAccountId,
+                ActionType = AuditActionType.INSERT.ToString(),
+                EntityName = nameof(CourseSubject),
+                RecordId = courseId,
+                NewValue = $"SubjectId: {request.SubjectId}, Seq: {request.SequenceNo}",
+                Description = $"Assigned Subject #{request.SubjectId} to Course #{courseId}"
+            }, cancellationToken);
+        }
 
         await _unitOfWork.SaveAsync(cancellationToken);
 
@@ -407,6 +527,33 @@ public class CourseService : ICourseService
         var existingMapping = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken))
             .FirstOrDefault(cs => cs.CourseId == courseId && cs.SubjectId == subjectId)
             ?? throw new KeyNotFoundException("CourseSubject mapping not found.");
+
+        // Validate: Check if there are ongoing/scheduled classes in this course that include this subject
+        var ongoingClasses = (await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken))
+            .Where(c => c.CourseId == courseId && !c.IsDeleted && (c.Status == ClassStatus.InProgress || c.Status == ClassStatus.Scheduled))
+            .ToList();
+
+        if (ongoingClasses.Any())
+        {
+            var ongoingClassIds = ongoingClasses.Select(c => c.ClassId).ToHashSet();
+            var isSubjectInOngoing = (await _unitOfWork.ClassSubjectRepository.GetAllAsync(cancellationToken))
+                .Any(cs => ongoingClassIds.Contains(cs.ClassId) && cs.SubjectId == subjectId && !cs.IsDeleted);
+
+            if (isSubjectInOngoing)
+            {
+                bool isChangingCriteria = existingMapping.PassingScore != request.PassingScore ||
+                                          existingMapping.RequiredHours != request.RequiredHours ||
+                                          existingMapping.RequiredSessions != request.RequiredSessions ||
+                                          existingMapping.IsMandatory != request.IsMandatory;
+
+                if (isChangingCriteria)
+                {
+                    var classCodes = string.Join(", ", ongoingClasses.Select(c => c.ClassCode));
+                    throw new BusinessRuleViolationException(
+                        $"Không thể thay đổi tiêu chí đánh giá môn học (Điểm đạt/Số giờ/Tính bắt buộc) khi đang có lớp học chưa kết thúc ({classCodes}) đang giảng dạy môn học này.");
+                }
+            }
+        }
 
         existingMapping.SequenceNo = request.SequenceNo;
         existingMapping.RequiredHours = request.RequiredHours;
@@ -445,22 +592,39 @@ public class CourseService : ICourseService
             .FirstOrDefault(cs => cs.CourseId == courseId && cs.SubjectId == subjectId)
             ?? throw new KeyNotFoundException("CourseSubject mapping not found.");
 
-        // Check if there are active classes under this course using this subject
-        var classIdsInCourse = (await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken))
+        // Check if there are classes under this course using this subject
+        var nonCancelledClasses = (await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken))
             .Where(c => c.CourseId == courseId && !c.IsDeleted && c.Status != ClassStatus.Cancelled)
-            .Select(c => c.ClassId).ToHashSet();
+            .ToList();
 
-        if (classIdsInCourse.Any())
+        if (nonCancelledClasses.Any())
         {
-            var hasActiveClasses = (await _unitOfWork.ClassSubjectRepository.GetAllAsync(cancellationToken))
-                .Any(cs => classIdsInCourse.Contains(cs.ClassId) && cs.SubjectId == subjectId && !cs.IsDeleted);
-            if (hasActiveClasses)
+            var classIdsInCourse = nonCancelledClasses.Select(c => c.ClassId).ToHashSet();
+            var classSubjects = (await _unitOfWork.ClassSubjectRepository.GetAllAsync(cancellationToken))
+                .Where(cs => classIdsInCourse.Contains(cs.ClassId) && cs.SubjectId == subjectId && !cs.IsDeleted)
+                .ToList();
+
+            if (classSubjects.Any())
             {
-                throw new BusinessRuleViolationException("Không thể gỡ môn học khỏi khóa học vì đang có lớp học thuộc khóa đang giảng dạy môn học này.");
+                var assignedClassIds = classSubjects.Select(cs => cs.ClassId).ToHashSet();
+                var ongoingClasses = nonCancelledClasses
+                    .Where(c => assignedClassIds.Contains(c.ClassId) && (c.Status == ClassStatus.InProgress || c.Status == ClassStatus.Scheduled))
+                    .Select(c => c.ClassCode)
+                    .Distinct()
+                    .ToList();
+
+                if (ongoingClasses.Any())
+                {
+                    throw new BusinessRuleViolationException(
+                        $"Không thể gỡ môn học khỏi khóa học vì đang có lớp học chưa kết thúc ({string.Join(", ", ongoingClasses)}) đang giảng dạy môn học này.");
+                }
+
+                throw new BusinessRuleViolationException(
+                    "Không thể gỡ môn học khỏi khóa học vì đã có lớp học thuộc khóa đang giảng dạy hoặc đã hoàn thành môn học này.");
             }
         }
             
-        // CourseSubject is a mapping table, usually hard deleted unless IsDeleted exists. BaseEntity has IsDeleted.
+        // CourseSubject is a mapping table with soft-delete
         existingMapping.IsDeleted = true;
         existingMapping.DeletedAt = DateTime.UtcNow;
         _unitOfWork.CourseSubjectRepository.Update(existingMapping);

@@ -348,7 +348,8 @@ public class EvidenceService : IEvidenceService
         var ids = evidenceFileIds.ToHashSet();
         return (await _unitOfWork.AttachmentRepository.GetAllAsync(cancellationToken))
             .Where(a => a.OwnerType == OwnerType && ids.Contains(a.OwnerId))
-            .ToDictionary(a => a.OwnerId);
+            .GroupBy(a => a.OwnerId)
+            .ToDictionary(g => g.Key, g => g.First());
     }
 
     private static EvidenceResponse MapToResponse(EvidenceFile file, Attachment? attachment)
