@@ -22,4 +22,7 @@ public class Course : BaseEntity
 
     /// <summary>When the CURRENT VersionNo took effect.</summary>
     public DateTime EffectiveFrom { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Pointer to the CourseId of the prior version when cloned, or null for version 1.</summary>
+    public int? PreviousVersionId { get; set; }
 }

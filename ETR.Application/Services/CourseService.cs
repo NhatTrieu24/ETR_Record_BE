@@ -15,11 +15,46 @@ public class CourseService : ICourseService
         _unitOfWork = unitOfWork;
     }
 
+    public async Task EnsureCourseNotLockedAsync(int courseId, CancellationToken cancellationToken = default)
+    {
+        var course = await _unitOfWork.CourseRepository.GetByIdAsync(courseId, cancellationToken);
+        if (course == null || course.IsDeleted) return;
+
+        var allClasses = await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken);
+        var classes = (allClasses ?? Enumerable.Empty<Class>())
+            .Where(c => c.CourseId == courseId && !c.IsDeleted).ToList();
+
+        var hasLockedClasses = classes.Any(c =>
+            c.Status == ClassStatus.Scheduled ||
+            c.Status == ClassStatus.InProgress ||
+            c.Status == ClassStatus.Completed);
+
+        if (hasLockedClasses)
+        {
+            throw new BusinessRuleViolationException(
+                $"Giáo trình của khóa học '{course.CourseName}' (Mã: {course.CourseCode}, Version: {course.VersionNo}) đã được mở lớp đào tạo chính thức (Scheduled/InProgress/Completed) nên đã bị đóng băng bất biến. Để sửa đổi giáo trình, vui lòng tạo phiên bản mới (New Version).");
+        }
+
+        if (classes.Any())
+        {
+            var classIds = classes.Select(c => c.ClassId).ToHashSet();
+            var allEnrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken);
+            var hasEnrollments = (allEnrollments ?? Enumerable.Empty<CourseEnrollment>())
+                .Any(e => classIds.Contains(e.ClassId) && !e.IsDeleted);
+
+            if (hasEnrollments)
+            {
+                throw new BusinessRuleViolationException(
+                    $"Giáo trình của khóa học '{course.CourseName}' (Mã: {course.CourseCode}, Version: {course.VersionNo}) đã có học viên ghi danh nên đã bị đóng băng bất biến. Để sửa đổi giáo trình, vui lòng tạo phiên bản mới (New Version).");
+            }
+        }
+    }
+
     public async Task<IEnumerable<CourseResponse>> GetAllCoursesAsync(CancellationToken cancellationToken = default)
     {
         var courses = await _unitOfWork.CourseRepository.GetAllAsync(cancellationToken);
         return courses.Where(c => !c.IsDeleted).Select(c => new CourseResponse(
-            c.CourseId, c.CourseCode, c.CourseName, c.Description, c.DurationHours, c.Status, c.ValidityMonths, c.CourseType, VersionNo: c.VersionNo));
+            c.CourseId, c.CourseCode, c.CourseName, c.Description, c.DurationHours, c.Status, c.ValidityMonths, c.CourseType, VersionNo: c.VersionNo, PreviousVersionId: c.PreviousVersionId));
     }
 
     public async Task<CourseResponse> GetCourseByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -36,7 +71,7 @@ public class CourseService : ICourseService
                 cs.CourseId, cs.SubjectId, cs.SequenceNo, cs.RequiredHours, cs.RequiredSessions, cs.IsMandatory, cs.PassingScore
             )).ToList();
 
-        return new CourseResponse(c.CourseId, c.CourseCode, c.CourseName, c.Description, c.DurationHours, c.Status, c.ValidityMonths, c.CourseType, subjects, c.VersionNo);
+        return new CourseResponse(c.CourseId, c.CourseCode, c.CourseName, c.Description, c.DurationHours, c.Status, c.ValidityMonths, c.CourseType, subjects, c.VersionNo, c.PreviousVersionId);
     }
 
     public async Task<CourseResponse> CreateCourseAsync(CreateCourseRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
@@ -47,10 +82,10 @@ public class CourseService : ICourseService
         }
 
         var isDuplicate = _unitOfWork.CourseRepository.GetQueryable()
-            .Any(c => c.CourseCode == request.CourseCode && !c.IsDeleted);
+            .Any(c => c.CourseCode == request.CourseCode && c.VersionNo == 1 && !c.IsDeleted);
         if (isDuplicate)
         {
-            throw new BusinessRuleViolationException($"A course with code '{request.CourseCode}' already exists.");
+            throw new BusinessRuleViolationException($"A course with code '{request.CourseCode}' (version 1) already exists.");
         }
 
         return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
@@ -150,22 +185,44 @@ public class CourseService : ICourseService
 
                 if (course.IsDeleted) throw new KeyNotFoundException("Course not found.");
 
+                var existingSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct))
+                    .Where(cs => cs.CourseId == id && !cs.IsDeleted).ToList();
+
+                // If course is locked, only status transition (e.g. Draft -> Active, Active -> Archived) without modifying curriculum content or subjects is allowed
+                bool isCurriculumUnchanged = course.CourseCode == request.CourseCode
+                    && course.CourseName == request.CourseName
+                    && course.Description == request.Description
+                    && course.DurationHours == request.DurationHours
+                    && course.ValidityMonths == request.ValidityMonths
+                    && course.CourseType == request.CourseType;
+
+                bool areSubjectsUnchanged = existingSubjects.Count == request.Subjects.Count
+                    && request.Subjects.All(reqSub =>
+                    {
+                        var match = existingSubjects.FirstOrDefault(e => e.SubjectId == reqSub.SubjectId);
+                        return match != null
+                            && match.SequenceNo == reqSub.SequenceNo
+                            && match.RequiredHours == reqSub.RequiredHours
+                            && match.RequiredSessions == reqSub.RequiredSessions
+                            && match.IsMandatory == reqSub.IsMandatory
+                            && match.PassingScore == reqSub.PassingScore;
+                    });
+
+                bool isOnlyStatusChange = isCurriculumUnchanged && areSubjectsUnchanged;
+
+                if (!isOnlyStatusChange)
+                {
+                    await EnsureCourseNotLockedAsync(id, ct);
+                }
+
                 var isDuplicate = _unitOfWork.CourseRepository.GetQueryable()
-                    .Any(c => c.CourseId != id && c.CourseCode == request.CourseCode && !c.IsDeleted);
+                    .Any(c => c.CourseId != id && c.CourseCode == request.CourseCode && c.VersionNo == course.VersionNo && !c.IsDeleted);
                 if (isDuplicate)
                 {
-                    throw new BusinessRuleViolationException($"A course with code '{request.CourseCode}' already exists.");
+                    throw new BusinessRuleViolationException($"A course with code '{request.CourseCode}' and version {course.VersionNo} already exists.");
                 }
 
                 var oldStatus = course.Status;
-
-                // ValidityMonths is the only Course field an evaluation rule actually reads today
-                // (it drives ETRCourseRecord.ExpiryDate at Completion — see EtrService.CompleteEtrAsync).
-                // Changing it must NOT retroactively affect learners who already enrolled under the
-                // old value, so it bumps VersionNo instead of silently mutating in place; other
-                // fields (name/description/status/duration/type) are purely descriptive and stay a
-                // plain overwrite.
-                var validityMonthsChanged = course.ValidityMonths != request.ValidityMonths;
 
                 course.CourseCode = request.CourseCode;
                 course.CourseName = request.CourseName;
@@ -177,12 +234,6 @@ public class CourseService : ICourseService
                 course.UpdatedAt = DateTime.UtcNow;
                 course.UpdatedByAccountId = updatedByAccountId;
 
-                if (validityMonthsChanged)
-                {
-                    course.VersionNo += 1;
-                    course.EffectiveFrom = DateTime.UtcNow;
-                }
-
                 _unitOfWork.CourseRepository.Update(course);
 
                 await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
@@ -193,15 +244,10 @@ public class CourseService : ICourseService
                     RecordId = course.CourseId,
                     OldValue = oldStatus.ToString(),
                     NewValue = course.Status.ToString(),
-                    Description = validityMonthsChanged
-                        ? $"Course #{course.CourseId} ({course.CourseCode}) updated; ValidityMonths changed — VersionNo bumped to {course.VersionNo} so already-enrolled learners keep evaluating against the prior version"
-                        : $"Course #{course.CourseId} ({course.CourseCode}) updated"
+                    Description = $"Course #{course.CourseId} ({course.CourseCode} v{course.VersionNo}) updated"
                 }, ct);
 
                 // SYNC SUBJECTS
-                var existingSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct))
-                    .Where(cs => cs.CourseId == id && !cs.IsDeleted).ToList();
-
                 var requestedSubjectIds = request.Subjects.Select(s => s.SubjectId).ToList();
 
                 // 1. Validate and remove subjects not in the request
@@ -386,12 +432,181 @@ public class CourseService : ICourseService
         }, cancellationToken);
     }
 
+    public async Task<CourseResponse> CloneCourseVersionAsync(int courseId, int createdByAccountId, CancellationToken cancellationToken = default)
+    {
+        return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
+        {
+            await _unitOfWork.BeginTransactionAsync(ct);
+            try
+            {
+                var original = await _unitOfWork.CourseRepository.GetByIdAsync(courseId, ct)
+                    ?? throw new KeyNotFoundException($"Course {courseId} not found.");
+
+                if (original.IsDeleted) throw new KeyNotFoundException($"Course {courseId} not found.");
+
+                var allVersions = (await _unitOfWork.CourseRepository.GetAllIncludingDeletedAsync(ct))
+                    .Where(c => c.CourseCode == original.CourseCode)
+                    .ToList();
+
+                var maxVersion = allVersions.Select(c => c.VersionNo).DefaultIfEmpty(0).Max();
+                var nextVersionNo = Math.Max(maxVersion + 1, original.VersionNo + 1);
+
+                var newCourse = new Course
+                {
+                    CourseCode = original.CourseCode,
+                    CourseName = original.CourseName,
+                    Description = original.Description,
+                    DurationHours = original.DurationHours,
+                    Status = CourseStatus.Draft,
+                    ValidityMonths = original.ValidityMonths,
+                    CourseType = original.CourseType,
+                    VersionNo = nextVersionNo,
+                    PreviousVersionId = original.CourseId,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedByAccountId = createdByAccountId
+                };
+
+                await _unitOfWork.CourseRepository.AddAsync(newCourse, ct);
+                await _unitOfWork.SaveAsync(ct);
+
+                // 1. Clone CourseSubject
+                var originalSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct))
+                    .Where(cs => cs.CourseId == courseId && !cs.IsDeleted)
+                    .OrderBy(cs => cs.SequenceNo)
+                    .ToList();
+
+                var clonedSubjects = new List<CourseSubjectResponse>();
+                foreach (var s in originalSubjects)
+                {
+                    var newCourseSubject = new CourseSubject
+                    {
+                        CourseId = newCourse.CourseId,
+                        SubjectId = s.SubjectId,
+                        SequenceNo = s.SequenceNo,
+                        RequiredHours = s.RequiredHours,
+                        RequiredSessions = s.RequiredSessions,
+                        IsMandatory = s.IsMandatory,
+                        PassingScore = s.PassingScore,
+                        CreatedAt = DateTime.UtcNow,
+                        CreatedByAccountId = createdByAccountId
+                    };
+                    await _unitOfWork.CourseSubjectRepository.AddAsync(newCourseSubject, ct);
+                    clonedSubjects.Add(new CourseSubjectResponse(
+                        newCourse.CourseId, s.SubjectId, s.SequenceNo, s.RequiredHours, s.RequiredSessions, s.IsMandatory, s.PassingScore));
+                }
+
+                // 2. Clone Assessment
+                var originalAssessments = (await _unitOfWork.AssessmentRepository.GetAllAsync(ct))
+                    .Where(a => a.CourseId == courseId && !a.IsDeleted)
+                    .ToList();
+
+                foreach (var a in originalAssessments)
+                {
+                    var newAssessment = new Assessment
+                    {
+                        CourseId = newCourse.CourseId,
+                        SubjectId = a.SubjectId,
+                        ComponentName = a.ComponentName,
+                        AssessmentType = a.AssessmentType,
+                        Weight = a.Weight,
+                        PassingScore = a.PassingScore,
+                        IsRequired = a.IsRequired,
+                        DisplayOrder = a.DisplayOrder,
+                        CreatedAt = DateTime.UtcNow,
+                        CreatedByAccountId = createdByAccountId
+                    };
+                    await _unitOfWork.AssessmentRepository.AddAsync(newAssessment, ct);
+                }
+
+                // 3. Clone PracticalChecklist
+                var originalChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(ct))
+                    .Where(p => p.CourseId == courseId && !p.IsDeleted)
+                    .ToList();
+
+                foreach (var p in originalChecklists)
+                {
+                    var newChecklist = new PracticalChecklist
+                    {
+                        CourseId = newCourse.CourseId,
+                        SubjectId = p.SubjectId,
+                        ItemName = p.ItemName,
+                        Description = p.Description,
+                        IsRequired = p.IsRequired,
+                        DisplayOrder = p.DisplayOrder,
+                        CreatedAt = DateTime.UtcNow,
+                        CreatedByAccountId = createdByAccountId
+                    };
+                    await _unitOfWork.PracticalChecklistRepository.AddAsync(newChecklist, ct);
+                }
+
+                // 4. Clone CompletionRequirement
+                var originalRequirements = (await _unitOfWork.CompletionRequirementRepository.GetAllAsync(ct))
+                    .Where(cr => cr.CourseId == courseId && !cr.IsDeleted && cr.EffectiveTo == null)
+                    .ToList();
+
+                foreach (var cr in originalRequirements)
+                {
+                    var newReq = new CompletionRequirement
+                    {
+                        CourseId = newCourse.CourseId,
+                        RequirementName = cr.RequirementName,
+                        Description = cr.Description,
+                        IsMandatory = cr.IsMandatory,
+                        DisplayOrder = cr.DisplayOrder,
+                        RequirementType = cr.RequirementType,
+                        ThresholdValue = cr.ThresholdValue,
+                        VersionNo = nextVersionNo,
+                        EffectiveFrom = DateTime.UtcNow,
+                        EffectiveTo = null,
+                        CreatedAt = DateTime.UtcNow,
+                        CreatedByAccountId = createdByAccountId
+                    };
+                    await _unitOfWork.CompletionRequirementRepository.AddAsync(newReq, ct);
+                }
+
+                await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                {
+                    AccountId = createdByAccountId,
+                    ActionType = AuditActionType.INSERT.ToString(),
+                    EntityName = nameof(Course),
+                    RecordId = newCourse.CourseId,
+                    NewValue = $"{newCourse.CourseCode} (v{newCourse.VersionNo})",
+                    Description = $"Cloned Course #{original.CourseId} ({original.CourseCode} v{original.VersionNo}) into new version #{newCourse.CourseId} (v{newCourse.VersionNo})"
+                }, ct);
+
+                await _unitOfWork.SaveAsync(ct);
+                await _unitOfWork.CommitTransactionAsync(ct);
+
+                return new CourseResponse(
+                    newCourse.CourseId,
+                    newCourse.CourseCode,
+                    newCourse.CourseName,
+                    newCourse.Description,
+                    newCourse.DurationHours,
+                    newCourse.Status,
+                    newCourse.ValidityMonths,
+                    newCourse.CourseType,
+                    clonedSubjects,
+                    newCourse.VersionNo,
+                    newCourse.PreviousVersionId
+                );
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync(ct);
+                throw;
+            }
+        }, cancellationToken);
+    }
+
     public async Task DeleteCourseAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default)
     {
         var course = await _unitOfWork.CourseRepository.GetByIdAsync(id, cancellationToken)
             ?? throw new KeyNotFoundException("Course not found.");
 
         if (course.IsDeleted) return;
+
+        await EnsureCourseNotLockedAsync(id, cancellationToken);
 
         var activeClasses = (await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken))
             .Where(c => c.CourseId == id && !c.IsDeleted && c.Status != ClassStatus.Cancelled).ToList();
@@ -428,6 +643,8 @@ public class CourseService : ICourseService
             ?? throw new KeyNotFoundException("Course not found.");
 
         if (course.IsDeleted) throw new KeyNotFoundException("Course not found.");
+
+        await EnsureCourseNotLockedAsync(courseId, cancellationToken);
 
         var subject = await _unitOfWork.SubjectRepository.GetByIdAsync(request.SubjectId, cancellationToken)
             ?? throw new KeyNotFoundException("Subject not found.");
@@ -524,6 +741,8 @@ public class CourseService : ICourseService
 
     public async Task<CourseSubjectResponse> UpdateCourseSubjectAsync(int courseId, int subjectId, UpdateCourseSubjectRequest request, int updatedByAccountId, CancellationToken cancellationToken = default)
     {
+        await EnsureCourseNotLockedAsync(courseId, cancellationToken);
+
         var existingMapping = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken))
             .FirstOrDefault(cs => cs.CourseId == courseId && cs.SubjectId == subjectId)
             ?? throw new KeyNotFoundException("CourseSubject mapping not found.");
@@ -588,6 +807,8 @@ public class CourseService : ICourseService
 
     public async Task RemoveSubjectFromCourseAsync(int courseId, int subjectId, int deletedByAccountId, CancellationToken cancellationToken = default)
     {
+        await EnsureCourseNotLockedAsync(courseId, cancellationToken);
+
         var existingMapping = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken))
             .FirstOrDefault(cs => cs.CourseId == courseId && cs.SubjectId == subjectId)
             ?? throw new KeyNotFoundException("CourseSubject mapping not found.");

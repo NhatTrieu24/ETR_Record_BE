@@ -12,10 +12,12 @@ namespace ETR.Application.Services;
 public class AssessmentService : IAssessmentService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICourseService _courseService;
 
-    public AssessmentService(IUnitOfWork unitOfWork)
+    public AssessmentService(IUnitOfWork unitOfWork, ICourseService courseService)
     {
         _unitOfWork = unitOfWork;
+        _courseService = courseService;
     }
 
     public async Task<IEnumerable<AssessmentResponse>> GetAllAssessmentsAsync(CancellationToken cancellationToken = default)
@@ -33,6 +35,8 @@ public class AssessmentService : IAssessmentService
 
     public async Task<AssessmentResponse> CreateAssessmentAsync(CreateAssessmentRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
     {
+        await _courseService.EnsureCourseNotLockedAsync(request.CourseId, cancellationToken);
+
         var entity = new Assessment
         {
             CourseId = request.CourseId,
@@ -57,6 +61,8 @@ public class AssessmentService : IAssessmentService
         var item = await _unitOfWork.AssessmentRepository.GetByIdAsync(id, cancellationToken);
         if (item == null) throw new KeyNotFoundException("Assessment not found.");
 
+        await _courseService.EnsureCourseNotLockedAsync(item.CourseId, cancellationToken);
+
         item.SubjectId = request.SubjectId;
         item.ComponentName = request.ComponentName;
         item.AssessmentType = request.AssessmentType;
@@ -76,6 +82,8 @@ public class AssessmentService : IAssessmentService
     {
         var item = await _unitOfWork.AssessmentRepository.GetByIdAsync(id, cancellationToken);
         if (item == null) throw new KeyNotFoundException("Assessment not found.");
+
+        await _courseService.EnsureCourseNotLockedAsync(item.CourseId, cancellationToken);
 
         _unitOfWork.AssessmentRepository.Delete(item);
         await _unitOfWork.SaveAsync(cancellationToken);

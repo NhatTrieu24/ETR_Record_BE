@@ -13,4 +13,5 @@ public class Class : BaseEntity
     public string? Location { get; set; }
     public int Capacity { get; set; }
     public ClassStatus Status { get; set; }
+    public int CourseVersionNo { get; set; } = 1;
 }

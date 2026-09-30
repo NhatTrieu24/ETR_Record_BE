@@ -7,10 +7,12 @@ namespace ETR.Application.Services;
 public class PracticalChecklistService : IPracticalChecklistService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICourseService _courseService;
 
-    public PracticalChecklistService(IUnitOfWork unitOfWork)
+    public PracticalChecklistService(IUnitOfWork unitOfWork, ICourseService courseService)
     {
         _unitOfWork = unitOfWork;
+        _courseService = courseService;
     }
 
     public async Task<IEnumerable<PracticalChecklistResponse>> GetAllPracticalChecklistsAsync(CancellationToken cancellationToken = default)
@@ -35,6 +37,8 @@ public class PracticalChecklistService : IPracticalChecklistService
 
     public async Task<PracticalChecklistResponse> CreatePracticalChecklistAsync(CreatePracticalChecklistRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
     {
+        await _courseService.EnsureCourseNotLockedAsync(request.CourseId, cancellationToken);
+
         // Basic validation for course/subject
         var course = await _unitOfWork.CourseRepository.GetByIdAsync(request.CourseId, cancellationToken);
         if (course == null) throw new KeyNotFoundException("Course not found.");
@@ -65,6 +69,8 @@ public class PracticalChecklistService : IPracticalChecklistService
         var item = await _unitOfWork.PracticalChecklistRepository.GetByIdAsync(id, cancellationToken);
         if (item == null) throw new KeyNotFoundException("PracticalChecklist not found.");
 
+        await _courseService.EnsureCourseNotLockedAsync(item.CourseId, cancellationToken);
+
         item.ItemName = request.ItemName;
         item.Description = request.Description;
         item.IsRequired = request.IsRequired;
@@ -82,6 +88,8 @@ public class PracticalChecklistService : IPracticalChecklistService
     {
         var item = await _unitOfWork.PracticalChecklistRepository.GetByIdAsync(id, cancellationToken);
         if (item == null) throw new KeyNotFoundException("PracticalChecklist not found.");
+
+        await _courseService.EnsureCourseNotLockedAsync(item.CourseId, cancellationToken);
 
         item.IsDeleted = true;
         item.DeletedAt = DateTime.UtcNow;

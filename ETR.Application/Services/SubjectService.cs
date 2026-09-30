@@ -9,10 +9,12 @@ namespace ETR.Application.Services;
 public class SubjectService : ISubjectService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICourseService _courseService;
 
-    public SubjectService(IUnitOfWork unitOfWork)
+    public SubjectService(IUnitOfWork unitOfWork, ICourseService courseService)
     {
         _unitOfWork = unitOfWork;
+        _courseService = courseService;
     }
 
     public async Task<IEnumerable<SubjectResponse>> GetAllSubjectsAsync(CancellationToken cancellationToken = default)
@@ -49,6 +51,8 @@ public class SubjectService : ISubjectService
             DefaultHours = request.DefaultHours,
             AssessmentMethod = request.AssessmentMethod,
             Description = request.Description,
+            MinSessions = request.MinSessions,
+            MaxSessions = request.MaxSessions,
             Status = request.Status,
             CreatedAt = DateTime.UtcNow,
             CreatedByAccountId = createdByAccountId
@@ -78,6 +82,29 @@ public class SubjectService : ISubjectService
 
         if (subject.IsDeleted) throw new KeyNotFoundException("Subject not found.");
 
+        bool isCoreFieldChanged = subject.SubjectCode != request.SubjectCode
+            || subject.SubjectName != request.SubjectName
+            || subject.SubjectType != request.SubjectType
+            || subject.DefaultHours != request.DefaultHours
+            || subject.AssessmentMethod != request.AssessmentMethod
+            || subject.MinSessions != request.MinSessions
+            || subject.MaxSessions != request.MaxSessions
+            || subject.Status != request.Status;
+
+        if (isCoreFieldChanged)
+        {
+            var courseIds = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken))
+                .Where(cs => cs.SubjectId == id && !cs.IsDeleted)
+                .Select(cs => cs.CourseId)
+                .Distinct()
+                .ToList();
+
+            foreach (var cId in courseIds)
+            {
+                await _courseService.EnsureCourseNotLockedAsync(cId, cancellationToken);
+            }
+        }
+
         var codeExists = _unitOfWork.SubjectRepository.GetQueryable()
             .Any(s => s.SubjectId != id && !s.IsDeleted && s.SubjectCode == request.SubjectCode);
         if (codeExists)
@@ -94,6 +121,8 @@ public class SubjectService : ISubjectService
         subject.DefaultHours = request.DefaultHours;
         subject.AssessmentMethod = request.AssessmentMethod;
         subject.Description = request.Description;
+        subject.MinSessions = request.MinSessions;
+        subject.MaxSessions = request.MaxSessions;
         subject.Status = request.Status;
         subject.UpdatedAt = DateTime.UtcNow;
         subject.UpdatedByAccountId = updatedByAccountId;

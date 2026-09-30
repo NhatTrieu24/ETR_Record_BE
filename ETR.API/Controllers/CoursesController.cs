@@ -94,6 +94,20 @@ public class CoursesController : ControllerBase
 
     /// <summary>
     /// [Module/Flow]: Quản lý Dữ liệu Gốc (Master Data)
+    /// [Core Responsibility]: Nhân bản khóa học sang một phiên bản mới (New Version) với toàn bộ môn học, bài kiểm tra, checklist và tiêu chí tốt nghiệp.
+    /// [Target Audience]: Admin, Academic
+    /// </summary>
+    [HttpPost("{id}/new-version")]
+    [Authorize(Roles = "Admin,Academic")]
+    public async Task<IActionResult> CloneCourseVersion(int id, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        var course = await _courseService.CloneCourseVersionAsync(id, accountId, cancellationToken);
+        return CreatedAtAction(nameof(GetCourse), new { id = course.CourseId }, course);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Quản lý Dữ liệu Gốc (Master Data)
     /// [Core Responsibility]: Gán một môn học vào một khóa học.
     /// [Target Audience]: Admin, Academic
     /// </summary>

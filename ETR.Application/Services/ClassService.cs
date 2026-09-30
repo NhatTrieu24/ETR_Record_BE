@@ -43,7 +43,7 @@ public class ClassService : IClassService
                 .ToList();
 
             return new TrainingClassResponse(
-                c.ClassId, c.ClassCode, c.ClassName, c.CourseId, c.StartDate, c.EndDate, c.Location, c.Capacity, c.Status, assignments);
+                c.ClassId, c.ClassCode, c.ClassName, c.CourseId, c.StartDate, c.EndDate, c.Location, c.Capacity, c.Status, assignments, c.CourseVersionNo);
         });
     }
 
@@ -60,7 +60,7 @@ public class ClassService : IClassService
             .Select(cs => new InstructorAssignmentResponse(cs.ClassSubjectId, cs.SubjectId, cs.InstructorAccountId))
             .ToList();
 
-        return new TrainingClassResponse(c.ClassId, c.ClassCode, c.ClassName, c.CourseId, c.StartDate, c.EndDate, c.Location, c.Capacity, c.Status, assignments);
+        return new TrainingClassResponse(c.ClassId, c.ClassCode, c.ClassName, c.CourseId, c.StartDate, c.EndDate, c.Location, c.Capacity, c.Status, assignments, c.CourseVersionNo);
     }
 
     public async Task<TrainingClassResponse> CreateClassAsync(CreateClassRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
@@ -88,6 +88,11 @@ public class ClassService : IClassService
 
         var course = await _unitOfWork.CourseRepository.GetByIdAsync(request.CourseId, ct)
             ?? throw new BusinessRuleViolationException("Course not found.");
+
+        if (course.Status != CourseStatus.Active)
+        {
+            throw new BusinessRuleViolationException($"Không thể mở lớp học mới cho khóa học ở trạng thái '{course.Status}'. Chỉ có thể mở lớp cho khóa học đang Hoạt động (Active).");
+        }
 
         var isDuplicate = _unitOfWork.ClassRepository.GetQueryable()
             .Any(c => c.ClassCode == request.ClassCode && !c.IsDeleted);
@@ -132,6 +137,7 @@ public class ClassService : IClassService
             ClassCode = request.ClassCode,
             ClassName = request.ClassName,
             CourseId = request.CourseId,
+            CourseVersionNo = course.VersionNo,
             StartDate = request.StartDate,
             EndDate = request.EndDate,
             Location = request.Location,
@@ -190,7 +196,7 @@ public class ClassService : IClassService
 
         await _unitOfWork.SaveAsync(ct);
 
-        return new TrainingClassResponse(cls.ClassId, cls.ClassCode, cls.ClassName, cls.CourseId, cls.StartDate, cls.EndDate, cls.Location, cls.Capacity, cls.Status, assignments);
+        return new TrainingClassResponse(cls.ClassId, cls.ClassCode, cls.ClassName, cls.CourseId, cls.StartDate, cls.EndDate, cls.Location, cls.Capacity, cls.Status, assignments, cls.CourseVersionNo);
     }
 
     public async Task<TrainingClassResponse> UpdateClassAsync(int id, UpdateClassRequest request, int updatedByAccountId, CancellationToken cancellationToken = default)
@@ -310,7 +316,7 @@ public class ClassService : IClassService
                 await _unitOfWork.SaveAsync(ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
 
-                return new TrainingClassResponse(cls.ClassId, cls.ClassCode, cls.ClassName, cls.CourseId, cls.StartDate, cls.EndDate, cls.Location, cls.Capacity, cls.Status, assignments);
+                return new TrainingClassResponse(cls.ClassId, cls.ClassCode, cls.ClassName, cls.CourseId, cls.StartDate, cls.EndDate, cls.Location, cls.Capacity, cls.Status, assignments, cls.CourseVersionNo);
             }
             catch
             {

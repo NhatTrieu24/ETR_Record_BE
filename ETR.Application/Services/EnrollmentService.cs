@@ -193,7 +193,7 @@ public class EnrollmentService : IEnrollmentService
                     CreatedAt = DateTime.UtcNow,
                     CreatedByAccountId = createdByAccountId,
                     PreviousRecordId = previousEtr?.ETRCourseRecordId,
-                    CourseVersionNo = course?.VersionNo ?? 1
+                    CourseVersionNo = trainingClass.CourseVersionNo
                 };
 
                 await _unitOfWork.ETRCourseRecordRepository.AddAsync(etrRecord, ct);
@@ -221,6 +221,8 @@ public class EnrollmentService : IEnrollmentService
                     .Where(a => a.CourseId == trainingClass.CourseId).ToList();
                 var allChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(ct))
                     .Where(p => p.CourseId == trainingClass.CourseId).ToList();
+                var subjectDict = (await _unitOfWork.SubjectRepository.GetAllAsync(ct))
+                    .ToDictionary(s => s.SubjectId, s => s);
 
                 // Retake-only-failed-subjects (mục 1.2): a subject the learner already Passed/Exempted
                 // on the previous attempt is carried over unchanged instead of being reset to Pending —
@@ -250,6 +252,7 @@ public class EnrollmentService : IEnrollmentService
                     var previousSubjectResult = previousSubjectResults.FirstOrDefault(sr => sr.SubjectId == cs.SubjectId);
                     var isCarriedOver = previousSubjectResult != null
                         && (previousSubjectResult.Status == SubjectResultStatus.Passed || previousSubjectResult.Status == SubjectResultStatus.Exempted);
+                    var subjectInfo = subjectDict.GetValueOrDefault(cs.SubjectId);
 
                     var subjectResult = new SubjectResult
                     {
@@ -262,7 +265,14 @@ public class EnrollmentService : IEnrollmentService
                         EvaluatedByAccountId = isCarriedOver ? previousSubjectResult!.EvaluatedByAccountId : null,
                         EvaluatedAt = isCarriedOver ? previousSubjectResult!.EvaluatedAt : null,
                         CarriedOverFromSubjectResultId = isCarriedOver ? previousSubjectResult!.SubjectResultId : null,
+                        SubjectCodeSnapshot = subjectInfo?.SubjectCode,
+                        SubjectNameSnapshot = subjectInfo?.SubjectName,
+                        SubjectTypeSnapshot = subjectInfo?.SubjectType,
                         PassingScoreSnapshot = cs.PassingScore,
+                        RequiredHoursSnapshot = cs.RequiredHours,
+                        RequiredSessionsSnapshot = cs.RequiredSessions,
+                        IsMandatorySnapshot = cs.IsMandatory,
+                        SequenceNoSnapshot = cs.SequenceNo,
                         CreatedAt = DateTime.UtcNow,
                         CreatedByAccountId = createdByAccountId
                     };
@@ -288,7 +298,8 @@ public class EnrollmentService : IEnrollmentService
                             IsPublished = previousAssessmentResult?.IsPublished ?? false,
                             AttemptNo = 1,
                             PassingScoreSnapshot = assessment.PassingScore,
-                            WeightSnapshot = assessment.Weight
+                            WeightSnapshot = assessment.Weight,
+                            IsMandatorySnapshot = assessment.IsRequired
                         };
                         await _unitOfWork.AssessmentResultRepository.AddAsync(assessmentResult, ct);
                     }
@@ -306,7 +317,8 @@ public class EnrollmentService : IEnrollmentService
                             PracticalChecklistId = checklist.PracticalChecklistId,
                             Score = previousChecklistResult?.Score ?? 0,
                             ResultStatus = previousChecklistResult?.ResultStatus ?? "Pending",
-                            IsPublished = previousChecklistResult?.IsPublished ?? false
+                            IsPublished = previousChecklistResult?.IsPublished ?? false,
+                            IsMandatorySnapshot = checklist.IsRequired
                         };
                         await _unitOfWork.PracticalChecklistResultRepository.AddAsync(checklistResult, ct);
                     }

@@ -22,6 +22,27 @@ public class SubjectResult : BaseEntity
     /// Null for records created before this field existed — those fall back to the live value.</summary>
     public decimal? PassingScoreSnapshot { get; set; }
 
+    /// <summary>Snapshot of Subject.SubjectCode at Enroll time.</summary>
+    public string? SubjectCodeSnapshot { get; set; }
+
+    /// <summary>Snapshot of Subject.SubjectName at Enroll time.</summary>
+    public string? SubjectNameSnapshot { get; set; }
+
+    /// <summary>Snapshot of Subject.SubjectType at Enroll time.</summary>
+    public string? SubjectTypeSnapshot { get; set; }
+
+    /// <summary>Snapshot of CourseSubject.RequiredHours at Enroll time.</summary>
+    public int? RequiredHoursSnapshot { get; set; }
+
+    /// <summary>Snapshot of CourseSubject.RequiredSessions at Enroll time.</summary>
+    public int? RequiredSessionsSnapshot { get; set; }
+
+    /// <summary>Snapshot of CourseSubject.IsMandatory at Enroll time.</summary>
+    public bool? IsMandatorySnapshot { get; set; }
+
+    /// <summary>Snapshot of CourseSubject.SequenceNo at Enroll time.</summary>
+    public int? SequenceNoSnapshot { get; set; }
+
     /// <summary>Set when this SubjectResult was carried over unchanged from a prior enrollment
     /// attempt at Enroll time (see EnrollmentService.CreateEnrollmentAsync) because the learner had
     /// already Passed/Exempted this subject — points at the SOURCE SubjectResult from the previous

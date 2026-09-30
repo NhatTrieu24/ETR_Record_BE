@@ -31,6 +31,9 @@ public class AssessmentResult : BaseEntity
     /// PassingScoreSnapshot. Null for records created before this field existed.</summary>
     public decimal? WeightSnapshot { get; set; }
 
+    /// <summary>Snapshot of Assessment.IsRequired captured when enrolled/attempted.</summary>
+    public bool? IsMandatorySnapshot { get; set; }
+
     // Navigation
     public Session? Session { get; set; }
 }

@@ -12,5 +12,6 @@ public record CourseResponse(
     int? ValidityMonths = null,
     string? CourseType = null,
     List<CourseSubjectResponse>? Subjects = null,
-    int VersionNo = 1
+    int VersionNo = 1,
+    int? PreviousVersionId = null
 );

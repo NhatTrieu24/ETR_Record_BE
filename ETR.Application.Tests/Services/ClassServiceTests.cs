@@ -40,7 +40,7 @@ public class ClassServiceTests
         var uow = new Mock<IUnitOfWork>();
         var courseRepo = new Mock<IGenericRepository<Course>>();
         courseRepo.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Course { CourseId = 1, CourseCode = "CRS-01" });
+            .ReturnsAsync(new Course { CourseId = 1, CourseCode = "CRS-01", Status = CourseStatus.Active, VersionNo = 2 });
         uow.Setup(u => u.CourseRepository).Returns(courseRepo.Object);
 
         var classRepo = new Mock<IGenericRepository<Class>>();
@@ -69,7 +69,7 @@ public class ClassServiceTests
         var uow = new Mock<IUnitOfWork>();
         var courseRepo = new Mock<IGenericRepository<Course>>();
         courseRepo.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Course { CourseId = 1, CourseCode = "CRS-01" });
+            .ReturnsAsync(new Course { CourseId = 1, CourseCode = "CRS-01", Status = CourseStatus.Active, VersionNo = 1 });
         uow.Setup(u => u.CourseRepository).Returns(courseRepo.Object);
 
         var classRepo = new Mock<IGenericRepository<Class>>();
@@ -107,6 +107,31 @@ public class ClassServiceTests
             service.CreateClassCoreAsync(request, createdByAccountId: 1));
 
         Assert.Contains("ICAO/CAAV", ex.Message);
+    }
+
+    [Theory]
+    [InlineData(CourseStatus.Draft)]
+    [InlineData(CourseStatus.Archived)]
+    [InlineData(CourseStatus.Inactive)]
+    public async Task CreateClassCoreAsync_ThrowsWhenCourseIsNotActive(CourseStatus nonActiveStatus)
+    {
+        var uow = new Mock<IUnitOfWork>();
+        var courseRepo = new Mock<IGenericRepository<Course>>();
+        courseRepo.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Course { CourseId = 1, CourseCode = "CRS-01", Status = nonActiveStatus, VersionNo = 1 });
+        uow.Setup(u => u.CourseRepository).Returns(courseRepo.Object);
+
+        var currentUserService = new Mock<ICurrentUserService>();
+        var service = new ClassService(uow.Object, currentUserService.Object);
+
+        var request = new CreateClassRequest(
+            "CLS-01", "Class 1", 1, DateTime.UtcNow.AddDays(1), DateTime.UtcNow.AddDays(30),
+            "Phòng Sim A320", 30, ClassStatus.Planned);
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            service.CreateClassCoreAsync(request, createdByAccountId: 1));
+
+        Assert.Contains("Chỉ có thể mở lớp cho khóa học đang Hoạt động", ex.Message);
     }
 
     [Fact]

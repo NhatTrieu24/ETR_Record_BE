@@ -213,4 +213,215 @@ public class CourseServiceTests
         _mockCourseSubjectRepo.Verify(r => r.Update(existingSoftDeleted), Times.Once);
         _mockUow.Verify(u => u.SaveAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task EnsureCourseNotLockedAsync_ShouldThrow_WhenCourseHasScheduledClass()
+    {
+        int courseId = 10;
+        _mockCourseRepo.Setup(r => r.GetByIdAsync(courseId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Course { CourseId = courseId, CourseCode = "C101", CourseName = "Private Pilot", VersionNo = 1 });
+
+        _mockClassRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Class>
+            {
+                new() { ClassId = 1, CourseId = courseId, Status = ClassStatus.Scheduled, IsDeleted = false }
+            });
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            _service.EnsureCourseNotLockedAsync(courseId));
+
+        Assert.Contains("đóng băng bất biến", ex.Message);
+    }
+
+    [Fact]
+    public async Task CloneCourseVersionAsync_ShouldCloneCourseAndBumpVersionNo()
+    {
+        int courseId = 10;
+        int createdByAccountId = 99;
+
+        var originalCourse = new Course
+        {
+            CourseId = courseId,
+            CourseCode = "PPL-2026",
+            CourseName = "Private Pilot License",
+            Description = "Initial Pilot Training",
+            DurationHours = 120,
+            Status = CourseStatus.Active,
+            VersionNo = 1
+        };
+
+        _mockCourseRepo.Setup(r => r.GetByIdAsync(courseId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(originalCourse);
+
+        _mockCourseRepo.Setup(r => r.GetAllIncludingDeletedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Course> { originalCourse });
+
+        var mockAssessmentRepo = new Mock<IGenericRepository<Assessment>>();
+        var mockChecklistRepo = new Mock<IGenericRepository<PracticalChecklist>>();
+        var mockReqRepo = new Mock<IGenericRepository<CompletionRequirement>>();
+        var mockEnrollmentRepo = new Mock<IGenericRepository<CourseEnrollment>>();
+
+        _mockUow.Setup(u => u.AssessmentRepository).Returns(mockAssessmentRepo.Object);
+        _mockUow.Setup(u => u.PracticalChecklistRepository).Returns(mockChecklistRepo.Object);
+        _mockUow.Setup(u => u.CompletionRequirementRepository).Returns(mockReqRepo.Object);
+        _mockUow.Setup(u => u.CourseEnrollmentRepository).Returns(mockEnrollmentRepo.Object);
+
+        _mockUow.Setup(u => u.ExecuteInStrategyAsync(It.IsAny<Func<CancellationToken, Task<CourseResponse>>>(), It.IsAny<CancellationToken>()))
+            .Returns<Func<CancellationToken, Task<CourseResponse>>, CancellationToken>((op, ct) => op(ct));
+
+        _mockCourseSubjectRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CourseSubject>
+            {
+                new() { CourseId = courseId, SubjectId = 1, SequenceNo = 1, PassingScore = 80, IsMandatory = true }
+            });
+
+        mockAssessmentRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Assessment>
+            {
+                new() { CourseId = courseId, SubjectId = 1, ComponentName = "Midterm", Weight = 40, PassingScore = 80, IsRequired = true }
+            });
+
+        mockChecklistRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<PracticalChecklist>
+            {
+                new() { CourseId = courseId, SubjectId = 1, ItemName = "Pre-flight Inspection", IsRequired = true }
+            });
+
+        mockReqRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CompletionRequirement>
+            {
+                new() { CourseId = courseId, RequirementName = "Min Attendance 80%", RequirementType = "MinAttendance", ThresholdValue = 80, IsMandatory = true, VersionNo = 1 }
+            });
+
+        var result = await _service.CloneCourseVersionAsync(courseId, createdByAccountId);
+
+        Assert.Equal(2, result.VersionNo);
+        Assert.Equal("PPL-2026", result.CourseCode);
+        Assert.Equal(courseId, result.PreviousVersionId);
+        Assert.Equal(CourseStatus.Draft, result.Status);
+        Assert.Single(result.Subjects!);
+
+        _mockCourseRepo.Verify(r => r.AddAsync(It.Is<Course>(c => c.VersionNo == 2 && c.PreviousVersionId == courseId && c.Status == CourseStatus.Draft), It.IsAny<CancellationToken>()), Times.Once);
+        _mockCourseSubjectRepo.Verify(r => r.AddAsync(It.Is<CourseSubject>(cs => cs.SubjectId == 1 && cs.PassingScore == 80), It.IsAny<CancellationToken>()), Times.Once);
+        mockAssessmentRepo.Verify(r => r.AddAsync(It.Is<Assessment>(a => a.ComponentName == "Midterm"), It.IsAny<CancellationToken>()), Times.Once);
+        mockChecklistRepo.Verify(r => r.AddAsync(It.Is<PracticalChecklist>(p => p.ItemName == "Pre-flight Inspection"), It.IsAny<CancellationToken>()), Times.Once);
+        mockReqRepo.Verify(r => r.AddAsync(It.Is<CompletionRequirement>(cr => cr.VersionNo == 2), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateCourseAsync_ShouldThrow_WhenModifyingSubjectsOfLockedCourse()
+    {
+        int courseId = 10;
+        var existingCourse = new Course
+        {
+            CourseId = courseId,
+            CourseCode = "PPL-101",
+            CourseName = "Private Pilot",
+            Description = "Desc",
+            DurationHours = 100,
+            Status = CourseStatus.Active,
+            ValidityMonths = 24,
+            CourseType = "Pilot",
+            VersionNo = 1
+        };
+
+        _mockCourseRepo.Setup(r => r.GetByIdAsync(courseId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingCourse);
+
+        // Course is locked due to InProgress class
+        _mockClassRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Class>
+            {
+                new() { ClassId = 1, CourseId = courseId, Status = ClassStatus.InProgress, IsDeleted = false }
+            });
+
+        _mockCourseSubjectRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CourseSubject>
+            {
+                new() { CourseId = courseId, SubjectId = 1, SequenceNo = 1, RequiredHours = 40, RequiredSessions = 10, IsMandatory = true, PassingScore = 75 }
+            });
+
+        _mockUow.Setup(u => u.ExecuteInStrategyAsync(It.IsAny<Func<CancellationToken, Task<CourseResponse>>>(), It.IsAny<CancellationToken>()))
+            .Returns<Func<CancellationToken, Task<CourseResponse>>, CancellationToken>((op, ct) => op(ct));
+
+        // Request changes PassingScore on subject from 75 to 85
+        var request = new UpdateCourseRequest(
+            courseId,
+            "PPL-101",
+            "Private Pilot",
+            "Desc",
+            100,
+            CourseStatus.Active,
+            24,
+            "Pilot",
+            new List<AddCourseSubjectRequest>
+            {
+                new() { SubjectId = 1, SequenceNo = 1, RequiredHours = 40, RequiredSessions = 10, IsMandatory = true, PassingScore = 85 }
+            }
+        );
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            _service.UpdateCourseAsync(courseId, request, updatedByAccountId: 1));
+
+        Assert.Contains("đóng băng bất biến", ex.Message);
+    }
+
+    [Fact]
+    public async Task UpdateCourseAsync_ShouldSucceed_WhenOnlyTransitioningStatusToArchivedOnLockedCourse()
+    {
+        int courseId = 10;
+        var existingCourse = new Course
+        {
+            CourseId = courseId,
+            CourseCode = "PPL-101",
+            CourseName = "Private Pilot",
+            Description = "Desc",
+            DurationHours = 100,
+            Status = CourseStatus.Active,
+            ValidityMonths = 24,
+            CourseType = "Pilot",
+            VersionNo = 1
+        };
+
+        _mockCourseRepo.Setup(r => r.GetByIdAsync(courseId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingCourse);
+
+        // Course is locked due to Completed class
+        _mockClassRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Class>
+            {
+                new() { ClassId = 1, CourseId = courseId, Status = ClassStatus.Completed, IsDeleted = false }
+            });
+
+        _mockCourseSubjectRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CourseSubject>
+            {
+                new() { CourseId = courseId, SubjectId = 1, SequenceNo = 1, RequiredHours = 40, RequiredSessions = 10, IsMandatory = true, PassingScore = 75 }
+            });
+
+        _mockUow.Setup(u => u.ExecuteInStrategyAsync(It.IsAny<Func<CancellationToken, Task<CourseResponse>>>(), It.IsAny<CancellationToken>()))
+            .Returns<Func<CancellationToken, Task<CourseResponse>>, CancellationToken>((op, ct) => op(ct));
+
+        // Request only changes status from Active to Archived
+        var request = new UpdateCourseRequest(
+            courseId,
+            "PPL-101",
+            "Private Pilot",
+            "Desc",
+            100,
+            CourseStatus.Archived,
+            24,
+            "Pilot",
+            new List<AddCourseSubjectRequest>
+            {
+                new() { SubjectId = 1, SequenceNo = 1, RequiredHours = 40, RequiredSessions = 10, IsMandatory = true, PassingScore = 75 }
+            }
+        );
+
+        var result = await _service.UpdateCourseAsync(courseId, request, updatedByAccountId: 1);
+
+        Assert.Equal(CourseStatus.Archived, result.Status);
+        Assert.Equal(CourseStatus.Archived, existingCourse.Status);
+        _mockCourseRepo.Verify(r => r.Update(existingCourse), Times.Once);
+    }
 }

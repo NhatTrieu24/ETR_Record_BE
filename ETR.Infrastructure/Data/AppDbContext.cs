@@ -120,7 +120,7 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<Role>().HasIndex(r => r.RoleName).IsUnique().HasFilter("[IsDeleted] = 0");
         modelBuilder.Entity<Department>().HasIndex(d => d.DepartmentName).IsUnique().HasFilter("[IsDeleted] = 0");
         modelBuilder.Entity<EvidenceType>().HasIndex(et => et.TypeName).IsUnique().HasFilter("[IsDeleted] = 0");
-        modelBuilder.Entity<Course>().HasIndex(c => c.CourseCode).IsUnique().HasFilter("[IsDeleted] = 0");
+        modelBuilder.Entity<Course>().HasIndex(c => new { c.CourseCode, c.VersionNo }).IsUnique().HasFilter("[IsDeleted] = 0");
         modelBuilder.Entity<Subject>().HasIndex(s => s.SubjectCode).IsUnique().HasFilter("[IsDeleted] = 0");
         modelBuilder.Entity<Class>().HasIndex(tc => tc.ClassCode).IsUnique().HasFilter("[IsDeleted] = 0");
 

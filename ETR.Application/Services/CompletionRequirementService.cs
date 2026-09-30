@@ -8,10 +8,12 @@ namespace ETR.Application.Services;
 public class CompletionRequirementService : ICompletionRequirementService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICourseService _courseService;
 
-    public CompletionRequirementService(IUnitOfWork unitOfWork)
+    public CompletionRequirementService(IUnitOfWork unitOfWork, ICourseService courseService)
     {
         _unitOfWork = unitOfWork;
+        _courseService = courseService;
     }
 
     public async Task<IEnumerable<CompletionRequirementResponse>> GetAllCompletionRequirementsAsync(CancellationToken cancellationToken = default)
@@ -39,6 +41,8 @@ public class CompletionRequirementService : ICompletionRequirementService
 
     public async Task<CompletionRequirementResponse> CreateCompletionRequirementAsync(CreateCompletionRequirementRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
     {
+        await _courseService.EnsureCourseNotLockedAsync(request.CourseId, cancellationToken);
+
         var course = await _unitOfWork.CourseRepository.GetByIdAsync(request.CourseId, cancellationToken);
         if (course == null) throw new KeyNotFoundException("Course not found.");
 
@@ -73,6 +77,8 @@ public class CompletionRequirementService : ICompletionRequirementService
             {
                 var item = await _unitOfWork.CompletionRequirementRepository.GetByIdAsync(id, ct)
                     ?? throw new KeyNotFoundException("CompletionRequirement not found.");
+
+                await _courseService.EnsureCourseNotLockedAsync(item.CourseId, ct);
 
                 // These three fields are what EtrService.SubmitEtrAsync/GetCompletionProgressAsync
                 // actually evaluate Pass/Fail against — changing any of them must NOT retroactively
@@ -163,6 +169,8 @@ public class CompletionRequirementService : ICompletionRequirementService
     {
         var item = await _unitOfWork.CompletionRequirementRepository.GetByIdAsync(id, cancellationToken);
         if (item == null) throw new KeyNotFoundException("CompletionRequirement not found.");
+
+        await _courseService.EnsureCourseNotLockedAsync(item.CourseId, cancellationToken);
 
         item.IsDeleted = true;
         item.DeletedAt = DateTime.UtcNow;

@@ -13,4 +13,6 @@ public interface ICourseService
     Task<IEnumerable<CourseSubjectResponse>> GetSubjectsByCourseAsync(int courseId, CancellationToken cancellationToken = default);
     Task<CourseSubjectResponse> UpdateCourseSubjectAsync(int courseId, int subjectId, UpdateCourseSubjectRequest request, int updatedByAccountId, CancellationToken cancellationToken = default);
     Task RemoveSubjectFromCourseAsync(int courseId, int subjectId, int deletedByAccountId, CancellationToken cancellationToken = default);
+    Task<CourseResponse> CloneCourseVersionAsync(int courseId, int createdByAccountId, CancellationToken cancellationToken = default);
+    Task EnsureCourseNotLockedAsync(int courseId, CancellationToken cancellationToken = default);
 }

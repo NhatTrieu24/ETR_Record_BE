@@ -13,4 +13,5 @@ public class PracticalChecklistResult : BaseEntity
     public string? VerificationComment { get; set; }
     public bool IsPublished { get; set; }
     public DateTime? PublishedAt { get; set; }
+    public bool? IsMandatorySnapshot { get; set; }
 }

@@ -5,6 +5,8 @@ namespace ETR.Domain.Enums;
 /// create a new, uncomparable value.</summary>
 public enum CourseStatus
 {
+    Draft,
     Active,
-    Inactive
+    Inactive,
+    Archived
 }
