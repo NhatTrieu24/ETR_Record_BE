@@ -426,4 +426,65 @@ public class AssessmentResultServiceTests
 
         Assert.Equal(SubjectResultStatus.Passed, subjectResult.Status);
     }
+
+    [Fact]
+    public async Task UpdateAssessmentResultAsync_ShouldIgnoreSoftDeletedAssessments_WhenCalculatingSubjectScore()
+    {
+        int subjectResultId = 10;
+        int assessmentResultId = 1;
+
+        var existingResult = new AssessmentResult
+        {
+            AssessmentResultId = assessmentResultId,
+            AssessmentId = 101,
+            AccountId = 5,
+            SubjectResultId = subjectResultId,
+            Score = 70,
+            IsPublished = false,
+            WeightSnapshot = 1.0m,
+            PassingScoreSnapshot = 70,
+            ResultStatus = "Passed",
+            AttemptNo = 1,
+            IsDeleted = false
+        };
+
+        var subjectResult = new SubjectResult
+        {
+            SubjectResultId = subjectResultId,
+            Score = 70
+        };
+
+        _mockAssessmentResultRepo.Setup(r => r.GetByIdAsync(assessmentResultId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingResult);
+        _mockSubjectResultRepo.Setup(r => r.GetByIdAsync(subjectResultId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(subjectResult);
+
+        var assessments = new List<Assessment>
+        {
+            new() { AssessmentId = 101, Weight = 1.0m, PassingScore = 70 },
+            new() { AssessmentId = 102, Weight = 1.0m, PassingScore = 70 }
+        };
+        _mockAssessmentRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(assessments);
+
+        // Active assessment 1: Score 90
+        // Soft-deleted assessment 2: Score 10, IsDeleted = true
+        var allResults = new List<AssessmentResult>
+        {
+            new() { AssessmentResultId = assessmentResultId, AssessmentId = 101, SubjectResultId = subjectResultId, Score = 90, WeightSnapshot = 1.0m, AttemptNo = 1, IsDeleted = false },
+            new() { AssessmentResultId = 2, AssessmentId = 102, SubjectResultId = subjectResultId, Score = 10, WeightSnapshot = 1.0m, AttemptNo = 1, IsDeleted = true }
+        };
+        _mockAssessmentResultRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(allResults);
+
+        var updateRequest = new UpdateAssessmentResultRequest(90, "Updated score");
+
+        var response = await _service.UpdateAssessmentResultAsync(assessmentResultId, updateRequest, updatedByAccountId: 99);
+
+        Assert.NotNull(response);
+        Assert.Equal(90, response.Score);
+        // SubjectResult score must be 90 (ignoring the soft-deleted Assessment 2 with score 10)
+        Assert.Equal(90, subjectResult.Score);
+        _mockSubjectResultRepo.Verify(r => r.Update(subjectResult), Times.Once);
+    }
 }

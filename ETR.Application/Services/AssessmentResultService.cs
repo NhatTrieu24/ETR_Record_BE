@@ -279,10 +279,10 @@ public class AssessmentResultService : IAssessmentResultService
         var subjectResult = await _unitOfWork.SubjectResultRepository.GetByIdAsync(subjectResultId, ct);
         if (subjectResult == null) return;
 
-        var allAssessmentResults = (await _unitOfWork.AssessmentResultRepository.GetAllAsync(ct))
-            .Where(r => r.SubjectResultId == subjectResultId).ToList();
+        var allAssessmentResults = (await _unitOfWork.AssessmentResultRepository.GetAllAsync(ct) ?? Enumerable.Empty<AssessmentResult>())
+            .Where(r => r.SubjectResultId == subjectResultId && !r.IsDeleted).ToList();
         
-        var allAssessments = await _unitOfWork.AssessmentRepository.GetAllAsync(ct);
+        var allAssessments = await _unitOfWork.AssessmentRepository.GetAllAsync(ct) ?? Enumerable.Empty<Assessment>();
 
         // Nhan's fix creates multiple rows for new sessions, and Retakes create multiple rows.
         // We MUST group by AssessmentId and take only the latest recorded score for each assessment
