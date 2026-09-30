@@ -405,24 +405,52 @@ public class ClassService : IClassService
         foreach (var cs in orderedCourseSubjects)
         {
             subjectMap.TryGetValue(cs.SubjectId, out var subjectType);
-            bool isPractical = !string.IsNullOrEmpty(subjectType) &&
-                (subjectType.Contains("Practical", StringComparison.OrdinalIgnoreCase) ||
-                 subjectType.Contains("SIM", StringComparison.OrdinalIgnoreCase) ||
-                 subjectType.Contains("Simulator", StringComparison.OrdinalIgnoreCase));
+            var currentSubject = allSubjects.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
+            TrainingType trainingType = TrainingTypeClassifier.Classify(currentSubject?.SubjectCode, currentSubject?.SubjectName, subjectType);
 
-            // 1. Phân bổ địa điểm theo SubjectType (Facility / Location Routing)
+            // 1. Phân bổ địa điểm theo TrainingType và SubjectType (Facility / Location Routing)
             string sessionLocation;
-            if (isPractical)
+            if (trainingType == TrainingType.Simulator)
             {
                 sessionLocation = !string.IsNullOrWhiteSpace(classLocation)
                     ? (classLocation.Contains("Sim", StringComparison.OrdinalIgnoreCase) ? classLocation : $"{classLocation} (SIM Room)")
                     : "Buồng lái mô phỏng (SIM / FSTD Room)";
             }
-            else
+            else if (trainingType == TrainingType.Flight)
             {
                 sessionLocation = !string.IsNullOrWhiteSpace(classLocation)
-                    ? classLocation
-                    : "Phòng học lý thuyết (Ground Classroom)";
+                    ? (classLocation.Contains("Bay", StringComparison.OrdinalIgnoreCase) ||
+                       classLocation.Contains("Airport", StringComparison.OrdinalIgnoreCase) ||
+                       classLocation.Contains("Sân bay", StringComparison.OrdinalIgnoreCase) ||
+                       classLocation.Contains("Flight", StringComparison.OrdinalIgnoreCase)
+                        ? classLocation
+                        : $"{classLocation} (Khu vực bay)")
+                    : "Sân bay huấn luyện / Khu vực bay (Airfield)";
+            }
+            else
+            {
+                bool isWorkshopOrNonFstdPractical = (!string.IsNullOrEmpty(subjectType) && subjectType.Contains("Practical", StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrEmpty(currentSubject?.SubjectName) && (
+                        currentSubject.SubjectName.Contains("Maintenance", StringComparison.OrdinalIgnoreCase) ||
+                        currentSubject.SubjectName.Contains("Bảo dưỡng", StringComparison.OrdinalIgnoreCase) ||
+                        currentSubject.SubjectName.Contains("Cabin", StringComparison.OrdinalIgnoreCase) ||
+                        currentSubject.SubjectName.Contains("Workshop", StringComparison.OrdinalIgnoreCase) ||
+                        currentSubject.SubjectName.Contains("Xưởng", StringComparison.OrdinalIgnoreCase) ||
+                        currentSubject.SubjectName.Contains("Thực hành", StringComparison.OrdinalIgnoreCase)
+                    ));
+
+                if (!string.IsNullOrWhiteSpace(classLocation))
+                {
+                    sessionLocation = classLocation;
+                }
+                else if (isWorkshopOrNonFstdPractical)
+                {
+                    sessionLocation = "Xưởng thực hành / Phòng huấn luyện an toàn (Ground Workshop)";
+                }
+                else
+                {
+                    sessionLocation = "Phòng học lý thuyết (Ground Classroom)";
+                }
             }
 
             int sessionCount = cs.RequiredSessions > 0 ? cs.RequiredSessions : 1;
@@ -447,7 +475,7 @@ public class ClassService : IClassService
                     isAssessmentRequired = true;
                 }
 
-                if (isFinalSession && (subjectChecklist != null || isPractical))
+                if (isFinalSession && (subjectChecklist != null || trainingType == TrainingType.Simulator || trainingType == TrainingType.Flight))
                 {
                     if (subjectChecklist != null) checklistId = subjectChecklist.PracticalChecklistId;
                     isChecklistRequired = true;
@@ -463,11 +491,20 @@ public class ClassService : IClassService
                 }
                 else if (isChecklistRequired)
                 {
-                    title = $"Buổi {i} (Đánh giá thực hành buồng lái)";
+                    if (trainingType == TrainingType.Simulator)
+                    {
+                        title = $"Buổi {i} (Đánh giá thực hành buồng lái mô phỏng)";
+                    }
+                    else if (trainingType == TrainingType.Flight)
+                    {
+                        title = $"Buổi {i} (Đánh giá thực hành bay)";
+                    }
+                    else
+                    {
+                        title = $"Buổi {i} (Đánh giá thực hành quy trình)";
+                    }
                 }
 
-                var currentSubject = allSubjects.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
-                TrainingType trainingType = TrainingTypeClassifier.Classify(currentSubject?.SubjectCode, currentSubject?.SubjectName, subjectType);
                 string lessonPrefix = currentSubject?.SubjectCode ?? "SUB";
                 string lessonCode = $"{lessonPrefix}-L{i:D2}";
 
