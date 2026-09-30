@@ -13,6 +13,8 @@ public interface IEtrService
     Task<IEnumerable<ExpiringStudentResponse>> GetDueForTrainingAsync(int? courseId, int daysThreshold, CancellationToken cancellationToken = default);
     Task<GroundedStatusRefreshResponse> RefreshGroundedStatusAsync(int actorAccountId, CancellationToken cancellationToken = default);
     Task<EtrCompletionProgressResponse> GetCompletionProgressAsync(int etrCourseRecordId, CancellationToken cancellationToken = default);
+    Task<EtrReadinessResponse> GetReadinessAssessmentAsync(int etrCourseRecordId, CancellationToken cancellationToken = default);
+    Task<EtrReadinessResponse> GetReadinessByEnrollmentAsync(int enrollmentId, CancellationToken cancellationToken = default);
     Task DeleteEtrAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default);
     
     Task<EtrRecordResponse> SubmitEtrAsync(int etrCourseRecordId, int accountId, CancellationToken cancellationToken = default);

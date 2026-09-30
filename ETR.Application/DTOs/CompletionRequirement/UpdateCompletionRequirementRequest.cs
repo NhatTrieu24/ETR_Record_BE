@@ -16,7 +16,7 @@ public class UpdateCompletionRequirementRequest
     /// <summary>"MinAttendance" | "AllAssessmentsPassed" | "AllChecklistsSignedOff" | null (advisory-only).</summary>
     public string? RequirementType { get; set; }
 
-    /// <summary>Threshold used by "MinAttendance" (percentage).</summary>
-    [Range(0, 100, ErrorMessage = "ThresholdValue must be between 0 and 100")]
+    /// <summary>Threshold used by "MinAttendance" (percentage 0-100) or "MinFlightHours"/"MinSimulatorHours" (hours 0-999.99).</summary>
+    [Range(0, 999.99, ErrorMessage = "ThresholdValue must be between 0 and 999.99")]
     public decimal? ThresholdValue { get; set; }
 }

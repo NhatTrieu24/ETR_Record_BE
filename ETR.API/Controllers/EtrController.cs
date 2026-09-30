@@ -86,14 +86,41 @@ public class EtrController : ControllerBase
     /// [Module/Flow]: Xử lý ETR
     /// [Core Responsibility]: Xem % đáp ứng các điều kiện hoàn thành trước khi Submit, không cần
     /// đợi Submit thất bại mới biết đang thiếu gì.
-    /// [Target Audience]: Instructor, QA, Admin, Audit, Academic, TrainingManager
+    /// [Target Audience]: Instructor, QA, Admin, Audit, Academic, TrainingManager, Student
     /// </summary>
     [HttpGet("{id}/completion-progress")]
-    [Authorize(Roles = "Instructor,QA,Admin,Audit,Academic,TrainingManager")]
+    [Authorize(Roles = "Instructor,QA,Admin,Audit,Academic,TrainingManager,Student")]
     public async Task<ActionResult<EtrCompletionProgressResponse>> GetCompletionProgress(int id, CancellationToken cancellationToken)
     {
         var progress = await _etrService.GetCompletionProgressAsync(id, cancellationToken);
         return Ok(progress);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Xử lý ETR / Đánh giá Sẵn sàng
+    /// [Core Responsibility]: Đánh giá chi tiết mức độ sẵn sàng hoàn thành khóa học theo Course Version,
+    /// đối chiếu các điều kiện môn học, chuyên cần, giờ bay/SIM và cảnh báo hồ sơ năng định.
+    /// [Target Audience]: Student, Instructor, QA, Admin, Audit, Academic, TrainingManager
+    /// </summary>
+    [HttpGet("{id}/readiness")]
+    [Authorize(Roles = "Student,Instructor,QA,Admin,Audit,Academic,TrainingManager")]
+    public async Task<ActionResult<EtrReadinessResponse>> GetReadiness(int id, CancellationToken cancellationToken)
+    {
+        var readiness = await _etrService.GetReadinessAssessmentAsync(id, cancellationToken);
+        return Ok(readiness);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Xử lý ETR / Đánh giá Sẵn sàng
+    /// [Core Responsibility]: Đánh giá mức độ sẵn sàng theo Enrollment ID.
+    /// [Target Audience]: Student, Instructor, QA, Admin, Audit, Academic, TrainingManager
+    /// </summary>
+    [HttpGet("enrollment/{enrollmentId:int}/readiness")]
+    [Authorize(Roles = "Student,Instructor,QA,Admin,Audit,Academic,TrainingManager")]
+    public async Task<ActionResult<EtrReadinessResponse>> GetReadinessByEnrollment(int enrollmentId, CancellationToken cancellationToken)
+    {
+        var readiness = await _etrService.GetReadinessByEnrollmentAsync(enrollmentId, cancellationToken);
+        return Ok(readiness);
     }
 
     /// <summary>

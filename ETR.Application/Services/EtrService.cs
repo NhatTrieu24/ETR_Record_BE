@@ -33,6 +33,32 @@ public class EtrService : IEtrService
         return enrollments.Where(e => classIds.Contains(e.ClassId)).Select(e => e.EnrollmentId).ToHashSet();
     }
 
+    private async Task<(decimal qualifiedFlightHours, decimal qualifiedSimHours)> GetQualifiedTrainingHoursAsync(int enrollmentId, CancellationToken cancellationToken)
+    {
+        var allSessions = (await _unitOfWork.SessionRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<Session>())
+            .Where(s => !s.IsDeleted)
+            .ToDictionary(s => s.SessionId);
+
+        var allAttendanceRecords = await _unitOfWork.AttendanceRecordRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<AttendanceRecord>();
+        var qualifiedRecords = allAttendanceRecords
+            .Where(ar => !ar.IsDeleted &&
+                         ar.EnrollmentId == enrollmentId &&
+                         ar.Status == AttendanceStatus.Present &&
+                         allSessions.ContainsKey(ar.SessionId))
+            .Where(ar =>
+            {
+                var session = allSessions[ar.SessionId];
+                bool isSignedByInstructor = ar.InstructorSignedAt.HasValue || ar.InstructorSignedByAccountId.HasValue;
+                bool isSessionConfirmed = session.IsConfirmed;
+                return isSignedByInstructor || isSessionConfirmed;
+            })
+            .ToList();
+
+        decimal flightH = qualifiedRecords.Sum(ar => ar.FlightHours ?? 0m);
+        decimal simH = qualifiedRecords.Sum(ar => ar.SimulatorHours ?? 0m);
+        return (flightH, simH);
+    }
+
     public async Task<IEnumerable<EtrRecordResponse>> GetAllEtrsAsync(CancellationToken cancellationToken = default)
     {
         var etrs = await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken);
@@ -282,7 +308,7 @@ public class EtrService : IEtrService
                 throw new BusinessRuleViolationException($"Cannot submit ETR. Subject (ID: {sr.SubjectId}) has not been signed off by instructor.");
             }
         }
-
+        
         // 5. Check mandatory CompletionRequirements configured for the course
         // Filtered by CourseVersionNo (snapshotted at Enroll time), NOT "whatever requirements exist
         // right now" — so a mid-course rule change never retroactively re-evaluates this learner
@@ -290,6 +316,8 @@ public class EtrService : IEtrService
         // VersionNo docs.
         var completionRequirements = (await _unitOfWork.CompletionRequirementRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<CompletionRequirement>())
             .Where(cr => cr.CourseId == trainingClass.CourseId && cr.IsMandatory && cr.VersionNo == etr.CourseVersionNo).ToList();
+
+        var (qualifiedFlightHours, qualifiedSimHours) = await GetQualifiedTrainingHoursAsync(etr.EnrollmentId, cancellationToken);
 
         foreach (var requirement in completionRequirements)
         {
@@ -300,6 +328,22 @@ public class EtrService : IEtrService
                     if (etr.SubjectResults != null && etr.SubjectResults.Any(sr => (sr.AttendanceRate ?? 0) < minAttendance))
                     {
                         throw new BusinessRuleViolationException($"Cannot submit ETR. Completion requirement '{requirement.RequirementName}' not met: attendance below {minAttendance}%.");
+                    }
+                    break;
+
+                case "MinFlightHours":
+                    var minFlightHours = requirement.ThresholdValue ?? 0m;
+                    if (qualifiedFlightHours < minFlightHours)
+                    {
+                        throw new BusinessRuleViolationException($"Cannot submit ETR. Completion requirement '{requirement.RequirementName}' not met: qualified flight hours ({qualifiedFlightHours:0.##}h) below required {minFlightHours:0.##}h.");
+                    }
+                    break;
+
+                case "MinSimulatorHours":
+                    var minSimHours = requirement.ThresholdValue ?? 0m;
+                    if (qualifiedSimHours < minSimHours)
+                    {
+                        throw new BusinessRuleViolationException($"Cannot submit ETR. Completion requirement '{requirement.RequirementName}' not met: qualified simulator hours ({qualifiedSimHours:0.##}h) below required {minSimHours:0.##}h.");
                     }
                     break;
 
@@ -495,14 +539,30 @@ public class EtrService : IEtrService
         var completionRequirements = (await _unitOfWork.CompletionRequirementRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<CompletionRequirement>())
             .Where(cr => cr.CourseId == trainingClass.CourseId && cr.IsMandatory && cr.VersionNo == etr.CourseVersionNo).ToList();
 
+        var (qualifiedFlightHours, qualifiedSimHours) = await GetQualifiedTrainingHoursAsync(etr.EnrollmentId, cancellationToken);
+
         foreach (var requirement in completionRequirements)
         {
             bool isMet;
+            string? detail = null;
             switch (requirement.RequirementType)
             {
                 case "MinAttendance":
                     var minAttendance = requirement.ThresholdValue ?? BusinessRuleEngine.MinimumAttendanceThreshold;
                     isMet = etr.SubjectResults == null || !etr.SubjectResults.Any(sr => (sr.AttendanceRate ?? 0) < minAttendance);
+                    detail = $"{minAttendance}% min";
+                    break;
+
+                case "MinFlightHours":
+                    var minFlight = requirement.ThresholdValue ?? 0m;
+                    isMet = qualifiedFlightHours >= minFlight;
+                    detail = $"{qualifiedFlightHours:0.##} / {minFlight:0.##} hours";
+                    break;
+
+                case "MinSimulatorHours":
+                    var minSim = requirement.ThresholdValue ?? 0m;
+                    isMet = qualifiedSimHours >= minSim;
+                    detail = $"{qualifiedSimHours:0.##} / {minSim:0.##} hours";
                     break;
 
                 case "AllAssessmentsPassed":
@@ -550,13 +610,464 @@ public class EtrService : IEtrService
                     break;
             }
 
-            checks.Add(new CompletionCheckItem($"Completion Requirement: {requirement.RequirementName}", true, isMet, null));
+            checks.Add(new CompletionCheckItem($"Completion Requirement: {requirement.RequirementName}", true, isMet, detail));
         }
 
         var metCount = checks.Count(c => c.IsMet);
         var percent = checks.Count == 0 ? 100m : Math.Round((decimal)metCount / checks.Count * 100, 2);
 
         return new EtrCompletionProgressResponse(etr.ETRCourseRecordId, checks.Count, metCount, percent, checks);
+    }
+
+    public async Task<EtrReadinessResponse> GetReadinessByEnrollmentAsync(int enrollmentId, CancellationToken cancellationToken = default)
+    {
+        var allEtrs = await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken);
+        var etr = allEtrs.FirstOrDefault(e => e.EnrollmentId == enrollmentId && !e.IsDeleted)
+            ?? throw new KeyNotFoundException($"Không tìm thấy hồ sơ ETR cho Enrollment #{enrollmentId}.");
+
+        return await GetReadinessAssessmentAsync(etr.ETRCourseRecordId, cancellationToken);
+    }
+
+    public async Task<EtrReadinessResponse> GetReadinessAssessmentAsync(int etrCourseRecordId, CancellationToken cancellationToken = default)
+    {
+        var etr = await _unitOfWork.ETRCourseRecordRepository.GetWithSubjectResultsAsync(etrCourseRecordId, cancellationToken)
+            ?? throw new KeyNotFoundException($"ETRCourseRecord #{etrCourseRecordId} not found.");
+
+        var enrollment = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(etr.EnrollmentId, cancellationToken)
+            ?? throw new KeyNotFoundException("Enrollment not found.");
+
+        var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(enrollment.ClassId, cancellationToken)
+            ?? throw new KeyNotFoundException("Class not found.");
+
+        var course = await _unitOfWork.CourseRepository.GetByIdAsync(trainingClass.CourseId, cancellationToken)
+            ?? throw new KeyNotFoundException("Course not found.");
+
+        var allProfiles = await _unitOfWork.UserProfileRepository.GetAllIncludingDeletedAsync(cancellationToken);
+        var studentProfile = allProfiles.FirstOrDefault(p => p.AccountId == enrollment.AccountId);
+        string studentName = studentProfile?.FullName ?? $"Student #{enrollment.AccountId}";
+
+        // 1. Phân quyền truy cập (Access Control)
+        bool isPrivilegedRole = _currentUserService.RoleName is "Admin" or "Academic" or "TrainingManager" or "QA" or "Audit";
+        bool isStudent = _currentUserService.RoleName is "Student" or "Learner";
+        bool isInstructor = _currentUserService.RoleName == "Instructor";
+        bool isOwn = _currentUserService.AccountId.HasValue && _currentUserService.AccountId.Value == enrollment.AccountId;
+
+        if (isStudent && !isOwn)
+        {
+            throw new UnauthorizedAccessException("Học viên chỉ có quyền xem đánh giá mức độ sẵn sàng của chính mình.");
+        }
+        else if (isInstructor && !isOwn)
+        {
+            var myEnrollmentIds = await GetInstructorEnrollmentIdsAsync(_currentUserService.AccountId!.Value, cancellationToken);
+            if (!myEnrollmentIds.Contains(etr.EnrollmentId))
+            {
+                throw new KeyNotFoundException($"Không tìm thấy dữ liệu học viên thuộc các lớp được phân công.");
+            }
+        }
+        else if (!isPrivilegedRole && !isOwn)
+        {
+            throw new UnauthorizedAccessException("Bạn không có quyền xem thông tin sẵn sàng của hồ sơ này.");
+        }
+
+        // 2. Lấy dữ liệu môn học, kết quả, chuyên cần, giờ bay/SIM
+        var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<CourseSubject>())
+            .Where(cs => cs.CourseId == trainingClass.CourseId).ToList();
+        var subjects = (await _unitOfWork.SubjectRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<Subject>())
+            .ToDictionary(s => s.SubjectId, s => s);
+
+        var (qualifiedFlightHours, qualifiedSimHours) = await GetQualifiedTrainingHoursAsync(etr.EnrollmentId, cancellationToken);
+
+        var conditions = new List<ReadinessItemDto>();
+        var warnings = new List<ReadinessWarningDto>();
+
+        // 3. Đánh giá Môn học Bắt buộc (Mandatory Subjects Assessment)
+        var subjectResultsList = etr.SubjectResults?.ToList() ?? new List<SubjectResult>();
+        bool hasSnapshots = subjectResultsList.Any(sr => sr.IsMandatorySnapshot.HasValue);
+
+        int mandatoryCount = 0;
+        int passedCount = 0;
+        int failedCount = 0;
+        int pendingCount = 0;
+
+        if (hasSnapshots)
+        {
+            var mandatorySRs = subjectResultsList.Where(sr => sr.IsMandatorySnapshot == true).ToList();
+            mandatoryCount = mandatorySRs.Count;
+            passedCount = mandatorySRs.Count(sr => sr.Status == SubjectResultStatus.Passed || sr.Status == SubjectResultStatus.Exempted);
+            failedCount = mandatorySRs.Count(sr => sr.Status == SubjectResultStatus.Failed);
+            pendingCount = mandatorySRs.Count(sr => sr.Status == SubjectResultStatus.Pending);
+        }
+        else
+        {
+            var mandatoryCourseSubjects = courseSubjects.Where(cs => cs.IsMandatory).ToList();
+            mandatoryCount = mandatoryCourseSubjects.Count;
+            foreach (var cs in mandatoryCourseSubjects)
+            {
+                var sr = subjectResultsList.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
+                if (sr == null || sr.Status == SubjectResultStatus.Pending)
+                    pendingCount++;
+                else if (sr.Status == SubjectResultStatus.Passed || sr.Status == SubjectResultStatus.Exempted)
+                    passedCount++;
+                else if (sr.Status == SubjectResultStatus.Failed)
+                    failedCount++;
+            }
+        }
+
+        ReadinessStatus subjectStatus = ReadinessStatus.Met;
+        string subjectExpl = $"Đã hoàn thành {passedCount}/{mandatoryCount} môn học bắt buộc.";
+        if (mandatoryCount == 0)
+        {
+            subjectStatus = ReadinessStatus.Met;
+            subjectExpl = "Không có môn học bắt buộc nào được cấu hình.";
+        }
+        else if (passedCount == mandatoryCount)
+        {
+            subjectStatus = ReadinessStatus.Met;
+            subjectExpl = $"Tất cả {mandatoryCount} môn học bắt buộc đã Đạt (Passed) hoặc Miễn (Exempted).";
+        }
+        else if (failedCount > 0)
+        {
+            subjectStatus = ReadinessStatus.NotMet;
+            subjectExpl = $"Có {failedCount} môn học bắt buộc chưa đạt (Failed). Cần thi lại hoặc học lại.";
+        }
+        else if (pendingCount > 0)
+        {
+            subjectStatus = (passedCount == 0) ? ReadinessStatus.NoData : ReadinessStatus.NotMet;
+            subjectExpl = $"Còn {pendingCount}/{mandatoryCount} môn học bắt buộc đang học hoặc chưa có kết quả thi.";
+        }
+
+        conditions.Add(new ReadinessItemDto(
+            ConditionCode: "MANDATORY_SUBJECTS",
+            ConditionName: "Môn học bắt buộc",
+            Status: subjectStatus,
+            CurrentValue: passedCount,
+            ThresholdValue: mandatoryCount,
+            Unit: "môn",
+            IsMandatory: true,
+            Explanation: subjectExpl,
+            Category: "Academic"
+        ));
+
+        // 4. Đánh giá Chuyên cần Tổng thể (Overall Attendance)
+        var subjectResultsWithAttendance = subjectResultsList.Where(sr => sr.AttendanceRate.HasValue).ToList();
+        if (subjectResultsWithAttendance.Count == 0)
+        {
+            conditions.Add(new ReadinessItemDto(
+                ConditionCode: "MIN_ATTENDANCE",
+                ConditionName: "Tỷ lệ chuyên cần tối thiểu",
+                Status: ReadinessStatus.NoData,
+                CurrentValue: null,
+                ThresholdValue: BusinessRuleEngine.MinimumAttendanceThreshold,
+                Unit: "%",
+                IsMandatory: true,
+                Explanation: $"Chưa có buổi học nào được xác nhận điểm danh (ngưỡng tối thiểu {BusinessRuleEngine.MinimumAttendanceThreshold}%).",
+                Category: "Attendance"
+            ));
+        }
+        else
+        {
+            decimal minAtt = subjectResultsWithAttendance.Min(sr => sr.AttendanceRate!.Value);
+            bool attMet = minAtt >= BusinessRuleEngine.MinimumAttendanceThreshold;
+            conditions.Add(new ReadinessItemDto(
+                ConditionCode: "MIN_ATTENDANCE",
+                ConditionName: "Tỷ lệ chuyên cần tối thiểu",
+                Status: attMet ? ReadinessStatus.Met : ReadinessStatus.NotMet,
+                CurrentValue: minAtt,
+                ThresholdValue: BusinessRuleEngine.MinimumAttendanceThreshold,
+                Unit: "%",
+                IsMandatory: true,
+                Explanation: attMet
+                    ? $"Tất cả các môn đều đạt chuyên cần tối thiểu (môn thấp nhất: {minAtt}% >= {BusinessRuleEngine.MinimumAttendanceThreshold}%)."
+                    : $"Có môn học có chuyên cần ({minAtt}%) dưới ngưỡng tối thiểu {BusinessRuleEngine.MinimumAttendanceThreshold}%.",
+                Category: "Attendance"
+            ));
+        }
+
+        // 5. Đánh giá Checklist Thực hành (Practical Checklists)
+        var subjectResultIds = subjectResultsList.Select(sr => sr.SubjectResultId).ToList();
+        var checklistResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<PracticalChecklistResult>())
+            .Where(r => subjectResultIds.Contains(r.SubjectResultId) && !r.IsDeleted).ToList();
+        var latestChecklistResults = checklistResults
+            .GroupBy(r => r.PracticalChecklistId)
+            .Select(g => g.OrderByDescending(r => r.CompletedAt ?? r.CreatedAt).ThenByDescending(r => r.PracticalChecklistResultId).First())
+            .ToList();
+
+        var mandatoryChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<PracticalChecklist>())
+            .Where(pc => pc.CourseId == trainingClass.CourseId && pc.IsRequired && !pc.IsDeleted).ToList();
+
+        if (mandatoryChecklists.Count > 0)
+        {
+            int chkPassed = mandatoryChecklists.Count(c => latestChecklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.ResultStatus == "Passed"));
+            ReadinessStatus chkStatus = (chkPassed == mandatoryChecklists.Count)
+                ? ReadinessStatus.Met
+                : (chkPassed == 0 && latestChecklistResults.Count == 0 ? ReadinessStatus.NoData : ReadinessStatus.NotMet);
+
+            conditions.Add(new ReadinessItemDto(
+                ConditionCode: "PRACTICAL_CHECKLISTS",
+                ConditionName: "Checklist thực hành kỹ năng",
+                Status: chkStatus,
+                CurrentValue: chkPassed,
+                ThresholdValue: mandatoryChecklists.Count,
+                Unit: "checklist",
+                IsMandatory: true,
+                Explanation: (chkStatus == ReadinessStatus.Met)
+                    ? $"Đã hoàn thành và ký duyệt toàn bộ {mandatoryChecklists.Count} checklist thực hành bắt buộc."
+                    : $"Đã hoàn thành {chkPassed}/{mandatoryChecklists.Count} checklist thực hành bắt buộc.",
+                Category: "Practical"
+            ));
+        }
+
+        // 6. Đánh giá Minh chứng Đào tạo (Evidence Files)
+        var allEvidences = (await _unitOfWork.EvidenceFileRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<EvidenceFile>())
+            .Where(e => subjectResultIds.Contains(e.SubjectResultId) && !e.IsDeleted).ToList();
+        if (allEvidences.Count > 0)
+        {
+            int pendingEv = allEvidences.Count(e => e.VerificationStatus != "Verified");
+            bool evMet = pendingEv == 0;
+            conditions.Add(new ReadinessItemDto(
+                ConditionCode: "EVIDENCE_FILES",
+                ConditionName: "Minh chứng đào tạo",
+                Status: evMet ? ReadinessStatus.Met : ReadinessStatus.ReviewRequired,
+                CurrentValue: allEvidences.Count - pendingEv,
+                ThresholdValue: allEvidences.Count,
+                Unit: "tệp",
+                IsMandatory: true,
+                Explanation: evMet
+                    ? $"Tất cả {allEvidences.Count} tệp minh chứng đã được xác minh hợp lệ (Verified)."
+                    : $"Còn {pendingEv}/{allEvidences.Count} tệp minh chứng đang chờ QA thẩm định.",
+                Category: "Evidence"
+            ));
+        }
+
+        // 7. Đánh giá Chữ ký Giảng viên (Instructor Signoffs)
+        var allSignoffs = (await _unitOfWork.SubjectSignoffRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<SubjectSignoff>()).ToList();
+        int signedSubjects = subjectResultsList.Count(sr => allSignoffs.Any(s => s.SubjectResultId == sr.SubjectResultId && !s.IsDeleted));
+        int totalSubjects = subjectResultsList.Count;
+        if (totalSubjects > 0)
+        {
+            bool signMet = signedSubjects == totalSubjects;
+            conditions.Add(new ReadinessItemDto(
+                ConditionCode: "INSTRUCTOR_SIGNOFFS",
+                ConditionName: "Chữ ký xác nhận môn học của Giảng viên",
+                Status: signMet ? ReadinessStatus.Met : ReadinessStatus.NotMet,
+                CurrentValue: signedSubjects,
+                ThresholdValue: totalSubjects,
+                Unit: "môn",
+                IsMandatory: true,
+                Explanation: signMet
+                    ? $"Toàn bộ {totalSubjects} môn học đã được giảng viên ký xác nhận hoàn thành."
+                    : $"Còn {totalSubjects - signedSubjects}/{totalSubjects} môn học chưa có chữ ký xác nhận của giảng viên.",
+                Category: "Signoff"
+            ));
+        }
+
+        // 8. Đánh giá CompletionRequirements theo CourseVersionNo (Flight/Sim Hours & Custom Requirements)
+        var completionRequirements = (await _unitOfWork.CompletionRequirementRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<CompletionRequirement>())
+            .Where(cr => cr.CourseId == trainingClass.CourseId && cr.VersionNo == etr.CourseVersionNo)
+            .OrderBy(cr => cr.DisplayOrder)
+            .ToList();
+
+        foreach (var req in completionRequirements)
+        {
+            switch (req.RequirementType)
+            {
+                case "MinFlightHours":
+                    var minFlight = req.ThresholdValue ?? 0m;
+                    ReadinessStatus flightStatus;
+                    string flightExpl;
+                    if (qualifiedFlightHours >= minFlight)
+                    {
+                        flightStatus = ReadinessStatus.Met;
+                        flightExpl = $"Đã tích lũy {qualifiedFlightHours:0.##} / {minFlight:0.##} giờ bay thực tế hợp lệ.";
+                    }
+                    else if (qualifiedFlightHours == 0)
+                    {
+                        flightStatus = (minFlight == 0) ? ReadinessStatus.Met : ReadinessStatus.NoData;
+                        flightExpl = $"Chưa có giờ bay thực tế hợp lệ nào được ghi nhận (0.00 / {minFlight:0.##} giờ).";
+                    }
+                    else
+                    {
+                        flightStatus = ReadinessStatus.NotMet;
+                        flightExpl = $"Còn thiếu {(minFlight - qualifiedFlightHours):0.##} giờ bay thực tế ({qualifiedFlightHours:0.##} / {minFlight:0.##} giờ).";
+                    }
+
+                    conditions.Add(new ReadinessItemDto(
+                        ConditionCode: "MIN_FLIGHT_HOURS",
+                        ConditionName: req.RequirementName,
+                        Status: flightStatus,
+                        CurrentValue: qualifiedFlightHours,
+                        ThresholdValue: minFlight,
+                        Unit: "giờ",
+                        IsMandatory: req.IsMandatory,
+                        Explanation: flightExpl,
+                        Category: "FlightTraining"
+                    ));
+                    break;
+
+                case "MinSimulatorHours":
+                    var minSim = req.ThresholdValue ?? 0m;
+                    ReadinessStatus simStatus;
+                    string simExpl;
+                    if (qualifiedSimHours >= minSim)
+                    {
+                        simStatus = ReadinessStatus.Met;
+                        simExpl = $"Đã tích lũy {qualifiedSimHours:0.##} / {minSim:0.##} giờ buồng lái mô phỏng (FSTD) hợp lệ.";
+                    }
+                    else if (qualifiedSimHours == 0)
+                    {
+                        simStatus = (minSim == 0) ? ReadinessStatus.Met : ReadinessStatus.NoData;
+                        simExpl = $"Chưa có giờ mô phỏng FSTD hợp lệ nào được ghi nhận (0.00 / {minSim:0.##} giờ).";
+                    }
+                    else
+                    {
+                        simStatus = ReadinessStatus.NotMet;
+                        simExpl = $"Còn thiếu {(minSim - qualifiedSimHours):0.##} giờ mô phỏng FSTD ({qualifiedSimHours:0.##} / {minSim:0.##} giờ).";
+                    }
+
+                    conditions.Add(new ReadinessItemDto(
+                        ConditionCode: "MIN_SIMULATOR_HOURS",
+                        ConditionName: req.RequirementName,
+                        Status: simStatus,
+                        CurrentValue: qualifiedSimHours,
+                        ThresholdValue: minSim,
+                        Unit: "giờ",
+                        IsMandatory: req.IsMandatory,
+                        Explanation: simExpl,
+                        Category: "SimulatorTraining"
+                    ));
+                    break;
+
+                case "MinAttendance":
+                case "AllAssessmentsPassed":
+                case "AllChecklistsSignedOff":
+                    // Already covered in standard checks above, unless specific threshold overrides
+                    break;
+
+                default:
+                    // Advisory / Custom requirement
+                    conditions.Add(new ReadinessItemDto(
+                        ConditionCode: $"CUSTOM_REQ_{req.RequirementId}",
+                        ConditionName: req.RequirementName,
+                        Status: ReadinessStatus.Met,
+                        CurrentValue: null,
+                        ThresholdValue: req.ThresholdValue,
+                        Unit: null,
+                        IsMandatory: req.IsMandatory,
+                        Explanation: req.Description ?? "Yêu cầu hoàn thành bổ sung theo giáo trình.",
+                        Category: "Custom"
+                    ));
+                    break;
+            }
+        }
+
+        // 9. Rà soát Hồ sơ Năng định & Cảnh báo (Pilot Credentials & Health Warnings - Non-blocking signals)
+        if (studentProfile != null)
+        {
+            if (!studentProfile.IsCredentialsVerified)
+            {
+                warnings.Add(new ReadinessWarningDto(
+                    WarningCode: "CREDENTIALS_UNVERIFIED",
+                    Message: "Hồ sơ năng định và tài liệu văn bằng của học viên chưa được xác minh bởi Phòng Đào tạo.",
+                    Severity: "ReviewRequired",
+                    Category: "Credentials"
+                ));
+            }
+
+            if (studentProfile.MedicalExpiryDate.HasValue)
+            {
+                if (studentProfile.MedicalExpiryDate.Value < DateTime.UtcNow)
+                {
+                    string msg = (isInstructor && !isOwn)
+                        ? "Giấy chứng nhận sức khỏe của học viên đã hết hạn. Cần kiểm tra hiệu lực trước khi xếp lịch huấn luyện."
+                        : $"Giấy chứng nhận sức khỏe (Hạng {studentProfile.MedicalClass ?? "N/A"}) đã hết hạn vào ngày {studentProfile.MedicalExpiryDate.Value:dd/MM/yyyy}.";
+
+                    warnings.Add(new ReadinessWarningDto(
+                        WarningCode: "MEDICAL_EXPIRED",
+                        Message: msg,
+                        Severity: "Warning",
+                        Category: "Medical"
+                    ));
+                }
+                else if (studentProfile.MedicalExpiryDate.Value <= DateTime.UtcNow.AddDays(30))
+                {
+                    string msg = (isInstructor && !isOwn)
+                        ? "Giấy chứng nhận sức khỏe của học viên sắp hết hạn trong vòng 30 ngày."
+                        : $"Giấy chứng nhận sức khỏe sẽ hết hạn vào ngày {studentProfile.MedicalExpiryDate.Value:dd/MM/yyyy} (còn dưới 30 ngày).";
+
+                    warnings.Add(new ReadinessWarningDto(
+                        WarningCode: "MEDICAL_EXPIRING_SOON",
+                        Message: msg,
+                        Severity: "Info",
+                        Category: "Medical"
+                    ));
+                }
+            }
+
+            if (studentProfile.LicenseExpiryDate.HasValue && studentProfile.LicenseExpiryDate.Value < DateTime.UtcNow)
+            {
+                string msg = (isInstructor && !isOwn)
+                    ? "Bằng lái phi công của học viên đã hết hạn. Cần rà soát trước khi thực hiện bay."
+                    : $"Bằng lái phi công ({studentProfile.LicenseType ?? "Pilot License"}) đã hết hạn vào ngày {studentProfile.LicenseExpiryDate.Value:dd/MM/yyyy}.";
+
+                warnings.Add(new ReadinessWarningDto(
+                    WarningCode: "LICENSE_EXPIRED",
+                    Message: msg,
+                    Severity: "Warning",
+                    Category: "License"
+                ));
+            }
+
+            if (studentProfile.IcaoElpExpiryDate.HasValue && studentProfile.IcaoElpExpiryDate.Value < DateTime.UtcNow)
+            {
+                string msg = (isInstructor && !isOwn)
+                    ? "Chứng chỉ tiếng Anh hàng không (ICAO ELP) của học viên đã hết hạn."
+                    : $"Chứng chỉ ICAO ELP (Level {studentProfile.IcaoElpLevel?.ToString() ?? "N/A"}) đã hết hạn vào ngày {studentProfile.IcaoElpExpiryDate.Value:dd/MM/yyyy}.";
+
+                warnings.Add(new ReadinessWarningDto(
+                    WarningCode: "ICAO_ELP_EXPIRED",
+                    Message: msg,
+                    Severity: "Warning",
+                    Category: "LanguageProficiency"
+                ));
+            }
+        }
+
+        // 10. Tính toán OverallStatus
+        bool hasMandatoryNotMet = conditions.Any(c => c.IsMandatory && (c.Status == ReadinessStatus.NotMet || c.Status == ReadinessStatus.NoData));
+        bool hasReviewRequired = conditions.Any(c => c.Status == ReadinessStatus.ReviewRequired) ||
+                                 warnings.Any(w => w.Severity == "ReviewRequired");
+
+        ReadinessStatus overallStatus;
+        if (hasMandatoryNotMet)
+        {
+            overallStatus = conditions.All(c => c.Status == ReadinessStatus.NoData) ? ReadinessStatus.NoData : ReadinessStatus.NotMet;
+        }
+        else if (hasReviewRequired)
+        {
+            overallStatus = ReadinessStatus.ReviewRequired;
+        }
+        else
+        {
+            overallStatus = ReadinessStatus.Met;
+        }
+
+        return new EtrReadinessResponse(
+            ETRCourseRecordId: etr.ETRCourseRecordId,
+            EnrollmentId: etr.EnrollmentId,
+            AccountId: enrollment.AccountId,
+            StudentName: studentName,
+            CourseId: trainingClass.CourseId,
+            CourseName: course.CourseName,
+            CourseVersionNo: etr.CourseVersionNo,
+            ClassId: trainingClass.ClassId,
+            ClassName: trainingClass.ClassName,
+            OverallStatus: overallStatus,
+            TotalFlightHours: qualifiedFlightHours,
+            TotalSimulatorHours: qualifiedSimHours,
+            EvaluatedAt: DateTime.UtcNow,
+            Conditions: conditions,
+            Warnings: warnings
+        );
     }
 
     public async Task<EtrRecordResponse> VerifyEtrAsync(int etrCourseRecordId, int accountId, CancellationToken cancellationToken = default)
