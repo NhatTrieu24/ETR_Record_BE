@@ -320,4 +320,82 @@ public class EtrServiceTests
 
         Assert.Contains("Mandatory subject", ex.Message);
     }
+
+    [Fact]
+    public async Task SubmitEtrAsync_ShouldSucceed_WhenMandatoryChecklistFailedFirst_ThenPassedRetake_UnderAllChecklistsSignedOff()
+    {
+        int etrId = 1;
+        int enrollmentId = 10;
+        int classId = 100;
+        int courseId = 500;
+
+        var etr = new ETRCourseRecord
+        {
+            ETRCourseRecordId = etrId,
+            EnrollmentId = enrollmentId,
+            Status = EtrStatus.InProgress,
+            IsLocked = false,
+            CourseVersionNo = 1,
+            SubjectResults = new List<SubjectResult>
+            {
+                new()
+                {
+                    SubjectResultId = 101,
+                    SubjectId = 1,
+                    Status = SubjectResultStatus.Passed,
+                    AttendanceRate = 90,
+                    IsMandatorySnapshot = true
+                }
+            }
+        };
+
+        _mockEtrRepo.Setup(r => r.GetWithSubjectResultsAsync(etrId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(etr);
+        _mockEnrollmentRepo.Setup(r => r.GetByIdAsync(enrollmentId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CourseEnrollment { EnrollmentId = enrollmentId, ClassId = classId });
+        _mockClassRepo.Setup(r => r.GetByIdAsync(classId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Class { ClassId = classId, CourseId = courseId });
+
+        _mockCourseSubjectRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CourseSubject>
+            {
+                new() { CourseId = courseId, SubjectId = 1, IsMandatory = true }
+            });
+
+        _mockEvidenceRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<EvidenceFile>());
+        _mockSignoffRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<SubjectSignoff>
+            {
+                new() { SubjectResultId = 101, IsDeleted = false }
+            });
+
+        _mockRequirementRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CompletionRequirement>
+            {
+                new() { CourseId = courseId, RequirementType = "AllChecklistsSignedOff", IsMandatory = true, VersionNo = 1 }
+            });
+
+        _mockChecklistRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<PracticalChecklist>
+            {
+                new() { PracticalChecklistId = 50, CourseId = courseId, SubjectId = 1, IsRequired = true }
+            });
+
+        // 2 records for the same PracticalChecklistId: Attempt 1 Failed, Attempt 2 Passed (CompletedAt is later)
+        _mockChecklistResultRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<PracticalChecklistResult>
+            {
+                new() { PracticalChecklistResultId = 1, SubjectResultId = 101, PracticalChecklistId = 50, IsMandatorySnapshot = true, ResultStatus = "Failed", CompletedAt = DateTime.UtcNow.AddDays(-2) },
+                new() { PracticalChecklistResultId = 2, SubjectResultId = 101, PracticalChecklistId = 50, IsMandatorySnapshot = true, ResultStatus = "Passed", CompletedAt = DateTime.UtcNow.AddDays(-1) }
+            });
+
+        _mockApprovalRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ApprovalRequest>());
+
+        var result = await _service.SubmitEtrAsync(etrId, accountId: 99);
+
+        Assert.NotNull(result);
+        Assert.Equal(EtrStatus.Submitted, result.Status);
+    }
 }

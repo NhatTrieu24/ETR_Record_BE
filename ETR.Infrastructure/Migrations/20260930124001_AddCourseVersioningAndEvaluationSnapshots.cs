@@ -153,7 +153,7 @@ namespace ETR.Infrastructure.Migrations
                 table: "AssessmentResults");
 
             // Rollback Guard: Check if multiple active course versions with the same CourseCode exist.
-            // If duplicate active CourseCodes exist, recreating the unique index IX_Courses_CourseCode will fail.
+            // If duplicate CourseCodes exist (where IsDeleted = 0), recreating the unique index IX_Courses_CourseCode will fail.
             // Rather than silently deleting user data, we halt rollback with an informative error message.
             migrationBuilder.Sql(@"
                 IF EXISTS (
@@ -164,7 +164,7 @@ namespace ETR.Infrastructure.Migrations
                     HAVING COUNT(*) > 1
                 )
                 BEGIN
-                    THROW 51000, 'Cannot rollback migration: multiple active versions of Courses with the same CourseCode exist in the database. Please manually archive or resolve multiple Course versions before rolling back the course versioning schema.', 1;
+                    THROW 51000, 'Cannot rollback migration: multiple Course records with the same CourseCode exist in the database (filter [IsDeleted] = 0). Please ensure only a single record per CourseCode remains not deleted (soft-delete or resolve duplicate Course versions) before rolling back the course versioning schema.', 1;
                 END
             ");
 

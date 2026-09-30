@@ -289,7 +289,7 @@ public class AssessmentResultService : IAssessmentResultService
         // to prevent artificially summing a test multiple times and skewing the average.
         var latestResults = allAssessmentResults
             .GroupBy(r => r.AssessmentId)
-            .Select(g => g.OrderByDescending(r => r.RecordedAt).ThenByDescending(r => r.AttemptNo).First())
+            .Select(g => g.OrderByDescending(r => r.AttemptNo).ThenByDescending(r => r.RecordedAt).ThenByDescending(r => r.AssessmentResultId).First())
             .ToList();
 
         decimal totalWeightedScore = 0;
@@ -500,7 +500,7 @@ public class AssessmentResultService : IAssessmentResultService
                     .ToList();
                 var latestAssessmentResults = studentResults
                     .GroupBy(r => r.AssessmentId)
-                    .Select(g => g.OrderByDescending(r => r.RecordedAt).ThenByDescending(r => r.AttemptNo).ThenByDescending(r => r.AssessmentResultId).First())
+                    .Select(g => g.OrderByDescending(r => r.AttemptNo).ThenByDescending(r => r.RecordedAt).ThenByDescending(r => r.AssessmentResultId).First())
                     .ToList();
                 var allCourseAssessments = (await _unitOfWork.AssessmentRepository.GetAllAsync(ct) ?? Enumerable.Empty<Assessment>())
                     .Where(a => a.CourseId == subjectResult.CourseId && a.SubjectId == subjectResult.SubjectId && !a.IsDeleted)
@@ -701,7 +701,7 @@ public class AssessmentResultService : IAssessmentResultService
             .Where(r => r.SubjectResultId == subjectResultId && !r.IsDeleted).ToList();
         var latestAssessmentResults = studentAssessmentResults
             .GroupBy(r => r.AssessmentId)
-            .Select(g => g.OrderByDescending(r => r.RecordedAt).ThenByDescending(r => r.AttemptNo).ThenByDescending(r => r.AssessmentResultId).First())
+            .Select(g => g.OrderByDescending(r => r.AttemptNo).ThenByDescending(r => r.RecordedAt).ThenByDescending(r => r.AssessmentResultId).First())
             .ToList();
         var allCourseAssessments = (await _unitOfWork.AssessmentRepository.GetAllAsync(ct) ?? Enumerable.Empty<Assessment>())
             .Where(a => a.CourseId == subjectResult.CourseId && a.SubjectId == subjectResult.SubjectId && !a.IsDeleted).ToList();
