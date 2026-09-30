@@ -101,7 +101,7 @@ public class ClassService : IClassService
             throw new BusinessRuleViolationException($"A class with code '{request.ClassCode}' already exists.");
         }
 
-        if (request.StartDate.Date < DateTime.UtcNow.Date)
+        if (AcademyTimeHelper.IsInPast(request.StartDate))
         {
             throw new BusinessRuleViolationException("Ngày bắt đầu đào tạo không được ở trong quá khứ.");
         }

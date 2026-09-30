@@ -1690,7 +1690,7 @@ public class ImportService : IImportService
             }
             else
             {
-                if (row.StartDate.Value.Date < DateTime.UtcNow.Date)
+                if (AcademyTimeHelper.IsInPast(row.StartDate.Value))
                     errors.Add(new ImportRowError(row.RowNumber, "Classes.StartDate", "Ngày bắt đầu đào tạo không được ở trong quá khứ."));
 
                 if (row.EndDate.Value <= row.StartDate.Value)
@@ -1857,7 +1857,7 @@ public class ImportService : IImportService
                 if (existingClass.Status == ClassStatus.InProgress ||
                     existingClass.Status == ClassStatus.Completed ||
                     existingClass.Status == ClassStatus.Cancelled ||
-                    existingClass.StartDate.Date < DateTime.UtcNow.Date)
+                    AcademyTimeHelper.IsInPast(existingClass.StartDate))
                 {
                     errors.Add(new ImportRowError(row.RowNumber, "Students.ClassCode",
                         $"Không thể ghi danh học viên vào lớp '{row.ClassCode}' vì lớp đã bắt đầu, đang diễn ra hoặc đã kết thúc (Trạng thái: {existingClass.Status}, Ngày bắt đầu: {existingClass.StartDate:dd/MM/yyyy})."));

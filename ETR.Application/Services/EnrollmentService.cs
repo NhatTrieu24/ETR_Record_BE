@@ -128,7 +128,7 @@ public class EnrollmentService : IEnrollmentService
                 if (trainingClass.Status == ClassStatus.InProgress ||
                     trainingClass.Status == ClassStatus.Completed ||
                     trainingClass.Status == ClassStatus.Cancelled ||
-                    trainingClass.StartDate.Date < DateTime.UtcNow.Date)
+                    AcademyTimeHelper.IsInPast(trainingClass.StartDate))
                 {
                     throw new BusinessRuleViolationException($"Không thể ghi danh học viên vào lớp học đã bắt đầu, đang diễn ra hoặc đã kết thúc (Trạng thái lớp: {trainingClass.Status}, Ngày bắt đầu: {trainingClass.StartDate:dd/MM/yyyy}).");
                 }
@@ -358,7 +358,7 @@ public class EnrollmentService : IEnrollmentService
                     if (targetClass.Status == ClassStatus.InProgress ||
                         targetClass.Status == ClassStatus.Completed ||
                         targetClass.Status == ClassStatus.Cancelled ||
-                        targetClass.StartDate.Date < DateTime.UtcNow.Date)
+                        AcademyTimeHelper.IsInPast(targetClass.StartDate))
                     {
                         throw new BusinessRuleViolationException($"Không thể chuyển học viên vào lớp học đã bắt đầu, đang diễn ra hoặc đã kết thúc (Trạng thái lớp: {targetClass.Status}, Ngày bắt đầu: {targetClass.StartDate:dd/MM/yyyy}).");
                     }
