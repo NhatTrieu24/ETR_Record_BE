@@ -366,6 +366,71 @@ public class AttendanceServiceTests
     }
 
     [Fact]
+    public async Task ConfirmSessionAsync_UnassignedInstructor_ShouldThrowForbidden()
+    {
+        int sessionId = 10;
+        int classId = 20;
+        int subjectId = 30;
+        int unassignedInstructorId = 99;
+
+        var session = new Session
+        {
+            SessionId = sessionId,
+            ClassId = classId,
+            SubjectId = subjectId,
+            TrainingType = TrainingType.Flight,
+            IsConfirmed = false
+        };
+        var trainingClass = new Class { ClassId = classId };
+        var classSubject = new ClassSubject { ClassId = classId, SubjectId = subjectId, InstructorAccountId = 50 }; // assigned to 50, not 99
+
+        _mockSessionRepo.Setup(r => r.GetByIdAsync(sessionId, It.IsAny<CancellationToken>())).ReturnsAsync(session);
+        _mockClassRepo.Setup(r => r.GetByIdAsync(classId, It.IsAny<CancellationToken>())).ReturnsAsync(trainingClass);
+        _mockClassSubjectRepo.Setup(r => r.GetQueryable()).Returns(new List<ClassSubject> { classSubject }.AsQueryable());
+
+        await Assert.ThrowsAsync<ForbiddenAccessException>(() =>
+            _service.ConfirmSessionAsync(sessionId, unassignedInstructorId, "Instructor"));
+    }
+
+    [Fact]
+    public async Task ConfirmSessionAsync_FlightSession_MissingEnrollmentRecord_ShouldThrow()
+    {
+        int sessionId = 10;
+        int classId = 20;
+        int subjectId = 30;
+
+        var session = new Session
+        {
+            SessionId = sessionId,
+            ClassId = classId,
+            SubjectId = subjectId,
+            TrainingType = TrainingType.Flight,
+            IsConfirmed = false
+        };
+
+        var enrollments = new List<CourseEnrollment>
+        {
+            new() { EnrollmentId = 101, ClassId = classId },
+            new() { EnrollmentId = 102, ClassId = classId }
+        };
+
+        // Only enrollment 101 has record, enrollment 102 is missing
+        var records = new List<AttendanceRecord>
+        {
+            new() { AttendanceRecordId = 1, SessionId = sessionId, EnrollmentId = 101, Status = AttendanceStatus.Present, InstructorSignedAt = DateTime.UtcNow }
+        };
+
+        _mockSessionRepo.Setup(r => r.GetByIdAsync(sessionId, It.IsAny<CancellationToken>())).ReturnsAsync(session);
+        _mockEnrollmentRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(enrollments);
+        _mockAttendanceRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(records);
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            _service.ConfirmSessionAsync(sessionId, 99, "Admin"));
+
+        Assert.Contains("do not have an attendance record", ex.Message);
+    }
+
+    [Fact]
     public async Task ConfirmSessionAsync_FlightSession_UnsignedRecords_ShouldThrow()
     {
         int sessionId = 10;
@@ -381,6 +446,12 @@ public class AttendanceServiceTests
             IsConfirmed = false
         };
 
+        var enrollments = new List<CourseEnrollment>
+        {
+            new() { EnrollmentId = 101, ClassId = classId },
+            new() { EnrollmentId = 102, ClassId = classId }
+        };
+
         var records = new List<AttendanceRecord>
         {
             new() { AttendanceRecordId = 1, SessionId = sessionId, EnrollmentId = 101, Status = AttendanceStatus.Present, InstructorSignedAt = null },
@@ -388,10 +459,11 @@ public class AttendanceServiceTests
         };
 
         _mockSessionRepo.Setup(r => r.GetByIdAsync(sessionId, It.IsAny<CancellationToken>())).ReturnsAsync(session);
+        _mockEnrollmentRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(enrollments);
         _mockAttendanceRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(records);
 
         var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
-            _service.ConfirmSessionAsync(sessionId, 99));
+            _service.ConfirmSessionAsync(sessionId, 99, "Admin"));
 
         Assert.Contains("have not been digitally signed by the instructor", ex.Message);
     }
@@ -412,6 +484,12 @@ public class AttendanceServiceTests
             IsConfirmed = false
         };
 
+        var enrollments = new List<CourseEnrollment>
+        {
+            new() { EnrollmentId = 101, ClassId = classId },
+            new() { EnrollmentId = 102, ClassId = classId }
+        };
+
         var records = new List<AttendanceRecord>
         {
             new() { AttendanceRecordId = 1, SessionId = sessionId, EnrollmentId = 101, Status = AttendanceStatus.Present, InstructorSignedAt = DateTime.UtcNow },
@@ -420,11 +498,11 @@ public class AttendanceServiceTests
 
         _mockSessionRepo.Setup(r => r.GetByIdAsync(sessionId, It.IsAny<CancellationToken>())).ReturnsAsync(session);
         _mockAttendanceRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(records);
-        _mockEnrollmentRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<CourseEnrollment>());
+        _mockEnrollmentRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(enrollments);
         _mockEtrRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<ETRCourseRecord>());
         _mockSubjectResultRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<SubjectResult>());
 
-        var result = await _service.ConfirmSessionAsync(sessionId, 99);
+        var result = await _service.ConfirmSessionAsync(sessionId, 99, "Admin");
 
         Assert.NotNull(result);
         Assert.True(result.IsConfirmed);

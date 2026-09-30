@@ -169,7 +169,7 @@ public class AttendanceService : IAttendanceService
         }, cancellationToken);
     }
 
-    public async Task<AttendanceSessionResponse> ConfirmSessionAsync(int sessionId, int confirmedByAccountId, CancellationToken cancellationToken = default)
+    public async Task<AttendanceSessionResponse> ConfirmSessionAsync(int sessionId, int confirmedByAccountId, string? roleName = null, CancellationToken cancellationToken = default)
     {
         return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
         {
@@ -179,11 +179,27 @@ public class AttendanceService : IAttendanceService
                 var session = await _unitOfWork.SessionRepository.GetByIdAsync(sessionId, ct)
                     ?? throw new KeyNotFoundException("Session not found.");
 
-                // For Flight and Simulator sessions, all recorded attendance entries must have instructor digital signatures
+                // Instructor assignment check (Admin is permitted by ClassOwnershipValidator policy)
+                var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(session.ClassId, ct);
+                var isAssigned = trainingClass != null && _unitOfWork.ClassSubjectRepository.GetQueryable()
+                    .Any(cs => cs.ClassId == trainingClass.ClassId && cs.SubjectId == session.SubjectId && cs.InstructorAccountId == confirmedByAccountId);
+                ClassOwnershipValidator.EnsureInstructorOwnsSubject(roleName, isAssigned);
+
+                var enrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct))
+                    .Where(e => e.ClassId == session.ClassId && !e.IsDeleted).ToList();
+
+                // For Flight and Simulator sessions, verify all enrolled students have attendance records and all records are digitally signed by the instructor
                 if (session.TrainingType == TrainingType.Flight || session.TrainingType == TrainingType.Simulator)
                 {
                     var sessionRecords = (await _unitOfWork.AttendanceRecordRepository.GetAllAsync(ct))
                         .Where(r => r.SessionId == sessionId && !r.IsDeleted).ToList();
+
+                    var recordedEnrollmentIds = sessionRecords.Select(r => r.EnrollmentId).ToHashSet();
+                    var missingEnrollments = enrollments.Where(e => !recordedEnrollmentIds.Contains(e.EnrollmentId)).ToList();
+                    if (missingEnrollments.Count > 0)
+                    {
+                        throw new BusinessRuleViolationException($"Cannot confirm {session.TrainingType} session #{sessionId} because {missingEnrollments.Count} enrolled student(s) in class #{session.ClassId} do not have an attendance record.");
+                    }
 
                     var unsignedRecords = sessionRecords.Where(r => !r.InstructorSignedAt.HasValue).ToList();
                     if (unsignedRecords.Count > 0)
@@ -200,9 +216,6 @@ public class AttendanceService : IAttendanceService
 
                 _unitOfWork.SessionRepository.Update(session);
                 await _unitOfWork.SaveAsync(ct);
-
-                var enrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct))
-                    .Where(e => e.ClassId == session.ClassId).ToList();
 
                 var etrs = (await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(ct))
                     .Where(e => enrollments.Select(en => en.EnrollmentId).Contains(e.EnrollmentId)).ToList();

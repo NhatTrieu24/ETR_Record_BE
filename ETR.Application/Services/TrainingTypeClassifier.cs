@@ -65,13 +65,45 @@ public static class TrainingTypeClassifier
             name.Contains("Flight Practice", StringComparison.OrdinalIgnoreCase) ||
             name.Contains("Thực hành bay", StringComparison.OrdinalIgnoreCase) ||
             name.Contains("Huấn luyện bay", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Bay vòng kín", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Bay đường dài", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Bay đêm", StringComparison.OrdinalIgnoreCase) ||
             code.StartsWith("FLT", StringComparison.OrdinalIgnoreCase) ||
             code.StartsWith("FLY", StringComparison.OrdinalIgnoreCase))
         {
             return TrainingType.Flight;
         }
 
-        // Default to Theory
+        // 5. Practical / Thực hành / Workshop / Skill classification
+        // If SubjectType is Practical/Thực hành without explicit theory precedence:
+        if (type.Contains("Practical", StringComparison.OrdinalIgnoreCase) ||
+            type.Contains("Thực hành", StringComparison.OrdinalIgnoreCase) ||
+            type.Contains("Thực tập", StringComparison.OrdinalIgnoreCase) ||
+            type.Contains("Skill", StringComparison.OrdinalIgnoreCase) ||
+            type.Contains("Workshop", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Thực hành", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Practical", StringComparison.OrdinalIgnoreCase))
+        {
+            // If practical name/code specifies flight markers -> Flight
+            if (name.Contains("Bay", StringComparison.OrdinalIgnoreCase) ||
+                name.Contains("Flight", StringComparison.OrdinalIgnoreCase) ||
+                name.Contains("Solo", StringComparison.OrdinalIgnoreCase) ||
+                name.Contains("PIC", StringComparison.OrdinalIgnoreCase) ||
+                name.Contains("Dual", StringComparison.OrdinalIgnoreCase) ||
+                name.Contains("VFR", StringComparison.OrdinalIgnoreCase) ||
+                name.Contains("Navigation", StringComparison.OrdinalIgnoreCase) ||
+                name.Contains("Circuit", StringComparison.OrdinalIgnoreCase) ||
+                code.StartsWith("PPL", StringComparison.OrdinalIgnoreCase) ||
+                code.StartsWith("CPL", StringComparison.OrdinalIgnoreCase))
+            {
+                return TrainingType.Flight;
+            }
+
+            // Otherwise, default practical training (cockpit procedures, MCC, generic practical checklists) to Simulator
+            return TrainingType.Simulator;
+        }
+
+        // 6. Default to Theory
         return TrainingType.Theory;
     }
 }

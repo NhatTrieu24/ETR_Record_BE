@@ -49,4 +49,31 @@ public class TrainingTypeClassifierTests
         var result = TrainingTypeClassifier.Classify(code, name, type);
         Assert.Equal(expected, result);
     }
+
+    [Theory]
+    [InlineData("PRAC-01", "Thực hành quy trình buồng lái", "Practical", TrainingType.Simulator)]
+    [InlineData("PRAC-02", "Thực hành buồng lái mô phỏng", "Thực hành", TrainingType.Simulator)]
+    [InlineData("CHK-01", "Thực hành tình huống khẩn cấp", "Thực tập", TrainingType.Simulator)]
+    [InlineData("SKL-01", "Kỹ năng buồng lái nhiều người", "Skill", TrainingType.Simulator)]
+    [InlineData("WKS-01", "Xử lý hệ thống điều khiển", "Workshop", TrainingType.Simulator)]
+    [InlineData("PRAC-FLT", "Thực hành bay vòng kín", "Practical", TrainingType.Flight)]
+    [InlineData("PRAC-SOLO", "Thực hành bay Solo đơn", "Thực hành", TrainingType.Flight)]
+    [InlineData("PPL-NAV", "Thực hành bay định chuẩn VFR", "Practical", TrainingType.Flight)]
+    public void Classify_PracticalSubjects_ShouldBeMappedAccuratelyWithoutDefaultingToTheory(
+        string? code, string? name, string? type, TrainingType expected)
+    {
+        var result = TrainingTypeClassifier.Classify(code, name, type);
+        Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData("ALW", "Thực hành phân tích Luật hàng không", "Practical", TrainingType.Theory)]
+    [InlineData("AIR_LAW", "Air Law Case Studies", "Thực hành", TrainingType.Theory)]
+    [InlineData("MET", "Meteorology Weather Chart Practice", "Practical", TrainingType.Theory)]
+    public void Classify_ExplicitTheorySubjectWithPracticalType_PreservesTheoryPrecedence(
+        string? code, string? name, string? type, TrainingType expected)
+    {
+        var result = TrainingTypeClassifier.Classify(code, name, type);
+        Assert.Equal(expected, result);
+    }
 }
