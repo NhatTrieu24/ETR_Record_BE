@@ -212,13 +212,10 @@ public class UserProfileService : IUserProfileService
             profile.IcaoElpExpiryDate = request.IcaoElpExpiryDate;
             profile.TypeRatings = request.TypeRatings;
 
-            bool isPrivilegedVerifier = _currentUserService.RoleName == "Admin" || _currentUserService.RoleName == "Academic";
-            if (!isPrivilegedVerifier)
-            {
-                profile.IsCredentialsVerified = false;
-                profile.CredentialsVerifiedByAccountId = null;
-                profile.CredentialsVerifiedAt = null;
-            }
+            // Any substantive change to credentials invalidates previous verification
+            profile.IsCredentialsVerified = false;
+            profile.CredentialsVerifiedByAccountId = null;
+            profile.CredentialsVerifiedAt = null;
         }
 
         profile.UpdatedAt = DateTime.UtcNow;
@@ -241,21 +238,31 @@ public class UserProfileService : IUserProfileService
             throw new BusinessRuleViolationException("ICAO ELP Level phải nằm trong khoảng từ 1 đến 6.");
         }
 
+        bool credentialsChanged =
+            profile.LicenseType != request.LicenseType ||
+            profile.LicenseNumber != request.LicenseNumber ||
+            profile.LicenseExpiryDate != request.LicenseExpiryDate ||
+            profile.MedicalClass != request.MedicalClass ||
+            profile.MedicalExpiryDate != request.MedicalExpiryDate ||
+            profile.IcaoElpLevel != request.IcaoElpLevel ||
+            profile.IcaoElpExpiryDate != request.IcaoElpExpiryDate ||
+            profile.TypeRatings != request.TypeRatings;
+
         var oldSummary = $"License: {profile.LicenseType}/{profile.LicenseNumber}, Medical: {profile.MedicalClass}, ELP: {profile.IcaoElpLevel}, TypeRatings: {profile.TypeRatings}";
         var newSummary = $"License: {request.LicenseType}/{request.LicenseNumber}, Medical: {request.MedicalClass}, ELP: {request.IcaoElpLevel}, TypeRatings: {request.TypeRatings}";
 
-        profile.LicenseType = request.LicenseType;
-        profile.LicenseNumber = request.LicenseNumber;
-        profile.LicenseExpiryDate = request.LicenseExpiryDate;
-        profile.MedicalClass = request.MedicalClass;
-        profile.MedicalExpiryDate = request.MedicalExpiryDate;
-        profile.IcaoElpLevel = request.IcaoElpLevel;
-        profile.IcaoElpExpiryDate = request.IcaoElpExpiryDate;
-        profile.TypeRatings = request.TypeRatings;
-
-        if (isSelfUpdate)
+        if (credentialsChanged)
         {
-            // Self-update resets verification flag to unverified
+            profile.LicenseType = request.LicenseType;
+            profile.LicenseNumber = request.LicenseNumber;
+            profile.LicenseExpiryDate = request.LicenseExpiryDate;
+            profile.MedicalClass = request.MedicalClass;
+            profile.MedicalExpiryDate = request.MedicalExpiryDate;
+            profile.IcaoElpLevel = request.IcaoElpLevel;
+            profile.IcaoElpExpiryDate = request.IcaoElpExpiryDate;
+            profile.TypeRatings = request.TypeRatings;
+
+            // Any substantive change invalidates previous verification regardless of who made the update
             profile.IsCredentialsVerified = false;
             profile.CredentialsVerifiedByAccountId = null;
             profile.CredentialsVerifiedAt = null;
@@ -272,7 +279,7 @@ public class UserProfileService : IUserProfileService
             RecordId = profile.AccountId,
             OldValue = oldSummary,
             NewValue = newSummary,
-            Description = $"Pilot credentials updated for Account #{accountId} (SelfUpdate: {isSelfUpdate})"
+            Description = $"Pilot credentials updated for Account #{accountId} (SelfUpdate: {isSelfUpdate}, Changed: {credentialsChanged})"
         }, cancellationToken);
 
         _unitOfWork.UserProfileRepository.Update(profile);
@@ -294,6 +301,44 @@ public class UserProfileService : IUserProfileService
         profile.UpdatedAt = DateTime.UtcNow;
         profile.UpdatedByAccountId = verifiedByAccountId;
 
+        string verificationBasis;
+        if (!request.IsVerified)
+        {
+            verificationBasis = "Revoked / Unverified";
+        }
+        else
+        {
+            var allAttachments = _unitOfWork.AttachmentRepository != null
+                ? await _unitOfWork.AttachmentRepository.GetAllAsync(cancellationToken)
+                : Enumerable.Empty<Attachment>();
+
+            var attachments = allAttachments
+                .Where(a => a.OwnerType == nameof(UserProfile) && a.OwnerId == accountId && !a.IsDeleted)
+                .ToList();
+
+            if (request.ReviewedAttachmentIds != null && request.ReviewedAttachmentIds.Count > 0)
+            {
+                var reviewedNames = attachments
+                    .Where(a => request.ReviewedAttachmentIds.Contains(a.AttachmentId))
+                    .Select(a => $"{a.DocType}:{a.FileName}")
+                    .ToList();
+                verificationBasis = reviewedNames.Count > 0
+                    ? $"Document review verified ({string.Join(", ", reviewedNames)})"
+                    : $"Document review (IDs: {string.Join(", ", request.ReviewedAttachmentIds)})";
+            }
+            else if (attachments.Count > 0)
+            {
+                var docTypes = attachments.Select(a => a.DocType ?? "General").Distinct();
+                verificationBasis = $"Based on {attachments.Count} uploaded evidence attachment(s) [{string.Join(", ", docTypes)}]";
+            }
+            else
+            {
+                verificationBasis = !string.IsNullOrWhiteSpace(request.VerificationMethod)
+                    ? $"Verified via {request.VerificationMethod} (Offline/Physical check without uploaded attachments)"
+                    : "Verified offline / direct physical check without uploaded attachments";
+            }
+        }
+
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
         {
             AccountId = verifiedByAccountId,
@@ -301,8 +346,8 @@ public class UserProfileService : IUserProfileService
             EntityName = nameof(UserProfile),
             RecordId = profile.AccountId,
             OldValue = $"Verified: {oldVerified}",
-            NewValue = $"Verified: {request.IsVerified}. Comment: {request.Comment}",
-            Description = $"Pilot credentials for Account #{accountId} {(request.IsVerified ? "VERIFIED" : "UNVERIFIED")} by Account #{verifiedByAccountId}"
+            NewValue = $"Verified: {request.IsVerified}. Basis: {verificationBasis}. Comment: {request.Comment}",
+            Description = $"Pilot credentials for Account #{accountId} {(request.IsVerified ? "VERIFIED" : "UNVERIFIED")} by Account #{verifiedByAccountId}. Basis: {verificationBasis}"
         }, cancellationToken);
 
         _unitOfWork.UserProfileRepository.Update(profile);

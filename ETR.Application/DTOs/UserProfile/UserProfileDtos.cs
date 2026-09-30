@@ -75,7 +75,9 @@ public record UpdatePilotCredentialsRequest(
 
 public record VerifyPilotCredentialsRequest(
     [Required] bool IsVerified,
-    string? Comment);
+    string? Comment = null,
+    string? VerificationMethod = null,
+    List<int>? ReviewedAttachmentIds = null);
 
 public record CredentialAttachmentDto(
     int AttachmentId,

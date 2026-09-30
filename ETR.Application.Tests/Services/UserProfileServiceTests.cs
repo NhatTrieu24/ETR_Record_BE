@@ -133,6 +133,211 @@ public class UserProfileServiceTests
     }
 
     [Fact]
+    public async Task UpdatePilotCredentialsAsync_AdminUpdate_WithSubstantiveChange_ResetsVerificationStatusAndClearsVerifier()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        var currentUserService = new Mock<ICurrentUserService>();
+        currentUserService.Setup(c => c.AccountId).Returns(1);
+        currentUserService.Setup(c => c.RoleName).Returns("Admin");
+
+        var profile = new UserProfile
+        {
+            AccountId = 10,
+            UserCode = "STU-010",
+            FullName = "Nguyen Pilot",
+            Email = "pilot@etr.com",
+            LicenseType = "PPL",
+            LicenseNumber = "VN-OLD",
+            IsCredentialsVerified = true,
+            CredentialsVerifiedByAccountId = 1,
+            CredentialsVerifiedAt = DateTime.UtcNow.AddDays(-10)
+        };
+
+        var profileRepo = new Mock<IGenericRepository<UserProfile>>();
+        profileRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<UserProfile> { profile });
+        uow.Setup(u => u.UserProfileRepository).Returns(profileRepo.Object);
+
+        var auditRepo = new Mock<IAuditLogRepository>();
+        uow.Setup(u => u.AuditLogRepository).Returns(auditRepo.Object);
+
+        var service = new UserProfileService(uow.Object, currentUserService.Object);
+
+        var request = new UpdatePilotCredentialsRequest(
+            "CPL", "VN-NEW-999", DateTime.UtcNow.AddYears(2),
+            "Class 1", DateTime.UtcNow.AddMonths(12),
+            5, DateTime.UtcNow.AddYears(6), "A320");
+
+        // Act: Admin updates the credentials with new License Type & Number
+        var result = await service.UpdatePilotCredentialsAsync(10, request, updatedByAccountId: 1, isSelfUpdate: false);
+
+        // Assert: Verification status MUST be reset to false and verifier info cleared
+        Assert.Equal("CPL", result.LicenseType);
+        Assert.Equal("VN-NEW-999", result.LicenseNumber);
+        Assert.False(result.IsCredentialsVerified);
+        Assert.Null(result.CredentialsVerifiedByAccountId);
+        Assert.Null(result.CredentialsVerifiedAt);
+    }
+
+    [Fact]
+    public async Task UpdatePilotCredentialsAsync_NoSubstantiveChange_PreservesVerificationStatusAndVerifier()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        var currentUserService = new Mock<ICurrentUserService>();
+        var verifiedDate = DateTime.UtcNow.AddDays(-5);
+
+        var profile = new UserProfile
+        {
+            AccountId = 10,
+            UserCode = "STU-010",
+            FullName = "Nguyen Pilot",
+            Email = "pilot@etr.com",
+            LicenseType = "CPL",
+            LicenseNumber = "VN-12345",
+            MedicalClass = "Class 1",
+            IcaoElpLevel = 5,
+            TypeRatings = "A320",
+            IsCredentialsVerified = true,
+            CredentialsVerifiedByAccountId = 2,
+            CredentialsVerifiedAt = verifiedDate
+        };
+
+        var profileRepo = new Mock<IGenericRepository<UserProfile>>();
+        profileRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<UserProfile> { profile });
+        uow.Setup(u => u.UserProfileRepository).Returns(profileRepo.Object);
+
+        var auditRepo = new Mock<IAuditLogRepository>();
+        uow.Setup(u => u.AuditLogRepository).Returns(auditRepo.Object);
+
+        var service = new UserProfileService(uow.Object, currentUserService.Object);
+
+        // Submitting identical credentials
+        var request = new UpdatePilotCredentialsRequest(
+            "CPL", "VN-12345", null,
+            "Class 1", null,
+            5, null, "A320");
+
+        // Act
+        var result = await service.UpdatePilotCredentialsAsync(10, request, updatedByAccountId: 10, isSelfUpdate: true);
+
+        // Assert: Verification status remains true because nothing changed
+        Assert.True(result.IsCredentialsVerified);
+        Assert.Equal(2, result.CredentialsVerifiedByAccountId);
+        Assert.Equal(verifiedDate, result.CredentialsVerifiedAt);
+    }
+
+    [Fact]
+    public async Task VerifyPilotCredentialsAsync_OfflineVerification_RecordsOfflineBasisInAudit()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        var currentUserService = new Mock<ICurrentUserService>();
+        currentUserService.Setup(c => c.AccountId).Returns(1);
+        currentUserService.Setup(c => c.RoleName).Returns("Admin");
+
+        var profile = new UserProfile
+        {
+            AccountId = 10,
+            FullName = "Nguyen Pilot",
+            Email = "pilot@etr.com",
+            LicenseType = "CPL",
+            LicenseNumber = "VN-12345",
+            IsCredentialsVerified = false
+        };
+
+        var profileRepo = new Mock<IGenericRepository<UserProfile>>();
+        profileRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<UserProfile> { profile });
+        uow.Setup(u => u.UserProfileRepository).Returns(profileRepo.Object);
+
+        var attachRepo = new Mock<IGenericRepository<Attachment>>();
+        attachRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Attachment>()); // No attachments on server
+        uow.Setup(u => u.AttachmentRepository).Returns(attachRepo.Object);
+
+        var auditLogs = new List<AuditLog>();
+        var auditRepo = new Mock<IAuditLogRepository>();
+        auditRepo.Setup(r => r.AddAsync(It.IsAny<AuditLog>(), It.IsAny<CancellationToken>()))
+            .Callback<AuditLog, CancellationToken>((a, _) => auditLogs.Add(a))
+            .Returns(Task.CompletedTask);
+        uow.Setup(u => u.AuditLogRepository).Returns(auditRepo.Object);
+
+        var service = new UserProfileService(uow.Object, currentUserService.Object);
+
+        var request = new VerifyPilotCredentialsRequest(
+            IsVerified: true,
+            Comment: "Inspected physical CAAV certificate card directly at flight ops",
+            VerificationMethod: "PhysicalCardInspection");
+
+        // Act
+        var result = await service.VerifyPilotCredentialsAsync(10, request, verifiedByAccountId: 1);
+
+        // Assert
+        Assert.True(result.IsCredentialsVerified);
+        Assert.Equal(1, result.CredentialsVerifiedByAccountId);
+        Assert.Single(auditLogs);
+        Assert.Contains("PhysicalCardInspection", auditLogs[0].NewValue);
+        Assert.Contains("Offline/Physical check without uploaded attachments", auditLogs[0].NewValue);
+    }
+
+    [Fact]
+    public async Task VerifyPilotCredentialsAsync_DocumentReview_RecordsReviewedAttachmentsInAudit()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        var currentUserService = new Mock<ICurrentUserService>();
+        currentUserService.Setup(c => c.AccountId).Returns(1);
+        currentUserService.Setup(c => c.RoleName).Returns("Academic");
+
+        var profile = new UserProfile
+        {
+            AccountId = 10,
+            FullName = "Nguyen Pilot",
+            Email = "pilot@etr.com",
+            LicenseType = "CPL",
+            LicenseNumber = "VN-12345",
+            IsCredentialsVerified = false
+        };
+
+        var profileRepo = new Mock<IGenericRepository<UserProfile>>();
+        profileRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<UserProfile> { profile });
+        uow.Setup(u => u.UserProfileRepository).Returns(profileRepo.Object);
+
+        var attachments = new List<Attachment>
+        {
+            new() { AttachmentId = 101, OwnerType = "UserProfile", OwnerId = 10, DocType = "License", FileName = "cpl_license.pdf" },
+            new() { AttachmentId = 102, OwnerType = "UserProfile", OwnerId = 10, DocType = "Medical", FileName = "class1_med.pdf" }
+        };
+        var attachRepo = new Mock<IGenericRepository<Attachment>>();
+        attachRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(attachments);
+        uow.Setup(u => u.AttachmentRepository).Returns(attachRepo.Object);
+
+        var auditLogs = new List<AuditLog>();
+        var auditRepo = new Mock<IAuditLogRepository>();
+        auditRepo.Setup(r => r.AddAsync(It.IsAny<AuditLog>(), It.IsAny<CancellationToken>()))
+            .Callback<AuditLog, CancellationToken>((a, _) => auditLogs.Add(a))
+            .Returns(Task.CompletedTask);
+        uow.Setup(u => u.AuditLogRepository).Returns(auditRepo.Object);
+
+        var service = new UserProfileService(uow.Object, currentUserService.Object);
+
+        var request = new VerifyPilotCredentialsRequest(
+            IsVerified: true,
+            Comment: "Approved based on uploaded scans",
+            ReviewedAttachmentIds: new List<int> { 101, 102 });
+
+        // Act
+        var result = await service.VerifyPilotCredentialsAsync(10, request, verifiedByAccountId: 1);
+
+        // Assert
+        Assert.True(result.IsCredentialsVerified);
+        Assert.Single(auditLogs);
+        Assert.Contains("License:cpl_license.pdf", auditLogs[0].NewValue);
+        Assert.Contains("Medical:class1_med.pdf", auditLogs[0].NewValue);
+    }
+
+    [Fact]
     public async Task GetCredentialAttachmentsAsync_OtherStudentAccess_ThrowsUnauthorizedAccessException()
     {
         var uow = new Mock<IUnitOfWork>();

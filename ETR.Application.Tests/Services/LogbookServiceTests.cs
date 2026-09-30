@@ -132,14 +132,18 @@ public class LogbookServiceTests
         Assert.Equal(4.0m, result.TotalSimulatorHours);
         // Dual = 2.0 (flight) + 4.0 (sim) = 6.0m
         Assert.Equal(6.0m, result.TotalDualHours);
+        Assert.Equal(2.0m, result.FlightDualHours);
+        Assert.Equal(4.0m, result.SimulatorDualHours);
         // Solo = 1.5m
         Assert.Equal(1.5m, result.TotalSoloHours);
         // PIC = 1.5m
         Assert.Equal(1.5m, result.TotalPicHours);
         // Night = 1.0m
         Assert.Equal(1.0m, result.TotalNightHours);
-        // Instrument = 1.0 + 2.0 = 3.0m
+        // Instrument = 1.0 (flight) + 2.0 (sim) = 3.0m
         Assert.Equal(3.0m, result.TotalInstrumentHours);
+        Assert.Equal(1.0m, result.FlightInstrumentHours);
+        Assert.Equal(2.0m, result.SimulatorInstrumentHours);
         // CrossCountry = 1.5m
         Assert.Equal(1.5m, result.TotalCrossCountryHours);
         // Landings: 4 Day + 1 Night = 5 Total

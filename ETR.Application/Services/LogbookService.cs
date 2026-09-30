@@ -99,11 +99,13 @@ public class LogbookService : ILogbookService
         // - Các giờ phân loại phụ (Dual, Solo, PIC, Night, Instrument, CrossCountry) là các chiều phân rã độc lập (KHÔNG cộng chồng vào Total)
         decimal totalFlightHours = 0m;
         decimal totalSimHours = 0m;
-        decimal totalDual = 0m;
+        decimal flightDualHours = 0m;
+        decimal simDualHours = 0m;
         decimal totalSolo = 0m;
         decimal totalPic = 0m;
         decimal totalNight = 0m;
-        decimal totalInstrument = 0m;
+        decimal flightInstrumentHours = 0m;
+        decimal simInstrumentHours = 0m;
         decimal totalCrossCountry = 0m;
         int totalDayLandings = 0;
         int totalNightLandings = 0;
@@ -131,11 +133,23 @@ public class LogbookService : ILogbookService
 
             totalFlightHours += flightH;
             totalSimHours += simH;
-            totalDual += dualH;
+
+            // Distinguish Dual and Instrument hours between Flight and Simulator
+            bool isSimSession = session.TrainingType == TrainingType.Simulator || (simH > 0 && flightH == 0);
+            if (isSimSession)
+            {
+                simDualHours += dualH;
+                simInstrumentHours += instH;
+            }
+            else
+            {
+                flightDualHours += dualH;
+                flightInstrumentHours += instH;
+            }
+
             totalSolo += soloH;
             totalPic += picH;
             totalNight += nightH;
-            totalInstrument += instH;
             totalCrossCountry += ccH;
 
             totalDayLandings += dayL;
@@ -190,6 +204,9 @@ public class LogbookService : ILogbookService
             .ThenByDescending(e => e.SessionId)
             .ToList();
 
+        decimal totalDual = flightDualHours + simDualHours;
+        decimal totalInstrument = flightInstrumentHours + simInstrumentHours;
+
         return new LogbookSummaryResponse(
             studentProfile.AccountId,
             studentProfile.UserCode,
@@ -197,12 +214,14 @@ public class LogbookService : ILogbookService
             totalFlightHours,
             totalSimHours,
             totalDual,
+            flightDualHours,
+            simDualHours,
             totalSolo,
             totalPic,
             totalNight,
             totalInstrument,
-            0m,
-            0m,
+            flightInstrumentHours,
+            simInstrumentHours,
             totalCrossCountry,
             totalDayLandings,
             totalNightLandings,
