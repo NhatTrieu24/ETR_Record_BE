@@ -118,7 +118,7 @@ public class UserProfileServiceTests
 
         var service = new UserProfileService(uow.Object, currentUserService.Object);
 
-        var request = new VerifyPilotCredentialsRequest(true, "CAAV License Verified");
+        var request = new VerifyPilotCredentialsRequest(true, "CAAV License Verified", VerificationMethod: "DirectAdminInspection");
 
         // Act
         var result = await service.VerifyPilotCredentialsAsync(10, request, verifiedByAccountId: 1);
@@ -130,6 +130,7 @@ public class UserProfileServiceTests
         Assert.Single(auditLogs);
         Assert.Contains("VERIFIED", auditLogs[0].Description);
         Assert.Contains("CAAV License Verified", auditLogs[0].NewValue);
+        Assert.Contains("DirectAdminInspection", auditLogs[0].NewValue);
     }
 
     [Fact]
@@ -277,7 +278,7 @@ public class UserProfileServiceTests
         Assert.Equal(1, result.CredentialsVerifiedByAccountId);
         Assert.Single(auditLogs);
         Assert.Contains("PhysicalCardInspection", auditLogs[0].NewValue);
-        Assert.Contains("Offline/Physical check without uploaded attachments", auditLogs[0].NewValue);
+        Assert.Contains("Offline/Direct check without uploaded attachments", auditLogs[0].NewValue);
     }
 
     [Fact]
@@ -389,5 +390,167 @@ public class UserProfileServiceTests
         Assert.Equal("UserProfile", attachments[0].OwnerType);
         Assert.Equal(10, attachments[0].OwnerId);
         Assert.Single(auditLogs);
+    }
+
+    [Fact]
+    public async Task VerifyPilotCredentialsAsync_WrongOwnerAttachmentId_ThrowsBusinessRuleViolationException()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        var currentUserService = new Mock<ICurrentUserService>();
+        currentUserService.Setup(c => c.AccountId).Returns(1);
+        currentUserService.Setup(c => c.RoleName).Returns("Academic");
+
+        var profile = new UserProfile { AccountId = 10, FullName = "Nguyen Pilot", Email = "pilot@etr.com" };
+        var profileRepo = new Mock<IGenericRepository<UserProfile>>();
+        profileRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<UserProfile> { profile });
+        uow.Setup(u => u.UserProfileRepository).Returns(profileRepo.Object);
+
+        // Attachment belongs to Student 99, not Student 10
+        var attachments = new List<Attachment>
+        {
+            new() { AttachmentId = 999, OwnerType = "UserProfile", OwnerId = 99, DocType = "License", FileName = "other_license.pdf" }
+        };
+        var attachRepo = new Mock<IGenericRepository<Attachment>>();
+        attachRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(attachments);
+        uow.Setup(u => u.AttachmentRepository).Returns(attachRepo.Object);
+
+        var service = new UserProfileService(uow.Object, currentUserService.Object);
+
+        var request = new VerifyPilotCredentialsRequest(
+            IsVerified: true,
+            ReviewedAttachmentIds: new List<int> { 999 });
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            service.VerifyPilotCredentialsAsync(10, request, verifiedByAccountId: 1));
+
+        Assert.Contains("#999", ex.Message);
+        Assert.Contains("không thuộc hồ sơ của học viên #10", ex.Message);
+    }
+
+    [Fact]
+    public async Task VerifyPilotCredentialsAsync_NonExistentOrDeletedAttachmentId_ThrowsBusinessRuleViolationException()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        var currentUserService = new Mock<ICurrentUserService>();
+        currentUserService.Setup(c => c.AccountId).Returns(1);
+        currentUserService.Setup(c => c.RoleName).Returns("Admin");
+
+        var profile = new UserProfile { AccountId = 10, FullName = "Nguyen Pilot", Email = "pilot@etr.com" };
+        var profileRepo = new Mock<IGenericRepository<UserProfile>>();
+        profileRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<UserProfile> { profile });
+        uow.Setup(u => u.UserProfileRepository).Returns(profileRepo.Object);
+
+        // Attachment 101 is soft-deleted
+        var attachments = new List<Attachment>
+        {
+            new() { AttachmentId = 101, OwnerType = "UserProfile", OwnerId = 10, DocType = "License", FileName = "cpl.pdf", IsDeleted = true }
+        };
+        var attachRepo = new Mock<IGenericRepository<Attachment>>();
+        attachRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(attachments);
+        uow.Setup(u => u.AttachmentRepository).Returns(attachRepo.Object);
+
+        var service = new UserProfileService(uow.Object, currentUserService.Object);
+
+        var request = new VerifyPilotCredentialsRequest(
+            IsVerified: true,
+            ReviewedAttachmentIds: new List<int> { 101 }); // Deleted
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            service.VerifyPilotCredentialsAsync(10, request, verifiedByAccountId: 1));
+
+        Assert.Contains("#101", ex.Message);
+        Assert.Contains("không tồn tại, đã bị xóa", ex.Message);
+    }
+
+    [Fact]
+    public async Task VerifyPilotCredentialsAsync_OfflineWithoutVerificationMethod_ThrowsBusinessRuleViolationException()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        var currentUserService = new Mock<ICurrentUserService>();
+        currentUserService.Setup(c => c.AccountId).Returns(1);
+        currentUserService.Setup(c => c.RoleName).Returns("Admin");
+
+        var profile = new UserProfile { AccountId = 10, FullName = "Nguyen Pilot", Email = "pilot@etr.com" };
+        var profileRepo = new Mock<IGenericRepository<UserProfile>>();
+        profileRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<UserProfile> { profile });
+        uow.Setup(u => u.UserProfileRepository).Returns(profileRepo.Object);
+
+        var service = new UserProfileService(uow.Object, currentUserService.Object);
+
+        // Verification without attachments and without VerificationMethod
+        var request = new VerifyPilotCredentialsRequest(
+            IsVerified: true,
+            Comment: "Direct verification",
+            VerificationMethod: "   "); // Empty
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            service.VerifyPilotCredentialsAsync(10, request, verifiedByAccountId: 1));
+
+        Assert.Contains("VerificationMethod", ex.Message);
+    }
+
+    [Fact]
+    public async Task DeleteCredentialAttachmentAsync_WhenCredentialsVerified_RevokesVerificationStatusAndLogsAudit()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        var currentUserService = new Mock<ICurrentUserService>();
+
+        var profile = new UserProfile
+        {
+            AccountId = 10,
+            FullName = "Nguyen Pilot",
+            Email = "pilot@etr.com",
+            IsCredentialsVerified = true,
+            CredentialsVerifiedByAccountId = 1,
+            CredentialsVerifiedAt = DateTime.UtcNow.AddDays(-2)
+        };
+        var profileRepo = new Mock<IGenericRepository<UserProfile>>();
+        profileRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<UserProfile> { profile });
+        uow.Setup(u => u.UserProfileRepository).Returns(profileRepo.Object);
+
+        var attachment = new Attachment
+        {
+            AttachmentId = 55,
+            OwnerType = "UserProfile",
+            OwnerId = 10,
+            DocType = "Medical",
+            FileName = "medical_class1.pdf",
+            UploadedByAccountId = 10,
+            IsDeleted = false
+        };
+
+        var attachRepo = new Mock<IGenericRepository<Attachment>>();
+        attachRepo.Setup(r => r.GetByIdAsync(55, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(attachment);
+        uow.Setup(u => u.AttachmentRepository).Returns(attachRepo.Object);
+
+        var auditLogs = new List<AuditLog>();
+        var auditRepo = new Mock<IAuditLogRepository>();
+        auditRepo.Setup(r => r.AddAsync(It.IsAny<AuditLog>(), It.IsAny<CancellationToken>()))
+            .Callback<AuditLog, CancellationToken>((a, _) => auditLogs.Add(a))
+            .Returns(Task.CompletedTask);
+        uow.Setup(u => u.AuditLogRepository).Returns(auditRepo.Object);
+
+        var service = new UserProfileService(uow.Object, currentUserService.Object);
+
+        // Act: Student deletes their own medical attachment
+        await service.DeleteCredentialAttachmentAsync(55, currentAccountId: 10, roleName: "Student");
+
+        // Assert
+        Assert.True(attachment.IsDeleted);
+        Assert.False(profile.IsCredentialsVerified);
+        Assert.Null(profile.CredentialsVerifiedByAccountId);
+        Assert.Null(profile.CredentialsVerifiedAt);
+
+        // Two audit logs: 1 for verification revocation, 1 for attachment deletion
+        Assert.Equal(2, auditLogs.Count);
+        Assert.Contains(auditLogs, l => l.Description.Contains("REVOKED due to deletion of evidence attachment #55"));
+        Assert.Contains(auditLogs, l => l.ActionType == AuditActionType.DELETE.ToString());
     }
 }

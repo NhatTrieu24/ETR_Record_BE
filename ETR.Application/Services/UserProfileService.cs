@@ -308,34 +308,39 @@ public class UserProfileService : IUserProfileService
         }
         else
         {
-            var allAttachments = _unitOfWork.AttachmentRepository != null
-                ? await _unitOfWork.AttachmentRepository.GetAllAsync(cancellationToken)
-                : Enumerable.Empty<Attachment>();
-
-            var attachments = allAttachments
-                .Where(a => a.OwnerType == nameof(UserProfile) && a.OwnerId == accountId && !a.IsDeleted)
-                .ToList();
-
             if (request.ReviewedAttachmentIds != null && request.ReviewedAttachmentIds.Count > 0)
             {
-                var reviewedNames = attachments
-                    .Where(a => request.ReviewedAttachmentIds.Contains(a.AttachmentId))
-                    .Select(a => $"{a.DocType}:{a.FileName}")
-                    .ToList();
-                verificationBasis = reviewedNames.Count > 0
-                    ? $"Document review verified ({string.Join(", ", reviewedNames)})"
-                    : $"Document review (IDs: {string.Join(", ", request.ReviewedAttachmentIds)})";
-            }
-            else if (attachments.Count > 0)
-            {
-                var docTypes = attachments.Select(a => a.DocType ?? "General").Distinct();
-                verificationBasis = $"Based on {attachments.Count} uploaded evidence attachment(s) [{string.Join(", ", docTypes)}]";
+                var allAttachments = _unitOfWork.AttachmentRepository != null
+                    ? await _unitOfWork.AttachmentRepository.GetAllAsync(cancellationToken)
+                    : Enumerable.Empty<Attachment>();
+
+                var attachmentMap = allAttachments.ToDictionary(a => a.AttachmentId);
+                var reviewedNames = new List<string>();
+
+                foreach (var attId in request.ReviewedAttachmentIds)
+                {
+                    if (!attachmentMap.TryGetValue(attId, out var att) ||
+                        att.IsDeleted ||
+                        att.OwnerType != nameof(UserProfile) ||
+                        att.OwnerId != accountId)
+                    {
+                        throw new BusinessRuleViolationException(
+                            $"Tài liệu minh chứng #{attId} không tồn tại, đã bị xóa hoặc không thuộc hồ sơ của học viên #{accountId}.");
+                    }
+                    reviewedNames.Add($"{att.DocType ?? "General"}:{att.FileName}");
+                }
+
+                verificationBasis = $"Document review verified ({string.Join(", ", reviewedNames)})";
             }
             else
             {
-                verificationBasis = !string.IsNullOrWhiteSpace(request.VerificationMethod)
-                    ? $"Verified via {request.VerificationMethod} (Offline/Physical check without uploaded attachments)"
-                    : "Verified offline / direct physical check without uploaded attachments";
+                if (string.IsNullOrWhiteSpace(request.VerificationMethod))
+                {
+                    throw new BusinessRuleViolationException(
+                        "Phương thức xác minh (VerificationMethod) là bắt buộc khi xác minh ngoại tuyến hoặc không đính kèm ID minh chứng.");
+                }
+
+                verificationBasis = $"Verified via {request.VerificationMethod.Trim()} (Offline/Direct check without uploaded attachments)";
             }
         }
 
@@ -453,6 +458,31 @@ public class UserProfileService : IUserProfileService
         attachment.UpdatedByAccountId = currentAccountId;
 
         _unitOfWork.AttachmentRepository.Update(attachment);
+
+        // If the profile had verified credentials, deleting an evidence attachment invalidates the verification
+        var profiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
+        var profile = profiles.FirstOrDefault(p => p.AccountId == attachment.OwnerId);
+        if (profile != null && profile.IsCredentialsVerified)
+        {
+            profile.IsCredentialsVerified = false;
+            profile.CredentialsVerifiedByAccountId = null;
+            profile.CredentialsVerifiedAt = null;
+            profile.UpdatedAt = DateTime.UtcNow;
+            profile.UpdatedByAccountId = currentAccountId;
+
+            _unitOfWork.UserProfileRepository.Update(profile);
+
+            await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+            {
+                AccountId = currentAccountId,
+                ActionType = AuditActionType.UPDATE.ToString(),
+                EntityName = nameof(UserProfile),
+                RecordId = profile.AccountId,
+                OldValue = "Verified: True",
+                NewValue = "Verified: False (Revoked due to evidence attachment deletion)",
+                Description = $"Credential verification for Account #{profile.AccountId} was REVOKED due to deletion of evidence attachment #{attachment.AttachmentId} ({attachment.FileName})"
+            }, cancellationToken);
+        }
 
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
         {
