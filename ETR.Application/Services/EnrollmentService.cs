@@ -125,12 +125,9 @@ public class EnrollmentService : IEnrollmentService
                 var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(classId, ct);
                 if (trainingClass == null) throw new BusinessRuleViolationException("Class not found.");
 
-                if (trainingClass.Status == ClassStatus.InProgress ||
-                    trainingClass.Status == ClassStatus.Completed ||
-                    trainingClass.Status == ClassStatus.Cancelled ||
-                    trainingClass.StartDate.Date <= DateTime.UtcNow.Date)
+                if (trainingClass.Status == ClassStatus.Completed || trainingClass.Status == ClassStatus.Cancelled)
                 {
-                    throw new BusinessRuleViolationException($"Không thể ghi danh học viên vào lớp học đã bắt đầu, đang diễn ra hoặc đã kết thúc (Trạng thái lớp: {trainingClass.Status}, Ngày bắt đầu: {trainingClass.StartDate:dd/MM/yyyy}).");
+                    throw new BusinessRuleViolationException($"Không thể ghi danh vào lớp học đã kết thúc hoặc đã hủy (Trạng thái lớp: {trainingClass.Status}).");
                 }
 
                 var course = await _unitOfWork.CourseRepository.GetByIdAsync(trainingClass.CourseId, ct);
@@ -342,12 +339,9 @@ public class EnrollmentService : IEnrollmentService
                 {
                     var targetClass = await _unitOfWork.ClassRepository.GetByIdAsync(request.ClassId, ct)
                         ?? throw new BusinessRuleViolationException("Class not found.");
-                    if (targetClass.Status == ClassStatus.InProgress ||
-                        targetClass.Status == ClassStatus.Completed ||
-                        targetClass.Status == ClassStatus.Cancelled ||
-                        targetClass.StartDate.Date <= DateTime.UtcNow.Date)
+                    if (targetClass.Status == ClassStatus.Completed || targetClass.Status == ClassStatus.Cancelled)
                     {
-                        throw new BusinessRuleViolationException($"Không thể chuyển học viên vào lớp học đã bắt đầu, đang diễn ra hoặc đã kết thúc (Trạng thái lớp: {targetClass.Status}, Ngày bắt đầu: {targetClass.StartDate:dd/MM/yyyy}).");
+                        throw new BusinessRuleViolationException($"Không thể chuyển học viên vào lớp học đã kết thúc hoặc đã hủy (Trạng thái lớp: {targetClass.Status}).");
                     }
                 }
 
