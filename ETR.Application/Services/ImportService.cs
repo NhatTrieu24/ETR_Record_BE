@@ -1854,6 +1854,14 @@ public class ImportService : IImportService
             {
                 existingClassId = existingClass.ClassId;
                 resolvedCourseId = existingClass.CourseId;
+                if (existingClass.Status == ClassStatus.InProgress ||
+                    existingClass.Status == ClassStatus.Completed ||
+                    existingClass.Status == ClassStatus.Cancelled ||
+                    existingClass.StartDate.Date <= DateTime.UtcNow.Date)
+                {
+                    errors.Add(new ImportRowError(row.RowNumber, "Students.ClassCode",
+                        $"Không thể ghi danh học viên vào lớp '{row.ClassCode}' vì lớp đã bắt đầu, đang diễn ra hoặc đã kết thúc (Trạng thái: {existingClass.Status}, Ngày bắt đầu: {existingClass.StartDate:dd/MM/yyyy})."));
+                }
             }
             else
             {
