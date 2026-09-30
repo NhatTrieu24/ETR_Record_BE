@@ -194,8 +194,11 @@ public class EnrollmentServiceTests
             _service.CreateEnrollmentAsync(studentAccountId, classId, createdByAccountId: 99));
     }
 
-    [Fact]
-    public async Task CreateEnrollmentAsync_ShouldSucceed_WhenClassStartsTodayInAcademyTime()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(7)]
+    public async Task CreateEnrollmentAsync_ShouldSucceed_WhenClassStartsTodayOrFutureInAcademyTime(int daysFromToday)
     {
         int studentAccountId = 50;
         int classId = 100;
@@ -208,8 +211,8 @@ public class EnrollmentServiceTests
         {
             ClassId = classId,
             CourseId = courseId,
-            ClassName = "B737 Type Rating 2026-Today",
-            StartDate = AcademyTimeHelper.GetToday(),
+            ClassName = "B737 Type Rating 2026-Test",
+            StartDate = AcademyTimeHelper.GetToday().AddDays(daysFromToday),
             Status = ClassStatus.Planned,
             Capacity = 20,
             CourseVersionNo = 1
@@ -301,8 +304,11 @@ public class EnrollmentServiceTests
             _service.UpdateEnrollmentAsync(enrollmentId, request, updatedByAccountId: 99));
     }
 
-    [Fact]
-    public async Task UpdateEnrollmentAsync_ShouldSucceed_WhenTargetClassIsPlannedAndStartsTodayOrFuture()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(7)]
+    public async Task UpdateEnrollmentAsync_ShouldSucceed_WhenTargetClassIsPlannedAndStartsTodayOrFuture(int daysFromToday)
     {
         int enrollmentId = 10;
         int currentClassId = 100;
@@ -323,7 +329,7 @@ public class EnrollmentServiceTests
             ClassId = targetClassId,
             CourseId = 1,
             ClassName = "B737 New Batch",
-            StartDate = AcademyTimeHelper.GetToday(),
+            StartDate = AcademyTimeHelper.GetToday().AddDays(daysFromToday),
             Status = ClassStatus.Planned,
             Capacity = 20
         };

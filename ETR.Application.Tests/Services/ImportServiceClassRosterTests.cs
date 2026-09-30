@@ -108,8 +108,11 @@ public class ImportServiceClassRosterTests
         Assert.Contains(result.Errors, e => e.Column == "Students.ClassCode");
     }
 
-    [Fact]
-    public async Task ValidateClassRosterImportAsync_ShouldAcceptStudents_WhenTargetExistingClassIsPlannedAndStartsTodayOrFuture()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(7)]
+    public async Task ValidateClassRosterImportAsync_ShouldAcceptStudents_WhenTargetExistingClassIsPlannedAndStartsTodayOrFuture(int daysFromToday)
     {
         var mockUow = new Mock<IUnitOfWork>();
         var mockClsSvc = new Mock<IClassService>();
@@ -120,7 +123,7 @@ public class ImportServiceClassRosterTests
             ClassId = 10,
             ClassCode = "B737-C1",
             CourseId = 1,
-            StartDate = AcademyTimeHelper.GetToday(),
+            StartDate = AcademyTimeHelper.GetToday().AddDays(daysFromToday),
             Status = ClassStatus.Planned,
             IsDeleted = false
         };
