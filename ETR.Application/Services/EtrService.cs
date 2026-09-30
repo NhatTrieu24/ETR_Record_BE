@@ -261,7 +261,7 @@ public class EtrService : IEtrService
         }
 
         // 3. Check all evidence is Verified
-        var allEvidences = await _unitOfWork.EvidenceFileRepository.GetAllAsync(cancellationToken);
+        var allEvidences = (await _unitOfWork.EvidenceFileRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<EvidenceFile>()).ToList();
         var etrSubjectIds = etr.SubjectResults?.Select(sr => sr.SubjectResultId).ToList() ?? new List<int>();
         var pendingEvidences = allEvidences
             .Where(e => etrSubjectIds.Contains(e.SubjectResultId) && e.VerificationStatus != "Verified" && !e.IsDeleted)
@@ -273,10 +273,10 @@ public class EtrService : IEtrService
         }
 
         // 4. Check all subject signoffs exist
-        var allSignoffs = await _unitOfWork.SubjectSignoffRepository.GetAllAsync(cancellationToken);
+        var allSignoffs = (await _unitOfWork.SubjectSignoffRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<SubjectSignoff>()).ToList();
         foreach (var sr in etr.SubjectResults ?? Enumerable.Empty<SubjectResult>())
         {
-            var hasSignoff = allSignoffs.Any(s => s.SubjectResultId == sr.SubjectResultId);
+            var hasSignoff = allSignoffs.Any(s => s.SubjectResultId == sr.SubjectResultId && !s.IsDeleted);
             if (!hasSignoff)
             {
                 throw new BusinessRuleViolationException($"Cannot submit ETR. Subject (ID: {sr.SubjectId}) has not been signed off by instructor.");
@@ -288,7 +288,7 @@ public class EtrService : IEtrService
         // right now" — so a mid-course rule change never retroactively re-evaluates this learner
         // against a threshold that didn't exist when they enrolled. See Course/CompletionRequirement
         // VersionNo docs.
-        var completionRequirements = (await _unitOfWork.CompletionRequirementRepository.GetAllAsync(cancellationToken))
+        var completionRequirements = (await _unitOfWork.CompletionRequirementRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<CompletionRequirement>())
             .Where(cr => cr.CourseId == trainingClass.CourseId && cr.IsMandatory && cr.VersionNo == etr.CourseVersionNo).ToList();
 
         foreach (var requirement in completionRequirements)
@@ -307,7 +307,7 @@ public class EtrService : IEtrService
                     if (hasSnapshots)
                     {
                         var mandatorySRs = subjectResults.Where(sr => sr.IsMandatorySnapshot == true).ToList();
-                        if (!mandatorySRs.All(sr => sr.Status == SubjectResultStatus.Passed || sr.Status == SubjectResultStatus.Exempted))
+                        if (mandatorySRs.Any(sr => sr.Status != SubjectResultStatus.Passed && sr.Status != SubjectResultStatus.Exempted))
                         {
                             throw new BusinessRuleViolationException($"Cannot submit ETR. Completion requirement '{requirement.RequirementName}' not met: not all mandatory subjects are Passed or Exempted.");
                         }
@@ -327,8 +327,8 @@ public class EtrService : IEtrService
 
                 case "AllChecklistsSignedOff":
                     var subjectResultIds = subjectResults.Select(sr => sr.SubjectResultId).ToList();
-                    var checklistResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(cancellationToken))
-                        .Where(r => subjectResultIds.Contains(r.SubjectResultId)).ToList();
+                    var checklistResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<PracticalChecklistResult>())
+                        .Where(r => subjectResultIds.Contains(r.SubjectResultId) && !r.IsDeleted).ToList();
                     bool hasChecklistSnapshots = checklistResults.Any(r => r.IsMandatorySnapshot.HasValue);
 
                     if (hasChecklistSnapshots)
@@ -341,8 +341,8 @@ public class EtrService : IEtrService
                     }
                     else
                     {
-                        var mandatoryChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(cancellationToken))
-                            .Where(pc => pc.CourseId == trainingClass.CourseId && pc.IsRequired).ToList();
+                        var mandatoryChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<PracticalChecklist>())
+                            .Where(pc => pc.CourseId == trainingClass.CourseId && pc.IsRequired && !pc.IsDeleted).ToList();
 
                         var hasUnpassedMandatoryChecklist = checklistResults.Any(r =>
                             mandatoryChecklists.Any(c => c.PracticalChecklistId == r.PracticalChecklistId)
@@ -468,18 +468,18 @@ public class EtrService : IEtrService
         }
 
         // 3. All evidence Verified (single aggregate check)
-        var allEvidences = await _unitOfWork.EvidenceFileRepository.GetAllAsync(cancellationToken);
+        var allEvidences = (await _unitOfWork.EvidenceFileRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<EvidenceFile>()).ToList();
         var etrSubjectIds = etr.SubjectResults?.Select(sr => sr.SubjectResultId).ToList() ?? new List<int>();
         var pendingEvidenceCount = allEvidences
             .Count(e => etrSubjectIds.Contains(e.SubjectResultId) && e.VerificationStatus != "Verified" && !e.IsDeleted);
         checks.Add(new CompletionCheckItem("All evidence Verified", true, pendingEvidenceCount == 0, $"{pendingEvidenceCount} pending"));
 
         // 4. Subject signoffs (one check per subject result)
-        var allSignoffs = await _unitOfWork.SubjectSignoffRepository.GetAllAsync(cancellationToken);
+        var allSignoffs = (await _unitOfWork.SubjectSignoffRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<SubjectSignoff>()).ToList();
         foreach (var sr in etr.SubjectResults ?? Enumerable.Empty<SubjectResult>())
         {
             var subjectName = sr.SubjectNameSnapshot ?? subjects.GetValueOrDefault(sr.SubjectId)?.SubjectName ?? $"Subject #{sr.SubjectId}";
-            var isMet = allSignoffs.Any(s => s.SubjectResultId == sr.SubjectResultId);
+            var isMet = allSignoffs.Any(s => s.SubjectResultId == sr.SubjectResultId && !s.IsDeleted);
             checks.Add(new CompletionCheckItem($"Instructor Signoff: {subjectName}", true, isMet, isMet ? "Signed off" : "Not signed off"));
         }
 
@@ -488,7 +488,7 @@ public class EtrService : IEtrService
         // right now" — so a mid-course rule change never retroactively re-evaluates this learner
         // against a threshold that didn't exist when they enrolled. See Course/CompletionRequirement
         // VersionNo docs.
-        var completionRequirements = (await _unitOfWork.CompletionRequirementRepository.GetAllAsync(cancellationToken))
+        var completionRequirements = (await _unitOfWork.CompletionRequirementRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<CompletionRequirement>())
             .Where(cr => cr.CourseId == trainingClass.CourseId && cr.IsMandatory && cr.VersionNo == etr.CourseVersionNo).ToList();
 
         foreach (var requirement in completionRequirements)
@@ -502,19 +502,25 @@ public class EtrService : IEtrService
                     break;
 
                 case "AllAssessmentsPassed":
-                    isMet = hasSnapshots
-                        ? subjectResultsList.Where(sr => sr.IsMandatorySnapshot == true).All(sr => sr.Status == SubjectResultStatus.Passed || sr.Status == SubjectResultStatus.Exempted)
-                        : courseSubjects.All(cs =>
+                    if (hasSnapshots)
+                    {
+                        var mandatorySRs = subjectResultsList.Where(sr => sr.IsMandatorySnapshot == true).ToList();
+                        isMet = mandatorySRs.All(sr => sr.Status == SubjectResultStatus.Passed || sr.Status == SubjectResultStatus.Exempted);
+                    }
+                    else
+                    {
+                        isMet = courseSubjects.All(cs =>
                         {
                             var sr = subjectResultsList.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
                             return sr != null && (sr.Status == SubjectResultStatus.Passed || sr.Status == SubjectResultStatus.Exempted);
                         });
+                    }
                     break;
 
                 case "AllChecklistsSignedOff":
                     var subjectResultIds = subjectResultsList.Select(sr => sr.SubjectResultId).ToList();
-                    var checklistResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(cancellationToken))
-                        .Where(r => subjectResultIds.Contains(r.SubjectResultId)).ToList();
+                    var checklistResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<PracticalChecklistResult>())
+                        .Where(r => subjectResultIds.Contains(r.SubjectResultId) && !r.IsDeleted).ToList();
                     bool hasChecklistSnapshots = checklistResults.Any(r => r.IsMandatorySnapshot.HasValue);
 
                     if (hasChecklistSnapshots)
@@ -524,8 +530,8 @@ public class EtrService : IEtrService
                     }
                     else
                     {
-                        var mandatoryChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(cancellationToken))
-                            .Where(pc => pc.CourseId == trainingClass.CourseId && pc.IsRequired).ToList();
+                        var mandatoryChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<PracticalChecklist>())
+                            .Where(pc => pc.CourseId == trainingClass.CourseId && pc.IsRequired && !pc.IsDeleted).ToList();
                         isMet = mandatoryChecklists.All(c => checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.ResultStatus == "Passed"));
                     }
                     break;
@@ -559,7 +565,7 @@ public class EtrService : IEtrService
         var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(enrollment.ClassId, cancellationToken)
             ?? throw new BusinessRuleViolationException("Class not found.");
 
-        var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken))
+        var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<CourseSubject>())
             .Where(cs => cs.CourseId == trainingClass.CourseId && cs.IsMandatory).ToList();
 
         var subjectResults = etr.SubjectResults ?? Enumerable.Empty<SubjectResult>();
@@ -591,7 +597,7 @@ public class EtrService : IEtrService
         }
 
         // 2. Check all evidence is Verified
-        var allEvidences = await _unitOfWork.EvidenceFileRepository.GetAllAsync(cancellationToken);
+        var allEvidences = (await _unitOfWork.EvidenceFileRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<EvidenceFile>()).ToList();
         var etrSubjectIds = subjectResults.Select(sr => sr.SubjectResultId).ToList();
         var pendingEvidences = allEvidences
             .Where(e => etrSubjectIds.Contains(e.SubjectResultId) && e.VerificationStatus != "Verified" && !e.IsDeleted)
@@ -603,7 +609,7 @@ public class EtrService : IEtrService
         }
 
         // 3. Check all subject signoffs exist
-        var allSignoffs = await _unitOfWork.SubjectSignoffRepository.GetAllAsync(cancellationToken);
+        var allSignoffs = (await _unitOfWork.SubjectSignoffRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<SubjectSignoff>()).ToList();
         foreach (var sr in subjectResults)
         {
             var hasSignoff = allSignoffs.Any(s => s.SubjectResultId == sr.SubjectResultId && !s.IsDeleted);
@@ -687,7 +693,7 @@ public class EtrService : IEtrService
         var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(enrollment.ClassId, cancellationToken);
         if (trainingClass == null) throw new BusinessRuleViolationException("Class not found.");
 
-        var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken))
+        var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken) ?? Enumerable.Empty<CourseSubject>())
             .Where(cs => cs.CourseId == trainingClass.CourseId && cs.IsMandatory).ToList();
 
         var subjectResults = etr.SubjectResults ?? Enumerable.Empty<SubjectResult>();

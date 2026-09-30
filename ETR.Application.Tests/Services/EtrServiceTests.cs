@@ -263,4 +263,61 @@ public class EtrServiceTests
         Assert.NotNull(result);
         Assert.Equal(EtrStatus.Submitted, result.Status);
     }
+
+    [Fact]
+    public async Task SubmitEtrAsync_ShouldThrow_WhenMandatoryCourseSubjectIsMissingFromLearnerResults()
+    {
+        int etrId = 1;
+        int enrollmentId = 10;
+        int classId = 100;
+        int courseId = 500;
+
+        var etr = new ETRCourseRecord
+        {
+            ETRCourseRecordId = etrId,
+            EnrollmentId = enrollmentId,
+            Status = EtrStatus.InProgress,
+            IsLocked = false,
+            CourseVersionNo = 1,
+            SubjectResults = new List<SubjectResult>
+            {
+                new()
+                {
+                    SubjectResultId = 101,
+                    SubjectId = 1,
+                    Status = SubjectResultStatus.Passed,
+                    AttendanceRate = 90,
+                    IsMandatorySnapshot = null // Legacy record without snapshot
+                }
+            }
+        };
+
+        _mockEtrRepo.Setup(r => r.GetWithSubjectResultsAsync(etrId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(etr);
+        _mockEnrollmentRepo.Setup(r => r.GetByIdAsync(enrollmentId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CourseEnrollment { EnrollmentId = enrollmentId, ClassId = classId });
+        _mockClassRepo.Setup(r => r.GetByIdAsync(classId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Class { ClassId = classId, CourseId = courseId });
+
+        // Course requires Subject 1 AND Subject 2 as mandatory
+        _mockCourseSubjectRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CourseSubject>
+            {
+                new() { CourseId = courseId, SubjectId = 1, IsMandatory = true },
+                new() { CourseId = courseId, SubjectId = 2, IsMandatory = true } // Missing in learner record
+            });
+
+        _mockEvidenceRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<EvidenceFile>());
+        _mockSignoffRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<SubjectSignoff>
+            {
+                new() { SubjectResultId = 101, IsDeleted = false }
+            });
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            _service.SubmitEtrAsync(etrId, accountId: 99));
+
+        Assert.Contains("Mandatory subject", ex.Message);
+    }
 }

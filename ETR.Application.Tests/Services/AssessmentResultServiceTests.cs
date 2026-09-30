@@ -192,4 +192,120 @@ public class AssessmentResultServiceTests
         Assert.Equal(SubjectResultStatus.Passed, subjectResult.Status);
         _mockSubjectResultRepo.Verify(r => r.Update(subjectResult), Times.Once);
     }
+
+    [Fact]
+    public async Task SignoffSubjectResultAsync_ShouldThrow_WhenMandatoryAssessmentIsFailed()
+    {
+        int subjectResultId = 10;
+        int courseId = 1;
+        int subjectId = 2;
+        int etrId = 100;
+        int enrollmentId = 50;
+        int classId = 20;
+        int instructorId = 5;
+
+        var subjectResult = new SubjectResult
+        {
+            SubjectResultId = subjectResultId,
+            CourseId = courseId,
+            SubjectId = subjectId,
+            EtrId = etrId,
+            AttendanceRate = 95,
+            Score = 80,
+            PassingScoreSnapshot = 70
+        };
+
+        _mockSubjectResultRepo.Setup(r => r.GetByIdAsync(subjectResultId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(subjectResult);
+        _mockEtrRepo.Setup(r => r.GetByIdAsync(etrId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ETRCourseRecord { ETRCourseRecordId = etrId, EnrollmentId = enrollmentId });
+        _mockEnrollmentRepo.Setup(r => r.GetByIdAsync(enrollmentId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CourseEnrollment { EnrollmentId = enrollmentId, ClassId = classId });
+        _mockClassRepo.Setup(r => r.GetByIdAsync(classId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Class { ClassId = classId, CourseId = courseId });
+
+        var classSubjects = new List<ClassSubject>
+        {
+            new() { ClassId = classId, SubjectId = subjectId, InstructorAccountId = instructorId, IsDeleted = false }
+        };
+        _mockClassSubjectRepo.Setup(r => r.GetQueryable()).Returns(classSubjects.AsQueryable());
+
+        _mockSignoffRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<SubjectSignoff>());
+
+        // 1 Mandatory Assessment (Failed)
+        var studentAssessments = new List<AssessmentResult>
+        {
+            new() { AssessmentResultId = 1, AssessmentId = 101, SubjectResultId = subjectResultId, IsMandatorySnapshot = true, ResultStatus = "Failed", Score = 50 }
+        };
+
+        _mockAssessmentResultRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(studentAssessments);
+        _mockChecklistResultRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<PracticalChecklistResult>());
+        _mockEvidenceRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<EvidenceFile>
+            {
+                new() { EvidenceFileId = 1, SubjectResultId = subjectResultId, VerificationStatus = "Verified", IsDeleted = false }
+            });
+        _mockCourseSubjectRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CourseSubject>());
+
+        var request = new CreateSubjectSignoffRequest(subjectResultId, "Signed off attempt");
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            _service.SignoffSubjectResultAsync(request, signoffByAccountId: instructorId, signoffByRoleName: "Instructor"));
+
+        Assert.Contains("Còn bài kiểm tra bắt buộc chưa đạt", ex.Message);
+    }
+
+    [Fact]
+    public async Task EvaluateSubjectPassabilityAsync_ShouldSetFailed_WhenMandatoryAssessmentIsFailed_EvenIfAverageScorePasses()
+    {
+        int subjectResultId = 10;
+        int courseId = 1;
+        int subjectId = 2;
+
+        var subjectResult = new SubjectResult
+        {
+            SubjectResultId = subjectResultId,
+            CourseId = courseId,
+            SubjectId = subjectId,
+            AttendanceRate = 90,
+            Score = 85, // High overall subject score
+            PassingScoreSnapshot = 70,
+            Status = SubjectResultStatus.Pending
+        };
+
+        _mockSubjectResultRepo.Setup(r => r.GetByIdAsync(subjectResultId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(subjectResult);
+
+        // Mandatory assessment failed
+        var studentAssessments = new List<AssessmentResult>
+        {
+            new() { AssessmentResultId = 1, AssessmentId = 101, SubjectResultId = subjectResultId, IsMandatorySnapshot = true, PassingScoreSnapshot = 70, Score = 50, ResultStatus = "Failed" }
+        };
+        _mockAssessmentResultRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(studentAssessments);
+
+        // Mandatory checklist passed
+        var checklistResults = new List<PracticalChecklistResult>
+        {
+            new() { PracticalChecklistResultId = 1, PracticalChecklistId = 201, SubjectResultId = subjectResultId, IsMandatorySnapshot = true, Score = 80, ResultStatus = "Passed" }
+        };
+        _mockChecklistResultRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(checklistResults);
+
+        _mockEvidenceRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<EvidenceFile>
+            {
+                new() { EvidenceFileId = 1, SubjectResultId = subjectResultId, VerificationStatus = "Verified", IsDeleted = false }
+            });
+
+        _mockCourseSubjectRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CourseSubject>());
+
+        await _service.EvaluateSubjectPassabilityAsync(subjectResultId);
+
+        Assert.Equal(SubjectResultStatus.Failed, subjectResult.Status);
+    }
 }

@@ -494,82 +494,97 @@ public class AssessmentResultService : IAssessmentResultService
                     throw new BusinessRuleViolationException($"Không thể ký chốt môn học. Tỷ lệ điểm danh của học viên ({subjectResult.AttendanceRate.Value:F1}%) chưa đạt mức tối thiểu bắt buộc ({BusinessRuleEngine.MinimumAttendanceThreshold}%).");
                 }
 
-                // 2. Validation: Assessments - All mandatory assessments configured for this subject must have scores
-                var studentResults = (await _unitOfWork.AssessmentResultRepository.GetAllAsync(ct))
+                // 2. Validation: Assessments - All mandatory assessments configured for this subject must be Passed
+                var studentResults = (await _unitOfWork.AssessmentResultRepository.GetAllAsync(ct) ?? Enumerable.Empty<AssessmentResult>())
                     .Where(r => r.SubjectResultId == request.SubjectResultId && !r.IsDeleted)
+                    .ToList();
+                var allCourseAssessments = (await _unitOfWork.AssessmentRepository.GetAllAsync(ct) ?? Enumerable.Empty<Assessment>())
+                    .Where(a => a.CourseId == subjectResult.CourseId && a.SubjectId == subjectResult.SubjectId && !a.IsDeleted)
                     .ToList();
 
                 bool hasAssessmentSnapshots = studentResults.Any(r => r.IsMandatorySnapshot.HasValue);
                 if (hasAssessmentSnapshots)
                 {
-                    var missingAssessments = studentResults
+                    var failedAssessments = studentResults
+                        .Where(r => r.IsMandatorySnapshot == true && r.ResultStatus == "Failed")
+                        .ToList();
+                    if (failedAssessments.Count > 0)
+                    {
+                        var ids = string.Join(", ", failedAssessments.Select(a => $"Assessment #{a.AssessmentId}"));
+                        throw new BusinessRuleViolationException($"Không thể ký chốt môn học. Còn bài kiểm tra bắt buộc chưa đạt (Failed): {ids}. Học viên phải thi lại và đạt trước khi ký chốt.");
+                    }
+
+                    var pendingAssessments = studentResults
                         .Where(r => r.IsMandatorySnapshot == true && (r.ResultStatus == "Pending" || string.IsNullOrEmpty(r.ResultStatus)))
                         .ToList();
-
-                    if (missingAssessments.Count > 0)
+                    if (pendingAssessments.Count > 0)
                     {
-                        var ids = string.Join(", ", missingAssessments.Select(a => $"Assessment #{a.AssessmentId}"));
+                        var ids = string.Join(", ", pendingAssessments.Select(a => $"Assessment #{a.AssessmentId}"));
                         throw new BusinessRuleViolationException($"Không thể ký chốt môn học. Còn bài kiểm tra bắt buộc chưa được nhập điểm: {ids}.");
                     }
                 }
                 else
                 {
-                    var courseAssessments = (await _unitOfWork.AssessmentRepository.GetAllAsync(ct))
-                        .Where(a => a.CourseId == subjectResult.CourseId && a.SubjectId == subjectResult.SubjectId && a.IsRequired && !a.IsDeleted)
-                        .ToList();
-
-                    if (courseAssessments.Count > 0)
+                    var mandatoryAssessments = allCourseAssessments.Where(a => a.IsRequired).ToList();
+                    if (mandatoryAssessments.Count > 0)
                     {
-                        var missingAssessments = courseAssessments
-                            .Where(a => !studentResults.Any(r => r.AssessmentId == a.AssessmentId && r.ResultStatus != "Pending" && !string.IsNullOrEmpty(r.ResultStatus)))
+                        var unpassedAssessments = mandatoryAssessments
+                            .Where(a => !studentResults.Any(r => r.AssessmentId == a.AssessmentId && r.ResultStatus == "Passed"))
                             .ToList();
 
-                        if (missingAssessments.Count > 0)
+                        if (unpassedAssessments.Count > 0)
                         {
-                            var names = string.Join(", ", missingAssessments.Select(a => a.ComponentName));
-                            throw new BusinessRuleViolationException($"Không thể ký chốt môn học. Còn bài kiểm tra chưa được nhập điểm: {names}.");
+                            var names = string.Join(", ", unpassedAssessments.Select(a => a.ComponentName));
+                            throw new BusinessRuleViolationException($"Không thể ký chốt môn học. Còn bài kiểm tra bắt buộc chưa đạt hoặc chưa nhập điểm: {names}.");
                         }
                     }
                 }
 
                 // 3. Validation: Mandatory Practical Checklists
-                var checklistResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(ct))
+                var checklistResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(ct) ?? Enumerable.Empty<PracticalChecklistResult>())
                     .Where(r => r.SubjectResultId == request.SubjectResultId && !r.IsDeleted)
+                    .ToList();
+                var allCourseChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(ct) ?? Enumerable.Empty<PracticalChecklist>())
+                    .Where(p => p.CourseId == subjectResult.CourseId && p.SubjectId == subjectResult.SubjectId && !p.IsDeleted)
                     .ToList();
 
                 bool hasChecklistSnapshots = checklistResults.Any(r => r.IsMandatorySnapshot.HasValue);
                 if (hasChecklistSnapshots)
                 {
-                    var missingChecklists = checklistResults
+                    var failedChecklists = checklistResults
+                        .Where(r => r.IsMandatorySnapshot == true && r.ResultStatus == "Failed")
+                        .ToList();
+                    if (failedChecklists.Count > 0)
+                    {
+                        var ids = string.Join(", ", failedChecklists.Select(c => $"Checklist #{c.PracticalChecklistId}"));
+                        throw new BusinessRuleViolationException($"Không thể ký chốt môn học. Còn danh mục thực hành bắt buộc chưa đạt (Failed): {ids}.");
+                    }
+
+                    var pendingChecklists = checklistResults
                         .Where(r => r.IsMandatorySnapshot == true && (r.ResultStatus == "Pending" || string.IsNullOrEmpty(r.ResultStatus)))
                         .ToList();
-
-                    if (missingChecklists.Count > 0)
+                    if (pendingChecklists.Count > 0)
                     {
-                        var ids = string.Join(", ", missingChecklists.Select(c => $"Checklist #{c.PracticalChecklistId}"));
+                        var ids = string.Join(", ", pendingChecklists.Select(c => $"Checklist #{c.PracticalChecklistId}"));
                         throw new BusinessRuleViolationException($"Không thể ký chốt môn học. Còn danh mục thực hành bắt buộc chưa được đánh giá: {ids}.");
                     }
                 }
                 else
                 {
-                    var mandatoryChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(ct))
-                        .Where(p => p.CourseId == subjectResult.CourseId && p.SubjectId == subjectResult.SubjectId && p.IsRequired && !p.IsDeleted)
-                        .ToList();
-
+                    var mandatoryChecklists = allCourseChecklists.Where(p => p.IsRequired).ToList();
                     if (mandatoryChecklists.Count > 0)
                     {
-                        var missingChecklists = mandatoryChecklists
-                            .Where(c => !checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.ResultStatus != "Pending" && !string.IsNullOrEmpty(r.ResultStatus)))
+                        var unpassedChecklists = mandatoryChecklists
+                            .Where(c => !checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.ResultStatus == "Passed"))
                             .ToList();
 
-                        if (missingChecklists.Count > 0)
+                        if (unpassedChecklists.Count > 0)
                         {
-                            var names = string.Join(", ", missingChecklists.Select(c => c.ItemName));
-                            throw new BusinessRuleViolationException($"Không thể ký chốt môn học. Còn danh mục thực hành bắt buộc chưa được đánh giá: {names}.");
+                            var names = string.Join(", ", unpassedChecklists.Select(c => c.ItemName));
+                            throw new BusinessRuleViolationException($"Không thể ký chốt môn học. Còn danh mục thực hành bắt buộc chưa đạt hoặc chưa được đánh giá: {names}.");
                         }
                     }
                 }
-
                 // 4. Validation: Mandatory Evidence Files (Must be uploaded BEFORE signing off)
                 var evidenceFiles = (await _unitOfWork.EvidenceFileRepository.GetAllAsync(ct))
                     .Where(e => e.SubjectResultId == request.SubjectResultId && !e.IsDeleted)
@@ -673,9 +688,42 @@ public class AssessmentResultService : IAssessmentResultService
         var attendanceFailed = (subjectResult.AttendanceRate ?? 0) < BusinessRuleEngine.MinimumAttendanceThreshold;
         var scoreFailed = (subjectResult.Score ?? 0) < passingScore;
 
-        // 2. Practical Checklist
-        var checklistResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(ct))
+        // 2. Mandatory Assessment Results Check
+        var studentAssessmentResults = (await _unitOfWork.AssessmentResultRepository.GetAllAsync(ct) ?? Enumerable.Empty<AssessmentResult>())
             .Where(r => r.SubjectResultId == subjectResultId && !r.IsDeleted).ToList();
+        var allCourseAssessments = (await _unitOfWork.AssessmentRepository.GetAllAsync(ct) ?? Enumerable.Empty<Assessment>())
+            .Where(a => a.CourseId == subjectResult.CourseId && a.SubjectId == subjectResult.SubjectId && !a.IsDeleted).ToList();
+
+        bool hasAssessmentSnapshots = studentAssessmentResults.Any(r => r.IsMandatorySnapshot.HasValue);
+        bool assessmentFailed;
+        bool assessmentsAllPassed;
+
+        if (hasAssessmentSnapshots)
+        {
+            var mandatoryAssessments = studentAssessmentResults.Where(r => r.IsMandatorySnapshot == true).ToList();
+            assessmentFailed = mandatoryAssessments.Any(r => r.ResultStatus == "Failed" || (r.PassingScoreSnapshot.HasValue && r.Score < r.PassingScoreSnapshot.Value));
+            assessmentsAllPassed = mandatoryAssessments.Count == 0 || mandatoryAssessments.All(r => r.ResultStatus == "Passed");
+        }
+        else
+        {
+            var mandatoryAssessments = allCourseAssessments.Where(a => a.IsRequired).ToList();
+            if (mandatoryAssessments.Count > 0)
+            {
+                assessmentFailed = mandatoryAssessments.Any(a => studentAssessmentResults.Any(r => r.AssessmentId == a.AssessmentId && (r.ResultStatus == "Failed" || r.Score < a.PassingScore)));
+                assessmentsAllPassed = mandatoryAssessments.All(a => studentAssessmentResults.Any(r => r.AssessmentId == a.AssessmentId && r.ResultStatus == "Passed" && r.Score >= a.PassingScore));
+            }
+            else
+            {
+                assessmentFailed = false;
+                assessmentsAllPassed = true;
+            }
+        }
+
+        // 3. Practical Checklist
+        var checklistResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(ct) ?? Enumerable.Empty<PracticalChecklistResult>())
+            .Where(r => r.SubjectResultId == subjectResultId && !r.IsDeleted).ToList();
+        var allCourseChecklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(ct) ?? Enumerable.Empty<PracticalChecklist>())
+            .Where(p => p.CourseId == subjectResult.CourseId && p.SubjectId == subjectResult.SubjectId && !p.IsDeleted).ToList();
 
         bool hasChecklistSnapshots = checklistResults.Any(r => r.IsMandatorySnapshot.HasValue);
         bool checklistFailed;
@@ -684,19 +732,25 @@ public class AssessmentResultService : IAssessmentResultService
         if (hasChecklistSnapshots)
         {
             var mandatoryChecklists = checklistResults.Where(r => r.IsMandatorySnapshot == true).ToList();
-            checklistFailed = mandatoryChecklists.Any(r => r.Score < passingScore || r.ResultStatus == "Failed");
-            checklistsAllPassed = mandatoryChecklists.All(r => r.Score >= passingScore && r.ResultStatus == "Passed");
+            checklistFailed = mandatoryChecklists.Any(r => r.ResultStatus == "Failed" || r.Score < passingScore);
+            checklistsAllPassed = mandatoryChecklists.Count == 0 || mandatoryChecklists.All(r => r.ResultStatus == "Passed" && r.Score >= passingScore);
         }
         else
         {
-            var checklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(ct))
-                .Where(p => p.CourseId == subjectResult.CourseId && p.SubjectId == subjectResult.SubjectId && p.IsRequired && !p.IsDeleted).ToList();
-
-            checklistFailed = checklists.Any(c => checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && (r.Score < passingScore || r.ResultStatus == "Failed")));
-            checklistsAllPassed = checklists.All(c => checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.Score >= passingScore && r.ResultStatus == "Passed"));
+            var mandatoryChecklists = allCourseChecklists.Where(p => p.IsRequired).ToList();
+            if (mandatoryChecklists.Count > 0)
+            {
+                checklistFailed = mandatoryChecklists.Any(c => checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && (r.Score < passingScore || r.ResultStatus == "Failed")));
+                checklistsAllPassed = mandatoryChecklists.All(c => checklistResults.Any(r => r.PracticalChecklistId == c.PracticalChecklistId && r.Score >= passingScore && r.ResultStatus == "Passed"));
+            }
+            else
+            {
+                checklistFailed = false;
+                checklistsAllPassed = true;
+            }
         }
 
-        // 3. Mandatory Evidence Files (At least ONE EvidenceFile must be linked, and all must be Verified)
+        // 4. Mandatory Evidence Files (At least ONE EvidenceFile must be linked, and all must be Verified)
         var evidenceFiles = (await _unitOfWork.EvidenceFileRepository.GetAllAsync(ct))
             .Where(e => e.SubjectResultId == subjectResultId && !e.IsDeleted).ToList();
 
@@ -704,11 +758,11 @@ public class AssessmentResultService : IAssessmentResultService
         var evidenceAllVerified = evidenceFiles.Count > 0 && evidenceFiles.All(e => e.VerificationStatus == "Verified");
 
         // Determine Status
-        if (scoreFailed || attendanceFailed || checklistFailed || evidenceRejected)
+        if (scoreFailed || attendanceFailed || assessmentFailed || checklistFailed || evidenceRejected)
         {
             subjectResult.Status = SubjectResultStatus.Failed;
         }
-        else if (checklistsAllPassed && evidenceAllVerified)
+        else if (assessmentsAllPassed && checklistsAllPassed && evidenceAllVerified)
         {
             subjectResult.Status = SubjectResultStatus.Passed;
         }

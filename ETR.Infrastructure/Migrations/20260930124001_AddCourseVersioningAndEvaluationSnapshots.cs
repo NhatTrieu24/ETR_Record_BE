@@ -152,8 +152,6 @@ namespace ETR.Infrastructure.Migrations
                 name: "IsMandatorySnapshot",
                 table: "AssessmentResults");
 
-            migrationBuilder.Sql("UPDATE Courses SET IsDeleted = 1, DeletedAt = GETUTCDATE() WHERE VersionNo > 1 AND [IsDeleted] = 0;");
-
             migrationBuilder.CreateIndex(
                 name: "IX_Courses_CourseCode",
                 table: "Courses",
