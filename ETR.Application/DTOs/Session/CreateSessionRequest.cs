@@ -24,4 +24,9 @@ public class CreateSessionRequest
     public bool IsChecklistRequired { get; set; } = false;
     public int? AssessmentId { get; set; }
     public int? PracticalChecklistId { get; set; }
+
+    // Phase 2: Flight / Simulator Training Extensions
+    public ETR.Domain.Enums.TrainingType TrainingType { get; set; } = ETR.Domain.Enums.TrainingType.Theory;
+    public string? LessonCode { get; set; }
 }
+

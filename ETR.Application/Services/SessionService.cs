@@ -142,7 +142,11 @@ public class SessionService : ISessionService
         session.IsAssessmentRequired = request.IsAssessmentRequired;
         session.IsChecklistRequired = request.IsChecklistRequired;
         session.AssessmentId = request.AssessmentId;
-        session.PracticalChecklistId = request.PracticalChecklistId;
+        if (request.TrainingType.HasValue)
+            session.TrainingType = request.TrainingType.Value;
+        if (request.LessonCode != null)
+            session.LessonCode = string.IsNullOrWhiteSpace(request.LessonCode) ? null : request.LessonCode.Trim();
+
         session.UpdatedAt = DateTime.UtcNow;
         session.UpdatedByAccountId = updatedByAccountId;
 
@@ -155,7 +159,7 @@ public class SessionService : ISessionService
             ActionType = AuditActionType.UPDATE.ToString(),
             EntityName = nameof(Session),
             RecordId = id,
-            NewValue = $"Title: {session.SessionTitle}, Date: {session.SessionDate:yyyy-MM-dd HH:mm}",
+            NewValue = $"Title: {session.SessionTitle}, Type: {session.TrainingType}, Lesson: {session.LessonCode}, Date: {session.SessionDate:yyyy-MM-dd HH:mm}",
             Description = $"Updated session schedule #{id} ('{session.SessionTitle}')"
         }, cancellationToken);
         await _unitOfWork.SaveAsync(cancellationToken);
@@ -204,7 +208,10 @@ public class SessionService : ISessionService
                 Description = practicalChecklist.Description,
                 IsRequired = practicalChecklist.IsRequired,
                 DisplayOrder = practicalChecklist.DisplayOrder
-            } : null
+            } : null,
+            TrainingType = session.TrainingType,
+            LessonCode = session.LessonCode
         };
     }
 }
+

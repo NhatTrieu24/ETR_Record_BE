@@ -124,7 +124,29 @@ public class AttendanceController : ControllerBase
         var accountId = _currentUserService.AccountId 
             ?? throw new UnauthorizedAccessException("User is not authenticated.");
 
-        var response = await _attendanceService.UpdateAttendanceRecordAsync(id, request, accountId, cancellationToken);
+        var response = await _attendanceService.UpdateAttendanceRecordAsync(id, request, accountId, _currentUserService.RoleName, cancellationToken);
+        return Ok(response);
+    }
+
+    [HttpPost("{id}/instructor-sign")]
+    [Authorize(Roles = "Instructor,Admin")]
+    public async Task<IActionResult> InstructorSignOff(int id, [FromBody] SignAttendanceRecordRequest? request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
+        var response = await _attendanceService.InstructorSignOffAsync(id, request ?? new SignAttendanceRecordRequest(), accountId, _currentUserService.RoleName, cancellationToken);
+        return Ok(response);
+    }
+
+    [HttpPost("{id}/student-sign")]
+    [Authorize(Roles = "Student,Admin")]
+    public async Task<IActionResult> StudentSignOff(int id, [FromBody] SignAttendanceRecordRequest? request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
+        var response = await _attendanceService.StudentSignOffAsync(id, request ?? new SignAttendanceRecordRequest(), accountId, _currentUserService.RoleName, cancellationToken);
         return Ok(response);
     }
 
@@ -139,5 +161,6 @@ public class AttendanceController : ControllerBase
         return NoContent();
     }
 }
+
 
 

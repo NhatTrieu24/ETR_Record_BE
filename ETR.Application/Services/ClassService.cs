@@ -388,6 +388,8 @@ public class ClassService : IClassService
     {
         var sessions = new List<Session>();
 
+        var allSubjects = (await _unitOfWork.SubjectRepository.GetAllAsync(ct)).ToList();
+
         // Tải danh sách Assessments và PracticalChecklists thuộc khóa học để tự động gắn vào các buổi kiểm tra
         var assessments = (await _unitOfWork.AssessmentRepository.GetAllAsync(ct))
             .Where(a => a.CourseId == cls.CourseId && !a.IsDeleted)
@@ -437,7 +439,7 @@ public class ClassService : IClassService
                 int? checklistId = null;
                 bool isAssessmentRequired = false;
                 bool isChecklistRequired = false;
-                string title;
+                string title = $"Buổi {i}";
 
                 if (isFinalSession && subjectAssessment != null)
                 {
@@ -463,10 +465,28 @@ public class ClassService : IClassService
                 {
                     title = $"Buổi {i} (Đánh giá thực hành buồng lái)";
                 }
-                else
+
+                TrainingType trainingType = TrainingType.Theory;
+                if (!string.IsNullOrEmpty(subjectType))
                 {
-                    title = $"Buổi {i}";
+                    if (subjectType.Contains("Flight", StringComparison.OrdinalIgnoreCase) ||
+                        subjectType.Contains("Bay", StringComparison.OrdinalIgnoreCase) ||
+                        subjectType.Contains("Air", StringComparison.OrdinalIgnoreCase))
+                    {
+                        trainingType = TrainingType.Flight;
+                    }
+                    else if (subjectType.Contains("Practical", StringComparison.OrdinalIgnoreCase) ||
+                             subjectType.Contains("SIM", StringComparison.OrdinalIgnoreCase) ||
+                             subjectType.Contains("Simulator", StringComparison.OrdinalIgnoreCase) ||
+                             subjectType.Contains("Mô phỏng", StringComparison.OrdinalIgnoreCase))
+                    {
+                        trainingType = TrainingType.Simulator;
+                    }
                 }
+
+                var currentSubject = allSubjects.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
+                string lessonPrefix = currentSubject?.SubjectCode ?? "SUB";
+                string lessonCode = $"{lessonPrefix}-L{i:D2}";
 
                 var session = new Session
                 {
@@ -479,11 +499,14 @@ public class ClassService : IClassService
                     PracticalChecklistId = checklistId,
                     IsAssessmentRequired = isAssessmentRequired,
                     IsChecklistRequired = isChecklistRequired,
-                    IsConfirmed = false
+                    IsConfirmed = false,
+                    TrainingType = trainingType,
+                    LessonCode = lessonCode
                 };
 
                 await _unitOfWork.SessionRepository.AddAsync(session, ct);
                 sessions.Add(session);
+
 
                 // 3. Quản trị mệt mỏi ICAO (Fatigue Risk Management):
                 // Môn SIM/Practical tối đa 4h/ngày -> mỗi ngày xếp 1 buổi SIM.

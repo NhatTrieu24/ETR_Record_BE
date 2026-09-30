@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using ETR.Application.Interfaces;
 using ETR.Domain.Entities;
+using ETR.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace ETR.Infrastructure.Data;
@@ -73,6 +74,8 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<SubjectResult>().Property(sr => sr.Status).HasConversion<string>();
         modelBuilder.Entity<ExportJob>().Property(ej => ej.Status).HasConversion<string>();
         modelBuilder.Entity<AttendanceRecord>().Property(ar => ar.Status).HasConversion<string>();
+        modelBuilder.Entity<AttendanceRecord>().Property(ar => ar.PerformanceGrade).HasConversion<string>();
+        modelBuilder.Entity<Session>().Property(s => s.TrainingType).HasConversion<string>();
         modelBuilder.Entity<AmendmentRequest>().Property(a => a.Status).HasConversion<string>();
         modelBuilder.Entity<UserProfile>().Property(u => u.Status).HasConversion<string>();
     }
@@ -94,10 +97,12 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<Class>().Property(c => c.CourseVersionNo).HasDefaultValue(1);
         modelBuilder.Entity<ClassSubject>().HasKey(e => e.ClassSubjectId);
         modelBuilder.Entity<Session>().HasKey(e => e.SessionId);
+        modelBuilder.Entity<Session>().Property(s => s.TrainingType).HasDefaultValue(TrainingType.Theory);
         modelBuilder.Entity<CourseEnrollment>().HasKey(e => e.EnrollmentId);
         modelBuilder.Entity<ETRCourseRecord>().HasKey(e => e.ETRCourseRecordId);
         modelBuilder.Entity<SubjectResult>().HasKey(e => e.SubjectResultId);
         modelBuilder.Entity<Assessment>().HasKey(e => e.AssessmentId);
+
         modelBuilder.Entity<AssessmentResult>().HasKey(e => e.AssessmentResultId);
         modelBuilder.Entity<PracticalChecklist>().HasKey(e => e.PracticalChecklistId);
         modelBuilder.Entity<PracticalChecklistResult>().HasKey(e => e.PracticalChecklistResultId);
@@ -187,7 +192,18 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<RetakeHistory>().Property(rh => rh.NewScore).HasColumnType("decimal(5,2)");
         modelBuilder.Entity<PracticalChecklistResult>().Property(p => p.Score).HasColumnType("decimal(5,2)");
         modelBuilder.Entity<CompletionRequirement>().Property(c => c.ThresholdValue).HasColumnType("decimal(5,2)");
+
+        // Phase 2: Flight / Simulator Hours (decimal(6,2))
+        modelBuilder.Entity<AttendanceRecord>().Property(ar => ar.FlightHours).HasColumnType("decimal(6,2)");
+        modelBuilder.Entity<AttendanceRecord>().Property(ar => ar.SimulatorHours).HasColumnType("decimal(6,2)");
+        modelBuilder.Entity<AttendanceRecord>().Property(ar => ar.DualHours).HasColumnType("decimal(6,2)");
+        modelBuilder.Entity<AttendanceRecord>().Property(ar => ar.SoloHours).HasColumnType("decimal(6,2)");
+        modelBuilder.Entity<AttendanceRecord>().Property(ar => ar.PicHours).HasColumnType("decimal(6,2)");
+        modelBuilder.Entity<AttendanceRecord>().Property(ar => ar.NightHours).HasColumnType("decimal(6,2)");
+        modelBuilder.Entity<AttendanceRecord>().Property(ar => ar.InstrumentHours).HasColumnType("decimal(6,2)");
+        modelBuilder.Entity<AttendanceRecord>().Property(ar => ar.CrossCountryHours).HasColumnType("decimal(6,2)");
     }
+
 
     private static void ConfigureRelationships(ModelBuilder modelBuilder)
     {

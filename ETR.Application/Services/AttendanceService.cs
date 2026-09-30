@@ -18,8 +18,12 @@ public class AttendanceService : IAttendanceService
     public async Task<IEnumerable<AttendanceRecordResponse>> GetAllAttendanceRecordsAsync(CancellationToken cancellationToken = default)
     {
         var records = await _unitOfWork.AttendanceRecordRepository.GetAllAsync(cancellationToken);
-        return records.Select(r => new AttendanceRecordResponse(
-            r.AttendanceRecordId, r.SessionId, r.EnrollmentId, r.Status, r.Remarks, r.RecordedByAccountId, r.RecordedAt));
+        var sessionIds = records.Select(r => r.SessionId).Distinct().ToList();
+        var sessions = (await _unitOfWork.SessionRepository.GetAllAsync(cancellationToken))
+            .Where(s => sessionIds.Contains(s.SessionId))
+            .ToDictionary(s => s.SessionId, s => s);
+
+        return records.Select(r => MapToResponse(r, sessions.GetValueOrDefault(r.SessionId)));
     }
 
     public async Task<IEnumerable<AttendanceRecordResponse>> GetAttendanceByEnrollmentAsync(int enrollmentId, int accountId, string? roleName, CancellationToken cancellationToken = default)
@@ -34,10 +38,14 @@ public class AttendanceService : IAttendanceService
         }
 
         var records = (await _unitOfWork.AttendanceRecordRepository.GetAllAsync(cancellationToken))
-            .Where(r => r.EnrollmentId == enrollmentId);
+            .Where(r => r.EnrollmentId == enrollmentId).ToList();
 
-        return records.Select(r => new AttendanceRecordResponse(
-            r.AttendanceRecordId, r.SessionId, r.EnrollmentId, r.Status, r.Remarks, r.RecordedByAccountId, r.RecordedAt));
+        var sessionIds = records.Select(r => r.SessionId).Distinct().ToList();
+        var sessions = (await _unitOfWork.SessionRepository.GetAllAsync(cancellationToken))
+            .Where(s => sessionIds.Contains(s.SessionId))
+            .ToDictionary(s => s.SessionId, s => s);
+
+        return records.Select(r => MapToResponse(r, sessions.GetValueOrDefault(r.SessionId)));
     }
 
     public async Task<AttendanceRecordResponse> RecordAttendanceAsync(CreateAttendanceRecordRequest request, int recordedByAccountId, string? recordedByRoleName, CancellationToken cancellationToken = default)
@@ -51,8 +59,14 @@ public class AttendanceService : IAttendanceService
                 if (session == null || session.IsConfirmed)
                     throw new BusinessRuleViolationException("Session not found or already confirmed.");
 
-                // Kiểm tra Grace Period (48 giờ): Nếu buổi học đã diễn ra quá 48h, Instructor không thể tự ý điểm danh bù
-                // trừ khi có quyền quản trị (Admin/Academic) can thiệp hỗ trợ.
+                // Validate flight/SIM hours and metadata against session training type and attendance status
+                ValidateTrainingRecord(session, request.Status, request.PerformanceGrade,
+                    request.FlightHours, request.SimulatorHours, request.DualHours, request.SoloHours,
+                    request.PicHours, request.NightHours, request.InstrumentHours, request.CrossCountryHours,
+                    request.DayLandings, request.NightLandings, request.AircraftRegistration, request.SimulatorDevice,
+                    request.DepartureIcao, request.ArrivalIcao, request.Route);
+
+                // Grace Period (48 hours)
                 if (session.SessionDate.HasValue)
                 {
                     if (session.SessionDate.Value.Date > DateTime.UtcNow.Date)
@@ -67,10 +81,8 @@ public class AttendanceService : IAttendanceService
                     }
                 }
 
-                // "Sân nhà ai nấy đá" — Instructor can only record attendance for a class they are
-                // actually assigned to (see ClassOwnershipValidator).
+                // Instructor ownership check
                 var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(session.ClassId, ct);
-                
                 var isAssigned = trainingClass != null && _unitOfWork.ClassSubjectRepository.GetQueryable()
                     .Any(cs => cs.ClassId == trainingClass.ClassId && cs.SubjectId == session.SubjectId && cs.InstructorAccountId == recordedByAccountId);
                 ClassOwnershipValidator.EnsureInstructorOwnsSubject(recordedByRoleName, isAssigned);
@@ -91,6 +103,24 @@ public class AttendanceService : IAttendanceService
                     EnrollmentId = request.EnrollmentId,
                     Status = request.Status,
                     Remarks = request.Remarks,
+                    PerformanceGrade = request.PerformanceGrade,
+                    FlightHours = request.FlightHours,
+                    SimulatorHours = request.SimulatorHours,
+                    DualHours = request.DualHours,
+                    SoloHours = request.SoloHours,
+                    PicHours = request.PicHours,
+                    NightHours = request.NightHours,
+                    InstrumentHours = request.InstrumentHours,
+                    CrossCountryHours = request.CrossCountryHours,
+                    DayLandings = request.DayLandings,
+                    NightLandings = request.NightLandings,
+                    AircraftRegistration = request.AircraftRegistration,
+                    SimulatorDevice = request.SimulatorDevice,
+                    DepartureIcao = request.DepartureIcao,
+                    ArrivalIcao = request.ArrivalIcao,
+                    Route = request.Route,
+                    InstructorComments = request.InstructorComments,
+                    StudentComments = request.StudentComments,
                     RecordedByAccountId = recordedByAccountId,
                     RecordedAt = DateTime.UtcNow,
                     CreatedAt = DateTime.UtcNow,
@@ -123,13 +153,13 @@ public class AttendanceService : IAttendanceService
                     RecordId = record.AttendanceRecordId,
                     ETRRecordId = etrRecord?.ETRCourseRecordId,
                     NewValue = request.Status.ToString(),
-                    Description = $"Recorded attendance status '{request.Status}' for Student Enrollment #{request.EnrollmentId} in Session #{request.SessionId}"
+                    Description = $"Recorded attendance status '{request.Status}' (Type: {session.TrainingType}) for Student Enrollment #{request.EnrollmentId} in Session #{request.SessionId}"
                 }, ct);
 
                 await _unitOfWork.SaveAsync(ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
 
-                return new AttendanceRecordResponse(record.AttendanceRecordId, record.SessionId, record.EnrollmentId, record.Status, record.Remarks, record.RecordedByAccountId, record.RecordedAt);
+                return MapToResponse(record, session);
             }
             catch
             {
@@ -206,11 +236,11 @@ public class AttendanceService : IAttendanceService
     {
         var r = await _unitOfWork.AttendanceRecordRepository.GetByIdAsync(id, cancellationToken);
         if (r == null) throw new KeyNotFoundException("AttendanceRecord not found.");
-        return new AttendanceRecordResponse(
-            r.AttendanceRecordId, r.SessionId, r.EnrollmentId, r.Status, r.Remarks, r.RecordedByAccountId, r.RecordedAt);
+        var session = await _unitOfWork.SessionRepository.GetByIdAsync(r.SessionId, cancellationToken);
+        return MapToResponse(r, session);
     }
 
-    public async Task<AttendanceRecordResponse> UpdateAttendanceRecordAsync(int id, UpdateAttendanceRecordRequest request, int updatedByAccountId, CancellationToken cancellationToken = default)
+    public async Task<AttendanceRecordResponse> UpdateAttendanceRecordAsync(int id, UpdateAttendanceRecordRequest request, int updatedByAccountId, string? roleName = null, CancellationToken cancellationToken = default)
     {
         return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
         {
@@ -224,10 +254,44 @@ public class AttendanceService : IAttendanceService
                 if (session != null && session.IsConfirmed)
                     throw new BusinessRuleViolationException("Cannot modify an attendance record for a session that has already been confirmed.");
 
+                if (session != null)
+                {
+                    // Instructor ownership check
+                    var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(session.ClassId, ct);
+                    var isAssigned = trainingClass != null && _unitOfWork.ClassSubjectRepository.GetQueryable()
+                        .Any(cs => cs.ClassId == trainingClass.ClassId && cs.SubjectId == session.SubjectId && cs.InstructorAccountId == updatedByAccountId);
+                    ClassOwnershipValidator.EnsureInstructorOwnsSubject(roleName, isAssigned);
+
+                    // Validate training details
+                    ValidateTrainingRecord(session, request.Status, request.PerformanceGrade,
+                        request.FlightHours, request.SimulatorHours, request.DualHours, request.SoloHours,
+                        request.PicHours, request.NightHours, request.InstrumentHours, request.CrossCountryHours,
+                        request.DayLandings, request.NightLandings, request.AircraftRegistration, request.SimulatorDevice,
+                        request.DepartureIcao, request.ArrivalIcao, request.Route);
+                }
+
                 var oldStatus = record.Status;
 
                 record.Status = request.Status;
                 record.Remarks = request.Remarks;
+                record.PerformanceGrade = request.PerformanceGrade;
+                record.FlightHours = request.FlightHours;
+                record.SimulatorHours = request.SimulatorHours;
+                record.DualHours = request.DualHours;
+                record.SoloHours = request.SoloHours;
+                record.PicHours = request.PicHours;
+                record.NightHours = request.NightHours;
+                record.InstrumentHours = request.InstrumentHours;
+                record.CrossCountryHours = request.CrossCountryHours;
+                record.DayLandings = request.DayLandings;
+                record.NightLandings = request.NightLandings;
+                record.AircraftRegistration = request.AircraftRegistration;
+                record.SimulatorDevice = request.SimulatorDevice;
+                record.DepartureIcao = request.DepartureIcao;
+                record.ArrivalIcao = request.ArrivalIcao;
+                record.Route = request.Route;
+                record.InstructorComments = request.InstructorComments;
+                record.StudentComments = request.StudentComments;
                 record.UpdatedAt = DateTime.UtcNow;
                 record.UpdatedByAccountId = updatedByAccountId;
 
@@ -253,8 +317,7 @@ public class AttendanceService : IAttendanceService
                 await _unitOfWork.SaveAsync(ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
 
-                return new AttendanceRecordResponse(
-                    record.AttendanceRecordId, record.SessionId, record.EnrollmentId, record.Status, record.Remarks, record.RecordedByAccountId, record.RecordedAt);
+                return MapToResponse(record, session);
             }
             catch
             {
@@ -375,5 +438,264 @@ public class AttendanceService : IAttendanceService
         if (sr == null) return;
 
         await RecalculateAttendanceRateAsync(sr, record.EnrollmentId, session.SubjectId, session.ClassId, ct);
+    }
+
+    public async Task<AttendanceRecordResponse> InstructorSignOffAsync(int id, SignAttendanceRecordRequest request, int instructorAccountId, string? roleName, CancellationToken cancellationToken = default)
+    {
+        return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
+        {
+            await _unitOfWork.BeginTransactionAsync(ct);
+            try
+            {
+                var record = await _unitOfWork.AttendanceRecordRepository.GetByIdAsync(id, ct)
+                    ?? throw new KeyNotFoundException("AttendanceRecord not found.");
+
+                var session = await _unitOfWork.SessionRepository.GetByIdAsync(record.SessionId, ct)
+                    ?? throw new KeyNotFoundException("Session not found.");
+
+                var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(session.ClassId, ct);
+                var isAssigned = trainingClass != null && _unitOfWork.ClassSubjectRepository.GetQueryable()
+                    .Any(cs => cs.ClassId == trainingClass.ClassId && cs.SubjectId == session.SubjectId && cs.InstructorAccountId == instructorAccountId);
+                ClassOwnershipValidator.EnsureInstructorOwnsSubject(roleName, isAssigned);
+
+                record.InstructorSignedAt = DateTime.UtcNow;
+                record.InstructorSignedByAccountId = instructorAccountId;
+                if (!string.IsNullOrWhiteSpace(request?.Comments))
+                {
+                    record.InstructorComments = request.Comments;
+                }
+                record.UpdatedAt = DateTime.UtcNow;
+                record.UpdatedByAccountId = instructorAccountId;
+
+                _unitOfWork.AttendanceRecordRepository.Update(record);
+
+                await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                {
+                    AccountId = instructorAccountId,
+                    ActionType = AuditActionType.UPDATE.ToString(),
+                    EntityName = nameof(AttendanceRecord),
+                    RecordId = id,
+                    NewValue = $"InstructorSignedAt: {record.InstructorSignedAt:O}",
+                    Description = $"Instructor #{instructorAccountId} digitally signed training attendance record #{id}"
+                }, ct);
+
+                await _unitOfWork.SaveAsync(ct);
+                await _unitOfWork.CommitTransactionAsync(ct);
+
+                return MapToResponse(record, session);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync(ct);
+                throw;
+            }
+        }, cancellationToken);
+    }
+
+    public async Task<AttendanceRecordResponse> StudentSignOffAsync(int id, SignAttendanceRecordRequest request, int studentAccountId, string? roleName, CancellationToken cancellationToken = default)
+    {
+        return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
+        {
+            await _unitOfWork.BeginTransactionAsync(ct);
+            try
+            {
+                var record = await _unitOfWork.AttendanceRecordRepository.GetByIdAsync(id, ct)
+                    ?? throw new KeyNotFoundException("AttendanceRecord not found.");
+
+                var enrollment = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(record.EnrollmentId, ct)
+                    ?? throw new KeyNotFoundException("Enrollment not found.");
+
+                // Zero-Trust: Students may only sign their own records
+                if (roleName == "Student" && enrollment.AccountId != studentAccountId)
+                {
+                    throw new ForbiddenAccessException("You are only authorized to sign your own training record.");
+                }
+
+                var session = await _unitOfWork.SessionRepository.GetByIdAsync(record.SessionId, ct);
+
+                record.StudentSignedAt = DateTime.UtcNow;
+                record.StudentSignedByAccountId = studentAccountId;
+                if (!string.IsNullOrWhiteSpace(request?.Comments))
+                {
+                    record.StudentComments = request.Comments;
+                }
+                record.UpdatedAt = DateTime.UtcNow;
+                record.UpdatedByAccountId = studentAccountId;
+
+                _unitOfWork.AttendanceRecordRepository.Update(record);
+
+                await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                {
+                    AccountId = studentAccountId,
+                    ActionType = AuditActionType.UPDATE.ToString(),
+                    EntityName = nameof(AttendanceRecord),
+                    RecordId = id,
+                    NewValue = $"StudentSignedAt: {record.StudentSignedAt:O}",
+                    Description = $"Student #{studentAccountId} digitally signed training attendance record #{id}"
+                }, ct);
+
+                await _unitOfWork.SaveAsync(ct);
+                await _unitOfWork.CommitTransactionAsync(ct);
+
+                return MapToResponse(record, session);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync(ct);
+                throw;
+            }
+        }, cancellationToken);
+    }
+
+    private static void ValidateTrainingRecord(
+        Session session,
+        AttendanceStatus status,
+        PerformanceGrade? performanceGrade,
+        decimal? flightHours,
+        decimal? simulatorHours,
+        decimal? dualHours,
+        decimal? soloHours,
+        decimal? picHours,
+        decimal? nightHours,
+        decimal? instrumentHours,
+        decimal? crossCountryHours,
+        int? dayLandings,
+        int? nightLandings,
+        string? aircraftRegistration,
+        string? simulatorDevice,
+        string? departureIcao,
+        string? arrivalIcao,
+        string? route)
+    {
+        // 1. Negative checks
+        if ((flightHours.HasValue && flightHours.Value < 0) ||
+            (simulatorHours.HasValue && simulatorHours.Value < 0) ||
+            (dualHours.HasValue && dualHours.Value < 0) ||
+            (soloHours.HasValue && soloHours.Value < 0) ||
+            (picHours.HasValue && picHours.Value < 0) ||
+            (nightHours.HasValue && nightHours.Value < 0) ||
+            (instrumentHours.HasValue && instrumentHours.Value < 0) ||
+            (crossCountryHours.HasValue && crossCountryHours.Value < 0))
+        {
+            throw new BusinessRuleViolationException("Training hours cannot be negative.");
+        }
+
+        if ((dayLandings.HasValue && dayLandings.Value < 0) ||
+            (nightLandings.HasValue && nightLandings.Value < 0))
+        {
+            throw new BusinessRuleViolationException("Landings cannot be negative.");
+        }
+
+        bool hasHours = (flightHours > 0) || (simulatorHours > 0) || (dualHours > 0) ||
+                        (soloHours > 0) || (picHours > 0) || (nightHours > 0) ||
+                        (instrumentHours > 0) || (crossCountryHours > 0);
+        bool hasLandings = (dayLandings > 0) || (nightLandings > 0);
+
+        // 2. Absent checks
+        if (status == AttendanceStatus.Absent)
+        {
+            if (hasHours)
+            {
+                throw new BusinessRuleViolationException("Absent student cannot record training hours.");
+            }
+            if (hasLandings)
+            {
+                throw new BusinessRuleViolationException("Absent student cannot record landings.");
+            }
+            if (performanceGrade == PerformanceGrade.Satisfactory)
+            {
+                throw new BusinessRuleViolationException("Absent student cannot receive a Satisfactory grade.");
+            }
+        }
+
+        // 3. Training Type specific checks
+        switch (session.TrainingType)
+        {
+            case TrainingType.Theory:
+                if (hasHours)
+                {
+                    throw new BusinessRuleViolationException("Theory sessions cannot record flight or simulator hours.");
+                }
+                if (hasLandings)
+                {
+                    throw new BusinessRuleViolationException("Theory sessions cannot record landings.");
+                }
+                if (!string.IsNullOrWhiteSpace(aircraftRegistration))
+                {
+                    throw new BusinessRuleViolationException("Theory sessions cannot record aircraft registration.");
+                }
+                if (!string.IsNullOrWhiteSpace(simulatorDevice))
+                {
+                    throw new BusinessRuleViolationException("Theory sessions cannot record simulator device.");
+                }
+                if (!string.IsNullOrWhiteSpace(departureIcao) || !string.IsNullOrWhiteSpace(arrivalIcao) || !string.IsNullOrWhiteSpace(route))
+                {
+                    throw new BusinessRuleViolationException("Theory sessions cannot record flight route details.");
+                }
+                break;
+
+            case TrainingType.Flight:
+                if (simulatorHours > 0)
+                {
+                    throw new BusinessRuleViolationException("Flight sessions cannot record simulator hours.");
+                }
+                if (!string.IsNullOrWhiteSpace(simulatorDevice))
+                {
+                    throw new BusinessRuleViolationException("Flight sessions cannot record simulator device.");
+                }
+                break;
+
+            case TrainingType.Simulator:
+                if (flightHours > 0)
+                {
+                    throw new BusinessRuleViolationException("Simulator sessions cannot record real flight hours.");
+                }
+                if (!string.IsNullOrWhiteSpace(aircraftRegistration))
+                {
+                    throw new BusinessRuleViolationException("Simulator sessions cannot record aircraft registration.");
+                }
+                if (!string.IsNullOrWhiteSpace(departureIcao) || !string.IsNullOrWhiteSpace(arrivalIcao) || !string.IsNullOrWhiteSpace(route))
+                {
+                    throw new BusinessRuleViolationException("Simulator sessions cannot record real flight route details.");
+                }
+                break;
+        }
+    }
+
+    private static AttendanceRecordResponse MapToResponse(AttendanceRecord r, Session? session = null)
+    {
+        return new AttendanceRecordResponse(
+            r.AttendanceRecordId,
+            r.SessionId,
+            r.EnrollmentId,
+            r.Status,
+            r.Remarks,
+            r.RecordedByAccountId,
+            r.RecordedAt,
+            r.PerformanceGrade,
+            r.FlightHours,
+            r.SimulatorHours,
+            r.DualHours,
+            r.SoloHours,
+            r.PicHours,
+            r.NightHours,
+            r.InstrumentHours,
+            r.CrossCountryHours,
+            r.DayLandings,
+            r.NightLandings,
+            r.AircraftRegistration,
+            r.SimulatorDevice,
+            r.DepartureIcao,
+            r.ArrivalIcao,
+            r.Route,
+            r.InstructorComments,
+            r.StudentComments,
+            r.InstructorSignedAt,
+            r.InstructorSignedByAccountId,
+            r.StudentSignedAt,
+            r.StudentSignedByAccountId,
+            session?.TrainingType,
+            session?.LessonCode
+        );
     }
 }

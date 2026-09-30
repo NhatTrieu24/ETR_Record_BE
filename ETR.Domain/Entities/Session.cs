@@ -1,3 +1,5 @@
+using ETR.Domain.Enums;
+
 namespace ETR.Domain.Entities;
 
 public class Session : BaseEntity
@@ -15,4 +17,15 @@ public class Session : BaseEntity
     public bool IsChecklistRequired { get; set; } = false;
     public int? AssessmentId { get; set; }
     public int? PracticalChecklistId { get; set; }
+
+    /// <summary>
+    /// Loại hình đào tạo của buổi học: Theory (mặc định), Flight (bay thực tế), Simulator (buồng lái mô phỏng).
+    /// </summary>
+    public TrainingType TrainingType { get; set; } = TrainingType.Theory;
+
+    /// <summary>
+    /// Mã bài học hoặc bài huấn luyện (ví dụ "EX-01", "SIM-03", "TH-02").
+    /// </summary>
+    public string? LessonCode { get; set; }
 }
+
