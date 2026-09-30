@@ -137,5 +137,85 @@ public class UserProfilesController : ControllerBase
         var profile = await _userProfileService.UpdateProfileStatusAsync(accountId, request.Status, currentAccountId, cancellationToken);
         return Ok(profile);
     }
+
+    /// <summary>
+    /// [Module/Flow]: Quản lý Năng định Phi công (Pilot Credentials)
+    /// [Core Responsibility]: Cập nhật thông tin năng định/bằng lái của chính người dùng hiện tại (Học viên tự khai -> Chưa xác minh).
+    /// [Target Audience]: All Roles (Student, etc.)
+    /// </summary>
+    [HttpPut("me/credentials")]
+    public async Task<ActionResult<UserProfileResponse>> UpdateMyCredentials([FromBody] UpdatePilotCredentialsRequest request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        var profile = await _userProfileService.UpdatePilotCredentialsAsync(accountId, request, accountId, isSelfUpdate: true, cancellationToken);
+        return Ok(profile);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Quản lý Năng định Phi công (Pilot Credentials)
+    /// [Core Responsibility]: Cập nhật thông tin bằng lái/năng định cho một tài khoản cụ thể.
+    /// [Target Audience]: Admin, Academic
+    /// </summary>
+    [HttpPut("{accountId:int}/credentials")]
+    [Authorize(Roles = "Admin,Academic")]
+    public async Task<ActionResult<UserProfileResponse>> UpdateUserCredentials(int accountId, [FromBody] UpdatePilotCredentialsRequest request, CancellationToken cancellationToken)
+    {
+        var currentAccountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        var profile = await _userProfileService.UpdatePilotCredentialsAsync(accountId, request, currentAccountId, isSelfUpdate: false, cancellationToken);
+        return Ok(profile);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Quản lý Năng định Phi công (Pilot Credentials)
+    /// [Core Responsibility]: Xác minh (Verify) hoặc hủy xác minh thông tin năng định/bằng lái của học viên.
+    /// [Target Audience]: Admin, Academic
+    /// </summary>
+    [HttpPut("{accountId:int}/verify-credentials")]
+    [Authorize(Roles = "Admin,Academic")]
+    public async Task<ActionResult<UserProfileResponse>> VerifyUserCredentials(int accountId, [FromBody] VerifyPilotCredentialsRequest request, CancellationToken cancellationToken)
+    {
+        var currentAccountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        var profile = await _userProfileService.VerifyPilotCredentialsAsync(accountId, request, currentAccountId, cancellationToken);
+        return Ok(profile);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Quản lý Minh chứng Năng định (Credential Evidences)
+    /// [Core Responsibility]: Lấy danh sách tệp đính kèm/minh chứng năng định (bằng lái, y tế, ELP) của tài khoản.
+    /// [Target Audience]: Student (xem của mình), Admin, Academic, QA, Audit
+    /// </summary>
+    [HttpGet("{accountId:int}/attachments")]
+    public async Task<ActionResult<IEnumerable<CredentialAttachmentDto>>> GetCredentialAttachments(int accountId, CancellationToken cancellationToken)
+    {
+        var currentAccountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        var attachments = await _userProfileService.GetCredentialAttachmentsAsync(accountId, currentAccountId, _currentUserService.RoleName ?? string.Empty, cancellationToken);
+        return Ok(attachments);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Quản lý Minh chứng Năng định (Credential Evidences)
+    /// [Core Responsibility]: Đăng ký tải lên tệp minh chứng năng định (bằng lái, y tế, ELP) cho tài khoản.
+    /// [Target Audience]: Student (tải lên của mình), Admin, Academic
+    /// </summary>
+    [HttpPost("{accountId:int}/attachments")]
+    public async Task<ActionResult<CredentialAttachmentDto>> UploadCredentialAttachment(int accountId, [FromBody] UploadCredentialAttachmentRequest request, CancellationToken cancellationToken)
+    {
+        var currentAccountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        var attachment = await _userProfileService.UploadCredentialAttachmentAsync(accountId, request, currentAccountId, _currentUserService.RoleName ?? string.Empty, cancellationToken);
+        return Ok(attachment);
+    }
+
+    /// <summary>
+    /// [Module/Flow]: Quản lý Minh chứng Năng định (Credential Evidences)
+    /// [Core Responsibility]: Xóa tệp minh chứng năng định của tài khoản.
+    /// [Target Audience]: Student (xóa của mình), Admin, Academic
+    /// </summary>
+    [HttpDelete("{accountId:int}/attachments/{attachmentId:int}")]
+    public async Task<IActionResult> DeleteCredentialAttachment(int accountId, int attachmentId, CancellationToken cancellationToken)
+    {
+        var currentAccountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
+        await _userProfileService.DeleteCredentialAttachmentAsync(attachmentId, currentAccountId, _currentUserService.RoleName ?? string.Empty, cancellationToken);
+        return NoContent();
+    }
 }
 

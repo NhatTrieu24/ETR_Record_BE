@@ -28,6 +28,7 @@ public class Attachment : BaseEntity
     public string? MimeType { get; set; }
     public long? FileSize { get; set; }
     public string? FileHash { get; set; }
+    public string? DocType { get; set; }
 
     public int UploadedByAccountId { get; set; }
     public DateTime UploadedAt { get; set; }

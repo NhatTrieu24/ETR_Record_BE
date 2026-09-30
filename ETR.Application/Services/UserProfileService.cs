@@ -190,6 +190,37 @@ public class UserProfileService : IUserProfileService
         profile.DateOfBirth = request.DateOfBirth;
         profile.Gender = request.Gender;
         profile.Organization = request.Organization;
+
+        bool credentialsChanged =
+            profile.LicenseType != request.LicenseType ||
+            profile.LicenseNumber != request.LicenseNumber ||
+            profile.LicenseExpiryDate != request.LicenseExpiryDate ||
+            profile.MedicalClass != request.MedicalClass ||
+            profile.MedicalExpiryDate != request.MedicalExpiryDate ||
+            profile.IcaoElpLevel != request.IcaoElpLevel ||
+            profile.IcaoElpExpiryDate != request.IcaoElpExpiryDate ||
+            profile.TypeRatings != request.TypeRatings;
+
+        if (credentialsChanged)
+        {
+            profile.LicenseType = request.LicenseType;
+            profile.LicenseNumber = request.LicenseNumber;
+            profile.LicenseExpiryDate = request.LicenseExpiryDate;
+            profile.MedicalClass = request.MedicalClass;
+            profile.MedicalExpiryDate = request.MedicalExpiryDate;
+            profile.IcaoElpLevel = request.IcaoElpLevel;
+            profile.IcaoElpExpiryDate = request.IcaoElpExpiryDate;
+            profile.TypeRatings = request.TypeRatings;
+
+            bool isPrivilegedVerifier = _currentUserService.RoleName == "Admin" || _currentUserService.RoleName == "Academic";
+            if (!isPrivilegedVerifier)
+            {
+                profile.IsCredentialsVerified = false;
+                profile.CredentialsVerifiedByAccountId = null;
+                profile.CredentialsVerifiedAt = null;
+            }
+        }
+
         profile.UpdatedAt = DateTime.UtcNow;
         profile.UpdatedByAccountId = updatedByAccountId;
 
@@ -197,6 +228,197 @@ public class UserProfileService : IUserProfileService
         await _unitOfWork.SaveAsync(cancellationToken);
 
         return MapToResponse(profile);
+    }
+
+    public async Task<UserProfileResponse> UpdatePilotCredentialsAsync(int accountId, UpdatePilotCredentialsRequest request, int updatedByAccountId, bool isSelfUpdate, CancellationToken cancellationToken = default)
+    {
+        var profiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
+        var profile = profiles.FirstOrDefault(p => p.AccountId == accountId)
+            ?? throw new KeyNotFoundException($"UserProfile for Account {accountId} not found.");
+
+        if (request.IcaoElpLevel.HasValue && (request.IcaoElpLevel.Value < 1 || request.IcaoElpLevel.Value > 6))
+        {
+            throw new BusinessRuleViolationException("ICAO ELP Level phải nằm trong khoảng từ 1 đến 6.");
+        }
+
+        var oldSummary = $"License: {profile.LicenseType}/{profile.LicenseNumber}, Medical: {profile.MedicalClass}, ELP: {profile.IcaoElpLevel}, TypeRatings: {profile.TypeRatings}";
+        var newSummary = $"License: {request.LicenseType}/{request.LicenseNumber}, Medical: {request.MedicalClass}, ELP: {request.IcaoElpLevel}, TypeRatings: {request.TypeRatings}";
+
+        profile.LicenseType = request.LicenseType;
+        profile.LicenseNumber = request.LicenseNumber;
+        profile.LicenseExpiryDate = request.LicenseExpiryDate;
+        profile.MedicalClass = request.MedicalClass;
+        profile.MedicalExpiryDate = request.MedicalExpiryDate;
+        profile.IcaoElpLevel = request.IcaoElpLevel;
+        profile.IcaoElpExpiryDate = request.IcaoElpExpiryDate;
+        profile.TypeRatings = request.TypeRatings;
+
+        if (isSelfUpdate)
+        {
+            // Self-update resets verification flag to unverified
+            profile.IsCredentialsVerified = false;
+            profile.CredentialsVerifiedByAccountId = null;
+            profile.CredentialsVerifiedAt = null;
+        }
+
+        profile.UpdatedAt = DateTime.UtcNow;
+        profile.UpdatedByAccountId = updatedByAccountId;
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = updatedByAccountId,
+            ActionType = AuditActionType.UPDATE.ToString(),
+            EntityName = nameof(UserProfile),
+            RecordId = profile.AccountId,
+            OldValue = oldSummary,
+            NewValue = newSummary,
+            Description = $"Pilot credentials updated for Account #{accountId} (SelfUpdate: {isSelfUpdate})"
+        }, cancellationToken);
+
+        _unitOfWork.UserProfileRepository.Update(profile);
+        await _unitOfWork.SaveAsync(cancellationToken);
+
+        return MapToResponse(profile);
+    }
+
+    public async Task<UserProfileResponse> VerifyPilotCredentialsAsync(int accountId, VerifyPilotCredentialsRequest request, int verifiedByAccountId, CancellationToken cancellationToken = default)
+    {
+        var profiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
+        var profile = profiles.FirstOrDefault(p => p.AccountId == accountId)
+            ?? throw new KeyNotFoundException($"UserProfile for Account {accountId} not found.");
+
+        bool oldVerified = profile.IsCredentialsVerified;
+        profile.IsCredentialsVerified = request.IsVerified;
+        profile.CredentialsVerifiedByAccountId = request.IsVerified ? verifiedByAccountId : null;
+        profile.CredentialsVerifiedAt = request.IsVerified ? DateTime.UtcNow : null;
+        profile.UpdatedAt = DateTime.UtcNow;
+        profile.UpdatedByAccountId = verifiedByAccountId;
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = verifiedByAccountId,
+            ActionType = AuditActionType.UPDATE.ToString(),
+            EntityName = nameof(UserProfile),
+            RecordId = profile.AccountId,
+            OldValue = $"Verified: {oldVerified}",
+            NewValue = $"Verified: {request.IsVerified}. Comment: {request.Comment}",
+            Description = $"Pilot credentials for Account #{accountId} {(request.IsVerified ? "VERIFIED" : "UNVERIFIED")} by Account #{verifiedByAccountId}"
+        }, cancellationToken);
+
+        _unitOfWork.UserProfileRepository.Update(profile);
+        await _unitOfWork.SaveAsync(cancellationToken);
+
+        return MapToResponse(profile);
+    }
+
+    public async Task<IEnumerable<CredentialAttachmentDto>> GetCredentialAttachmentsAsync(int accountId, int currentAccountId, string roleName, CancellationToken cancellationToken = default)
+    {
+        bool isPrivilegedRole = roleName is "Admin" or "Academic" or "QA" or "Audit";
+        if (!isPrivilegedRole && accountId != currentAccountId)
+        {
+            throw new UnauthorizedAccessException("Bạn không có quyền xem tài liệu năng định / y tế của học viên này.");
+        }
+
+        var allAttachments = await _unitOfWork.AttachmentRepository.GetAllAsync(cancellationToken);
+        var userAttachments = allAttachments
+            .Where(a => a.OwnerType == nameof(UserProfile) && a.OwnerId == accountId && !a.IsDeleted)
+            .OrderByDescending(a => a.UploadedAt)
+            .Select(a => new CredentialAttachmentDto(
+                a.AttachmentId,
+                a.OwnerId,
+                a.DocType ?? "General",
+                a.FileName,
+                a.Url,
+                a.MimeType,
+                a.FileSize,
+                a.UploadedAt,
+                a.UploadedByAccountId))
+            .ToList();
+
+        return userAttachments;
+    }
+
+    public async Task<CredentialAttachmentDto> UploadCredentialAttachmentAsync(int accountId, UploadCredentialAttachmentRequest request, int uploadedByAccountId, string roleName, CancellationToken cancellationToken = default)
+    {
+        bool isPrivilegedRole = roleName is "Admin" or "Academic";
+        if (!isPrivilegedRole && accountId != uploadedByAccountId)
+        {
+            throw new UnauthorizedAccessException("Bạn chỉ được tải lên tài liệu minh chứng cho hồ sơ của chính mình.");
+        }
+
+        var attachment = new Attachment
+        {
+            OwnerType = nameof(UserProfile),
+            OwnerId = accountId,
+            DocType = request.DocType,
+            Url = request.Url,
+            FileName = request.FileName,
+            PublicId = request.PublicId,
+            MimeType = request.MimeType,
+            FileSize = request.FileSize,
+            UploadedByAccountId = uploadedByAccountId,
+            UploadedAt = DateTime.UtcNow
+        };
+
+        await _unitOfWork.AttachmentRepository.AddAsync(attachment, cancellationToken);
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = uploadedByAccountId,
+            ActionType = AuditActionType.INSERT.ToString(),
+            EntityName = nameof(Attachment),
+            RecordId = accountId,
+            NewValue = $"DocType: {request.DocType}, File: {request.FileName}",
+            Description = $"Uploaded credential document '{request.DocType}' for UserProfile Account #{accountId}"
+        }, cancellationToken);
+
+        await _unitOfWork.SaveAsync(cancellationToken);
+
+        return new CredentialAttachmentDto(
+            attachment.AttachmentId,
+            attachment.OwnerId,
+            attachment.DocType ?? "General",
+            attachment.FileName,
+            attachment.Url,
+            attachment.MimeType,
+            attachment.FileSize,
+            attachment.UploadedAt,
+            attachment.UploadedByAccountId);
+    }
+
+    public async Task DeleteCredentialAttachmentAsync(int attachmentId, int currentAccountId, string roleName, CancellationToken cancellationToken = default)
+    {
+        var attachment = await _unitOfWork.AttachmentRepository.GetByIdAsync(attachmentId, cancellationToken)
+            ?? throw new KeyNotFoundException("Attachment not found.");
+
+        if (attachment.OwnerType != nameof(UserProfile))
+        {
+            throw new BusinessRuleViolationException("Tệp tin không thuộc hồ sơ năng định.");
+        }
+
+        bool isPrivilegedRole = roleName is "Admin" or "Academic";
+        if (!isPrivilegedRole && attachment.UploadedByAccountId != currentAccountId && attachment.OwnerId != currentAccountId)
+        {
+            throw new UnauthorizedAccessException("Bạn không có quyền xóa tệp minh chứng này.");
+        }
+
+        attachment.IsDeleted = true;
+        attachment.DeletedAt = DateTime.UtcNow;
+        attachment.UpdatedAt = DateTime.UtcNow;
+        attachment.UpdatedByAccountId = currentAccountId;
+
+        _unitOfWork.AttachmentRepository.Update(attachment);
+
+        await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+        {
+            AccountId = currentAccountId,
+            ActionType = AuditActionType.DELETE.ToString(),
+            EntityName = nameof(Attachment),
+            RecordId = attachment.AttachmentId,
+            Description = $"Deleted credential document #{attachment.AttachmentId} ({attachment.FileName}) for Account #{attachment.OwnerId}"
+        }, cancellationToken);
+
+        await _unitOfWork.SaveAsync(cancellationToken);
     }
 
     public async Task<UserProfileResponse> UpdateProfileStatusAsync(int accountId, LearnerStatus status, int updatedByAccountId, CancellationToken cancellationToken = default)
@@ -246,6 +468,17 @@ public class UserProfileService : IUserProfileService
             p.DateOfBirth,
             p.Gender,
             p.Organization,
-            p.Status);
+            p.Status,
+            p.LicenseType,
+            p.LicenseNumber,
+            p.LicenseExpiryDate,
+            p.MedicalClass,
+            p.MedicalExpiryDate,
+            p.IcaoElpLevel,
+            p.IcaoElpExpiryDate,
+            p.TypeRatings,
+            p.IsCredentialsVerified,
+            p.CredentialsVerifiedByAccountId,
+            p.CredentialsVerifiedAt);
     }
 }

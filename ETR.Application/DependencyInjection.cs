@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<IImportService, ImportService>();
         services.AddScoped<ICertificateExpiryNotificationService, CertificateExpiryNotificationService>();
         services.AddScoped<IAuthSecurityService, AuthSecurityService>();
+        services.AddScoped<ILogbookService, LogbookService>();
 
         return services;
     }
