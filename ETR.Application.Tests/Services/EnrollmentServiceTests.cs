@@ -157,4 +157,40 @@ public class EnrollmentServiceTests
         Assert.Equal("Ground School", createdSubjectResults[0].SubjectNameSnapshot);
         Assert.Equal(75, createdSubjectResults[0].PassingScoreSnapshot);
     }
+
+    [Theory]
+    [InlineData(ClassStatus.InProgress, 7)]
+    [InlineData(ClassStatus.Completed, 7)]
+    [InlineData(ClassStatus.Cancelled, 7)]
+    [InlineData(ClassStatus.Planned, -2)]
+    public async Task CreateEnrollmentAsync_ShouldThrow_WhenClassIsInProgressCompletedCancelledOrPastStartDate(ClassStatus status, int daysFromNow)
+    {
+        int studentAccountId = 50;
+        int classId = 100;
+        int courseId = 200;
+
+        var mockUserProfileRepo = new Mock<IGenericRepository<UserProfile>>();
+        mockUserProfileRepo.Setup(r => r.GetByIdAsync(studentAccountId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UserProfile { AccountId = studentAccountId, FullName = "Test Student" });
+        _mockUow.Setup(u => u.UserProfileRepository).Returns(mockUserProfileRepo.Object);
+
+        var trainingClass = new Class
+        {
+            ClassId = classId,
+            CourseId = courseId,
+            ClassName = "B737 Type Rating 2026-A",
+            StartDate = DateTime.UtcNow.AddDays(daysFromNow),
+            Status = status,
+            Capacity = 20
+        };
+
+        _mockClassRepo.Setup(r => r.GetByIdAsync(classId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(trainingClass);
+
+        _mockUow.Setup(u => u.ExecuteInStrategyAsync(It.IsAny<Func<CancellationToken, Task<CreateEnrollmentResponse>>>(), It.IsAny<CancellationToken>()))
+            .Returns<Func<CancellationToken, Task<CreateEnrollmentResponse>>, CancellationToken>((op, ct) => op(ct));
+
+        await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            _service.CreateEnrollmentAsync(studentAccountId, classId, createdByAccountId: 99));
+    }
 }
