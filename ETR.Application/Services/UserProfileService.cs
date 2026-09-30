@@ -532,8 +532,37 @@ public class UserProfileService : IUserProfileService
         return MapToResponse(profile);
     }
 
-    private static UserProfileResponse MapToResponse(UserProfile p)
+    private UserProfileResponse MapToResponse(UserProfile p)
     {
+        bool isInstructor = _currentUserService.RoleName == "Instructor";
+        bool isOwnProfile = _currentUserService.AccountId.HasValue && _currentUserService.AccountId.Value == p.AccountId;
+
+        // If Instructor viewing another student's profile, mask sensitive pilot credentials
+        if (isInstructor && !isOwnProfile)
+        {
+            return new UserProfileResponse(
+                p.AccountId,
+                p.UserCode,
+                p.FullName,
+                p.Email,
+                p.Phone,
+                p.DateOfBirth,
+                p.Gender,
+                p.Organization,
+                p.Status,
+                LicenseType: p.LicenseType,
+                LicenseNumber: null,
+                LicenseExpiryDate: null,
+                MedicalClass: null,
+                MedicalExpiryDate: null,
+                IcaoElpLevel: null,
+                IcaoElpExpiryDate: null,
+                TypeRatings: null,
+                IsCredentialsVerified: p.IsCredentialsVerified,
+                CredentialsVerifiedByAccountId: null,
+                CredentialsVerifiedAt: null);
+        }
+
         return new UserProfileResponse(
             p.AccountId,
             p.UserCode,

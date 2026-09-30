@@ -553,4 +553,167 @@ public class UserProfileServiceTests
         Assert.Contains(auditLogs, l => l.Description.Contains("REVOKED due to deletion of evidence attachment #55"));
         Assert.Contains(auditLogs, l => l.ActionType == AuditActionType.DELETE.ToString());
     }
+
+    [Fact]
+    public async Task GetProfileByAccountIdAsync_InstructorViewingAssignedStudent_MasksSensitiveCredentials()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        var currentUserService = new Mock<ICurrentUserService>();
+        currentUserService.Setup(c => c.AccountId).Returns(2);
+        currentUserService.Setup(c => c.RoleName).Returns("Instructor");
+
+        var studentProfile = new UserProfile
+        {
+            AccountId = 10,
+            UserCode = "STU-010",
+            FullName = "Nguyen Student",
+            Email = "student@etr.com",
+            Phone = "0912345678",
+            LicenseType = "CPL",
+            LicenseNumber = "VN-TOPSECRET-99",
+            LicenseExpiryDate = new DateTime(2028, 5, 1),
+            MedicalClass = "Class 1",
+            MedicalExpiryDate = new DateTime(2027, 5, 1),
+            IcaoElpLevel = 5,
+            IcaoElpExpiryDate = new DateTime(2030, 5, 1),
+            TypeRatings = "A320, B737",
+            IsCredentialsVerified = true,
+            CredentialsVerifiedByAccountId = 1,
+            CredentialsVerifiedAt = new DateTime(2026, 1, 1)
+        };
+
+        var profileRepo = new Mock<IGenericRepository<UserProfile>>();
+        profileRepo.Setup(r => r.GetAllIncludingDeletedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<UserProfile> { studentProfile });
+        uow.Setup(u => u.UserProfileRepository).Returns(profileRepo.Object);
+
+        // Instructor teaches Class 100
+        var classSubjects = new List<ClassSubject>
+        {
+            new() { ClassId = 100, SubjectId = 1, InstructorAccountId = 2 }
+        }.AsQueryable();
+        var csRepo = new Mock<IGenericRepository<ClassSubject>>();
+        csRepo.Setup(r => r.GetQueryable()).Returns(classSubjects);
+        uow.Setup(u => u.ClassSubjectRepository).Returns(csRepo.Object);
+
+        // Student is enrolled in Class 100
+        var enrollments = new List<CourseEnrollment>
+        {
+            new() { EnrollmentId = 1, ClassId = 100, AccountId = 10, IsDeleted = false }
+        };
+        var enrRepo = new Mock<IGenericRepository<CourseEnrollment>>();
+        enrRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(enrollments);
+        uow.Setup(u => u.CourseEnrollmentRepository).Returns(enrRepo.Object);
+
+        var service = new UserProfileService(uow.Object, currentUserService.Object);
+
+        // Act: Instructor views student in their assigned class
+        var result = await service.GetProfileByAccountIdAsync(10);
+
+        // Assert: General fields and verification badge are visible, sensitive details are masked/null
+        Assert.Equal("Nguyen Student", result.FullName);
+        Assert.Equal("STU-010", result.UserCode);
+        Assert.Equal("CPL", result.LicenseType);
+        Assert.True(result.IsCredentialsVerified);
+
+        // Sensitive credentials MUST be null/masked for Instructor
+        Assert.Null(result.LicenseNumber);
+        Assert.Null(result.LicenseExpiryDate);
+        Assert.Null(result.MedicalClass);
+        Assert.Null(result.MedicalExpiryDate);
+        Assert.Null(result.IcaoElpLevel);
+        Assert.Null(result.IcaoElpExpiryDate);
+        Assert.Null(result.TypeRatings);
+        Assert.Null(result.CredentialsVerifiedByAccountId);
+        Assert.Null(result.CredentialsVerifiedAt);
+    }
+
+    [Fact]
+    public async Task GetProfileByAccountIdAsync_InstructorViewingUnassignedStudent_ThrowsKeyNotFoundException()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        var currentUserService = new Mock<ICurrentUserService>();
+        currentUserService.Setup(c => c.AccountId).Returns(2);
+        currentUserService.Setup(c => c.RoleName).Returns("Instructor");
+
+        var studentProfile = new UserProfile
+        {
+            AccountId = 99,
+            UserCode = "STU-099",
+            FullName = "Other Student",
+            Email = "other@etr.com"
+        };
+
+        var profileRepo = new Mock<IGenericRepository<UserProfile>>();
+        profileRepo.Setup(r => r.GetAllIncludingDeletedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<UserProfile> { studentProfile });
+        uow.Setup(u => u.UserProfileRepository).Returns(profileRepo.Object);
+
+        // Instructor teaches Class 100
+        var classSubjects = new List<ClassSubject>
+        {
+            new() { ClassId = 100, SubjectId = 1, InstructorAccountId = 2 }
+        }.AsQueryable();
+        var csRepo = new Mock<IGenericRepository<ClassSubject>>();
+        csRepo.Setup(r => r.GetQueryable()).Returns(classSubjects);
+        uow.Setup(u => u.ClassSubjectRepository).Returns(csRepo.Object);
+
+        // Student 99 is enrolled in Class 200 (not taught by Instructor 2)
+        var enrollments = new List<CourseEnrollment>
+        {
+            new() { EnrollmentId = 2, ClassId = 200, AccountId = 99, IsDeleted = false }
+        };
+        var enrRepo = new Mock<IGenericRepository<CourseEnrollment>>();
+        enrRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(enrollments);
+        uow.Setup(u => u.CourseEnrollmentRepository).Returns(enrRepo.Object);
+
+        var service = new UserProfileService(uow.Object, currentUserService.Object);
+
+        // Act & Assert: Should hide student outside instructor's scope with KeyNotFoundException
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => service.GetProfileByAccountIdAsync(99));
+    }
+
+    [Fact]
+    public async Task GetProfileByAccountIdAsync_StudentViewingOwnProfile_ReturnsFullCredentials()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        var currentUserService = new Mock<ICurrentUserService>();
+        currentUserService.Setup(c => c.AccountId).Returns(10);
+        currentUserService.Setup(c => c.RoleName).Returns("Student");
+
+        var studentProfile = new UserProfile
+        {
+            AccountId = 10,
+            UserCode = "STU-010",
+            FullName = "Nguyen Student",
+            Email = "student@etr.com",
+            LicenseType = "CPL",
+            LicenseNumber = "VN-TOPSECRET-99",
+            LicenseExpiryDate = new DateTime(2028, 5, 1),
+            MedicalClass = "Class 1",
+            MedicalExpiryDate = new DateTime(2027, 5, 1),
+            IcaoElpLevel = 5,
+            IcaoElpExpiryDate = new DateTime(2030, 5, 1),
+            TypeRatings = "A320",
+            IsCredentialsVerified = true
+        };
+
+        var profileRepo = new Mock<IGenericRepository<UserProfile>>();
+        profileRepo.Setup(r => r.GetAllIncludingDeletedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<UserProfile> { studentProfile });
+        uow.Setup(u => u.UserProfileRepository).Returns(profileRepo.Object);
+
+        var service = new UserProfileService(uow.Object, currentUserService.Object);
+
+        // Act: Student views own profile
+        var result = await service.GetProfileByAccountIdAsync(10);
+
+        // Assert: Full details MUST be returned to the owner
+        Assert.Equal("VN-TOPSECRET-99", result.LicenseNumber);
+        Assert.Equal("Class 1", result.MedicalClass);
+        Assert.Equal(5, result.IcaoElpLevel);
+        Assert.Equal("A320", result.TypeRatings);
+    }
 }
