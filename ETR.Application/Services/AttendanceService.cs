@@ -179,6 +179,19 @@ public class AttendanceService : IAttendanceService
                 var session = await _unitOfWork.SessionRepository.GetByIdAsync(sessionId, ct)
                     ?? throw new KeyNotFoundException("Session not found.");
 
+                // For Flight and Simulator sessions, all recorded attendance entries must have instructor digital signatures
+                if (session.TrainingType == TrainingType.Flight || session.TrainingType == TrainingType.Simulator)
+                {
+                    var sessionRecords = (await _unitOfWork.AttendanceRecordRepository.GetAllAsync(ct))
+                        .Where(r => r.SessionId == sessionId && !r.IsDeleted).ToList();
+
+                    var unsignedRecords = sessionRecords.Where(r => !r.InstructorSignedAt.HasValue).ToList();
+                    if (unsignedRecords.Count > 0)
+                    {
+                        throw new BusinessRuleViolationException($"Cannot confirm {session.TrainingType} session #{sessionId} because {unsignedRecords.Count} attendance record(s) have not been digitally signed by the instructor.");
+                    }
+                }
+
                 session.IsConfirmed = true;
                 session.ConfirmedByAccountId = confirmedByAccountId;
                 session.ConfirmedAt = DateTime.UtcNow;
@@ -271,6 +284,15 @@ public class AttendanceService : IAttendanceService
                 }
 
                 var oldStatus = record.Status;
+                bool signaturesInvalidated = false;
+                if (record.InstructorSignedAt.HasValue || record.StudentSignedAt.HasValue)
+                {
+                    record.InstructorSignedAt = null;
+                    record.InstructorSignedByAccountId = null;
+                    record.StudentSignedAt = null;
+                    record.StudentSignedByAccountId = null;
+                    signaturesInvalidated = true;
+                }
 
                 record.Status = request.Status;
                 record.Remarks = request.Remarks;
@@ -306,6 +328,19 @@ public class AttendanceService : IAttendanceService
                         OldValue = oldStatus.ToString(),
                         NewValue = request.Status.ToString(),
                         Description = $"Updated AttendanceRecord status from {oldStatus} to {request.Status}",
+                        CreatedAt = DateTime.UtcNow
+                    }, ct);
+                }
+
+                if (signaturesInvalidated)
+                {
+                    await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                    {
+                        AccountId = updatedByAccountId,
+                        ActionType = AuditActionType.UPDATE.ToString(),
+                        EntityName = nameof(AttendanceRecord),
+                        RecordId = id,
+                        Description = $"Digital signatures invalidated due to training record update by account #{updatedByAccountId}",
                         CreatedAt = DateTime.UtcNow
                     }, ct);
                 }
@@ -505,8 +540,8 @@ public class AttendanceService : IAttendanceService
                 var enrollment = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(record.EnrollmentId, ct)
                     ?? throw new KeyNotFoundException("Enrollment not found.");
 
-                // Zero-Trust: Students may only sign their own records
-                if (roleName == "Student" && enrollment.AccountId != studentAccountId)
+                // Zero-Trust: Students may only sign their own records (Admins must use admin-student-sign-override)
+                if (enrollment.AccountId != studentAccountId)
                 {
                     throw new ForbiddenAccessException("You are only authorized to sign your own training record.");
                 }
@@ -532,6 +567,65 @@ public class AttendanceService : IAttendanceService
                     RecordId = id,
                     NewValue = $"StudentSignedAt: {record.StudentSignedAt:O}",
                     Description = $"Student #{studentAccountId} digitally signed training attendance record #{id}"
+                }, ct);
+
+                await _unitOfWork.SaveAsync(ct);
+                await _unitOfWork.CommitTransactionAsync(ct);
+
+                return MapToResponse(record, session);
+            }
+            catch
+            {
+                await _unitOfWork.RollbackTransactionAsync(ct);
+                throw;
+            }
+        }, cancellationToken);
+    }
+
+    public async Task<AttendanceRecordResponse> AdminStudentSignOverrideAsync(int id, AdminSignOverrideRequest request, int adminAccountId, string? roleName, CancellationToken cancellationToken = default)
+    {
+        return await _unitOfWork.ExecuteInStrategyAsync(async (ct) =>
+        {
+            await _unitOfWork.BeginTransactionAsync(ct);
+            try
+            {
+                if (!string.Equals(roleName, "Admin", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new ForbiddenAccessException("Only administrators can perform proxy sign-off for students.");
+                }
+
+                if (request == null || string.IsNullOrWhiteSpace(request.Reason) || request.Reason.Trim().Length < 10)
+                {
+                    throw new BusinessRuleViolationException("A valid reason with at least 10 characters is required for admin student sign-off override.");
+                }
+
+                var record = await _unitOfWork.AttendanceRecordRepository.GetByIdAsync(id, ct)
+                    ?? throw new KeyNotFoundException("AttendanceRecord not found.");
+
+                var enrollment = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(record.EnrollmentId, ct)
+                    ?? throw new KeyNotFoundException("Enrollment not found.");
+
+                var session = await _unitOfWork.SessionRepository.GetByIdAsync(record.SessionId, ct);
+
+                record.StudentSignedAt = DateTime.UtcNow;
+                record.StudentSignedByAccountId = adminAccountId;
+                string overrideNote = $"[Admin Override by Account #{adminAccountId}: {request.Reason.Trim()}]";
+                record.StudentComments = string.IsNullOrWhiteSpace(record.StudentComments)
+                    ? overrideNote
+                    : $"{record.StudentComments}\n{overrideNote}";
+                record.UpdatedAt = DateTime.UtcNow;
+                record.UpdatedByAccountId = adminAccountId;
+
+                _unitOfWork.AttendanceRecordRepository.Update(record);
+
+                await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                {
+                    AccountId = adminAccountId,
+                    ActionType = AuditActionType.UPDATE.ToString(),
+                    EntityName = nameof(AttendanceRecord),
+                    RecordId = id,
+                    NewValue = $"StudentSignedAt: {record.StudentSignedAt:O} (Admin Override by #{adminAccountId})",
+                    Description = $"Admin #{adminAccountId} performed student sign override for Student Account #{enrollment.AccountId} on AttendanceRecord #{id}. Reason: {request.Reason.Trim()}"
                 }, ct);
 
                 await _unitOfWork.SaveAsync(ct);
@@ -649,6 +743,26 @@ public class AttendanceService : IAttendanceService
                 if (flightHours > 0)
                 {
                     throw new BusinessRuleViolationException("Simulator sessions cannot record real flight hours.");
+                }
+                if (soloHours > 0)
+                {
+                    throw new BusinessRuleViolationException("Simulator sessions cannot record solo flight hours.");
+                }
+                if (picHours > 0)
+                {
+                    throw new BusinessRuleViolationException("Simulator sessions cannot record PIC flight hours.");
+                }
+                if (nightHours > 0)
+                {
+                    throw new BusinessRuleViolationException("Simulator sessions cannot record real night flight hours.");
+                }
+                if (crossCountryHours > 0)
+                {
+                    throw new BusinessRuleViolationException("Simulator sessions cannot record cross-country flight hours.");
+                }
+                if (dayLandings > 0 || nightLandings > 0)
+                {
+                    throw new BusinessRuleViolationException("Simulator sessions cannot record real aircraft landings.");
                 }
                 if (!string.IsNullOrWhiteSpace(aircraftRegistration))
                 {

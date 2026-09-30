@@ -45,6 +45,8 @@ public class AttendanceServiceTests
 
         _mockUow.Setup(u => u.ExecuteInStrategyAsync(It.IsAny<Func<CancellationToken, Task<AttendanceRecordResponse>>>(), It.IsAny<CancellationToken>()))
             .Returns<Func<CancellationToken, Task<AttendanceRecordResponse>>, CancellationToken>((op, ct) => op(ct));
+        _mockUow.Setup(u => u.ExecuteInStrategyAsync(It.IsAny<Func<CancellationToken, Task<AttendanceSessionResponse>>>(), It.IsAny<CancellationToken>()))
+            .Returns<Func<CancellationToken, Task<AttendanceSessionResponse>>, CancellationToken>((op, ct) => op(ct));
         _mockUow.Setup(u => u.ExecuteInStrategyAsync(It.IsAny<Func<CancellationToken, Task<bool>>>(), It.IsAny<CancellationToken>()))
             .Returns<Func<CancellationToken, Task<bool>>, CancellationToken>((op, ct) => op(ct));
 
@@ -313,5 +315,206 @@ public class AttendanceServiceTests
         Assert.NotNull(result.StudentSignedAt);
         Assert.Equal(studentAccountId, result.StudentSignedByAccountId);
         Assert.Equal("Acknowledged feedback", result.StudentComments);
+    }
+
+    [Fact]
+    public async Task UpdateAttendanceRecordAsync_WhenSigned_ShouldInvalidateSignatures()
+    {
+        int recordId = 1;
+        int sessionId = 10;
+        int classId = 20;
+        int subjectId = 30;
+        int instructorId = 50;
+
+        var record = new AttendanceRecord
+        {
+            AttendanceRecordId = recordId,
+            SessionId = sessionId,
+            EnrollmentId = 100,
+            Status = AttendanceStatus.Present,
+            FlightHours = 1.0m,
+            InstructorSignedAt = DateTime.UtcNow.AddHours(-1),
+            InstructorSignedByAccountId = instructorId,
+            StudentSignedAt = DateTime.UtcNow.AddMinutes(-30),
+            StudentSignedByAccountId = 77
+        };
+        var session = new Session { SessionId = sessionId, ClassId = classId, SubjectId = subjectId, TrainingType = TrainingType.Flight, IsConfirmed = false };
+        var trainingClass = new Class { ClassId = classId };
+        var classSubject = new ClassSubject { ClassId = classId, SubjectId = subjectId, InstructorAccountId = instructorId };
+
+        _mockAttendanceRepo.Setup(r => r.GetByIdAsync(recordId, It.IsAny<CancellationToken>())).ReturnsAsync(record);
+        _mockSessionRepo.Setup(r => r.GetByIdAsync(sessionId, It.IsAny<CancellationToken>())).ReturnsAsync(session);
+        _mockClassRepo.Setup(r => r.GetByIdAsync(classId, It.IsAny<CancellationToken>())).ReturnsAsync(trainingClass);
+        _mockClassSubjectRepo.Setup(r => r.GetQueryable()).Returns(new List<ClassSubject> { classSubject }.AsQueryable());
+        _mockEnrollmentRepo.Setup(r => r.GetByIdAsync(100, It.IsAny<CancellationToken>())).ReturnsAsync(new CourseEnrollment { EnrollmentId = 100, ClassId = classId });
+        _mockEtrRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<ETRCourseRecord>());
+
+        var updateRequest = new UpdateAttendanceRecordRequest(
+            Status: AttendanceStatus.Present,
+            FlightHours: 1.5m,
+            Remarks: "Updated flight time"
+        );
+
+        var result = await _service.UpdateAttendanceRecordAsync(recordId, updateRequest, instructorId, "Instructor");
+
+        Assert.NotNull(result);
+        Assert.Null(result.InstructorSignedAt);
+        Assert.Null(result.InstructorSignedByAccountId);
+        Assert.Null(result.StudentSignedAt);
+        Assert.Null(result.StudentSignedByAccountId);
+        Assert.Equal(1.5m, result.FlightHours);
+    }
+
+    [Fact]
+    public async Task ConfirmSessionAsync_FlightSession_UnsignedRecords_ShouldThrow()
+    {
+        int sessionId = 10;
+        int classId = 20;
+        int subjectId = 30;
+
+        var session = new Session
+        {
+            SessionId = sessionId,
+            ClassId = classId,
+            SubjectId = subjectId,
+            TrainingType = TrainingType.Flight,
+            IsConfirmed = false
+        };
+
+        var records = new List<AttendanceRecord>
+        {
+            new() { AttendanceRecordId = 1, SessionId = sessionId, EnrollmentId = 101, Status = AttendanceStatus.Present, InstructorSignedAt = null },
+            new() { AttendanceRecordId = 2, SessionId = sessionId, EnrollmentId = 102, Status = AttendanceStatus.Present, InstructorSignedAt = DateTime.UtcNow }
+        };
+
+        _mockSessionRepo.Setup(r => r.GetByIdAsync(sessionId, It.IsAny<CancellationToken>())).ReturnsAsync(session);
+        _mockAttendanceRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(records);
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            _service.ConfirmSessionAsync(sessionId, 99));
+
+        Assert.Contains("have not been digitally signed by the instructor", ex.Message);
+    }
+
+    [Fact]
+    public async Task ConfirmSessionAsync_FlightSession_AllRecordsSigned_ShouldSucceed()
+    {
+        int sessionId = 10;
+        int classId = 20;
+        int subjectId = 30;
+
+        var session = new Session
+        {
+            SessionId = sessionId,
+            ClassId = classId,
+            SubjectId = subjectId,
+            TrainingType = TrainingType.Flight,
+            IsConfirmed = false
+        };
+
+        var records = new List<AttendanceRecord>
+        {
+            new() { AttendanceRecordId = 1, SessionId = sessionId, EnrollmentId = 101, Status = AttendanceStatus.Present, InstructorSignedAt = DateTime.UtcNow },
+            new() { AttendanceRecordId = 2, SessionId = sessionId, EnrollmentId = 102, Status = AttendanceStatus.Present, InstructorSignedAt = DateTime.UtcNow }
+        };
+
+        _mockSessionRepo.Setup(r => r.GetByIdAsync(sessionId, It.IsAny<CancellationToken>())).ReturnsAsync(session);
+        _mockAttendanceRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(records);
+        _mockEnrollmentRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<CourseEnrollment>());
+        _mockEtrRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<ETRCourseRecord>());
+        _mockSubjectResultRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<SubjectResult>());
+
+        var result = await _service.ConfirmSessionAsync(sessionId, 99);
+
+        Assert.NotNull(result);
+        Assert.True(result.IsConfirmed);
+    }
+
+    [Fact]
+    public async Task AdminStudentSignOverrideAsync_NonAdmin_ShouldThrowForbidden()
+    {
+        var overrideRequest = new AdminSignOverrideRequest("Student is hospitalized and requested proxy sign");
+        await Assert.ThrowsAsync<ForbiddenAccessException>(() =>
+            _service.AdminStudentSignOverrideAsync(1, overrideRequest, 50, "Instructor"));
+    }
+
+    [Fact]
+    public async Task AdminStudentSignOverrideAsync_ShortReason_ShouldThrow()
+    {
+        var overrideRequest = new AdminSignOverrideRequest("Too short");
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            _service.AdminStudentSignOverrideAsync(1, overrideRequest, 99, "Admin"));
+        Assert.Contains("at least 10 characters", ex.Message);
+    }
+
+    [Fact]
+    public async Task AdminStudentSignOverrideAsync_ValidAdmin_ShouldSignWithAudit()
+    {
+        int recordId = 1;
+        int enrollmentId = 100;
+        int studentAccountId = 77;
+        int adminAccountId = 99;
+
+        var record = new AttendanceRecord
+        {
+            AttendanceRecordId = recordId,
+            SessionId = 10,
+            EnrollmentId = enrollmentId,
+            StudentComments = "Initial notes"
+        };
+        var enrollment = new CourseEnrollment
+        {
+            EnrollmentId = enrollmentId,
+            AccountId = studentAccountId
+        };
+        var session = new Session { SessionId = 10, TrainingType = TrainingType.Flight };
+
+        _mockAttendanceRepo.Setup(r => r.GetByIdAsync(recordId, It.IsAny<CancellationToken>())).ReturnsAsync(record);
+        _mockEnrollmentRepo.Setup(r => r.GetByIdAsync(enrollmentId, It.IsAny<CancellationToken>())).ReturnsAsync(enrollment);
+        _mockSessionRepo.Setup(r => r.GetByIdAsync(10, It.IsAny<CancellationToken>())).ReturnsAsync(session);
+
+        var overrideRequest = new AdminSignOverrideRequest("Student authorized admin sign-off due to emergency leave");
+        var result = await _service.AdminStudentSignOverrideAsync(recordId, overrideRequest, adminAccountId, "Admin");
+
+        Assert.NotNull(result);
+        Assert.NotNull(result.StudentSignedAt);
+        Assert.Equal(adminAccountId, result.StudentSignedByAccountId);
+        Assert.Contains("[Admin Override by Account #99: Student authorized admin sign-off due to emergency leave]", result.StudentComments);
+    }
+
+    [Theory]
+    [InlineData(1.0, 0, 0, 0, 0, 0, null, null, "Simulator sessions cannot record real flight hours")]
+    [InlineData(0, 1.0, 0, 0, 0, 0, null, null, "Simulator sessions cannot record solo flight hours")]
+    [InlineData(0, 0, 1.0, 0, 0, 0, null, null, "Simulator sessions cannot record PIC flight hours")]
+    [InlineData(0, 0, 0, 1.0, 0, 0, null, null, "Simulator sessions cannot record real night flight hours")]
+    [InlineData(0, 0, 0, 0, 1.0, 0, null, null, "Simulator sessions cannot record cross-country flight hours")]
+    [InlineData(0, 0, 0, 0, 0, 2, null, null, "Simulator sessions cannot record real aircraft landings")]
+    [InlineData(0, 0, 0, 0, 0, 0, "VN-C172", null, "Simulator sessions cannot record aircraft registration")]
+    [InlineData(0, 0, 0, 0, 0, 0, null, "VVTS", "Simulator sessions cannot record real flight route details")]
+    public async Task RecordAttendanceAsync_SimulatorInvalidCombinations_ShouldThrow(
+        decimal flightHours, decimal soloHours, decimal picHours, decimal nightHours,
+        decimal crossCountryHours, int dayLandings, string? aircraftRegistration, string? departureIcao, string expectedErrorSubstr)
+    {
+        var session = new Session { SessionId = 5, ClassId = 10, SubjectId = 100, TrainingType = TrainingType.Simulator, IsConfirmed = false };
+        _mockSessionRepo.Setup(r => r.GetByIdAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(session);
+
+        var request = new CreateAttendanceRecordRequest(
+            SessionId: 5,
+            EnrollmentId: 5,
+            Status: AttendanceStatus.Present,
+            FlightHours: flightHours > 0 ? flightHours : null,
+            SoloHours: soloHours > 0 ? soloHours : null,
+            PicHours: picHours > 0 ? picHours : null,
+            NightHours: nightHours > 0 ? nightHours : null,
+            CrossCountryHours: crossCountryHours > 0 ? crossCountryHours : null,
+            DayLandings: dayLandings > 0 ? dayLandings : null,
+            AircraftRegistration: aircraftRegistration,
+            DepartureIcao: departureIcao
+        );
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            _service.RecordAttendanceAsync(request, 99, "Admin"));
+
+        Assert.Contains(expectedErrorSubstr, ex.Message);
     }
 }

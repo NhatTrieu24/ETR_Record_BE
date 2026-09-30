@@ -140,13 +140,24 @@ public class AttendanceController : ControllerBase
     }
 
     [HttpPost("{id}/student-sign")]
-    [Authorize(Roles = "Student,Admin")]
+    [Authorize(Roles = "Student")]
     public async Task<IActionResult> StudentSignOff(int id, [FromBody] SignAttendanceRecordRequest? request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId 
             ?? throw new UnauthorizedAccessException("User is not authenticated.");
 
         var response = await _attendanceService.StudentSignOffAsync(id, request ?? new SignAttendanceRecordRequest(), accountId, _currentUserService.RoleName, cancellationToken);
+        return Ok(response);
+    }
+
+    [HttpPost("{id}/admin-student-sign-override")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> AdminStudentSignOverride(int id, [FromBody] AdminSignOverrideRequest request, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+
+        var response = await _attendanceService.AdminStudentSignOverrideAsync(id, request, accountId, _currentUserService.RoleName, cancellationToken);
         return Ok(response);
     }
 

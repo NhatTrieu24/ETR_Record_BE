@@ -466,25 +466,8 @@ public class ClassService : IClassService
                     title = $"Buổi {i} (Đánh giá thực hành buồng lái)";
                 }
 
-                TrainingType trainingType = TrainingType.Theory;
-                if (!string.IsNullOrEmpty(subjectType))
-                {
-                    if (subjectType.Contains("Flight", StringComparison.OrdinalIgnoreCase) ||
-                        subjectType.Contains("Bay", StringComparison.OrdinalIgnoreCase) ||
-                        subjectType.Contains("Air", StringComparison.OrdinalIgnoreCase))
-                    {
-                        trainingType = TrainingType.Flight;
-                    }
-                    else if (subjectType.Contains("Practical", StringComparison.OrdinalIgnoreCase) ||
-                             subjectType.Contains("SIM", StringComparison.OrdinalIgnoreCase) ||
-                             subjectType.Contains("Simulator", StringComparison.OrdinalIgnoreCase) ||
-                             subjectType.Contains("Mô phỏng", StringComparison.OrdinalIgnoreCase))
-                    {
-                        trainingType = TrainingType.Simulator;
-                    }
-                }
-
                 var currentSubject = allSubjects.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
+                TrainingType trainingType = TrainingTypeClassifier.Classify(currentSubject?.SubjectCode, currentSubject?.SubjectName, subjectType);
                 string lessonPrefix = currentSubject?.SubjectCode ?? "SUB";
                 string lessonCode = $"{lessonPrefix}-L{i:D2}";
 

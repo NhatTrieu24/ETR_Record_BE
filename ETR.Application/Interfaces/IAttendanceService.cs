@@ -14,5 +14,6 @@ public interface IAttendanceService
     Task<IEnumerable<LowAttendanceStudentResponse>> GetLowAttendanceStudentsAsync(int? classId, CancellationToken cancellationToken = default);
     Task<AttendanceRecordResponse> InstructorSignOffAsync(int id, SignAttendanceRecordRequest request, int instructorAccountId, string? roleName, CancellationToken cancellationToken = default);
     Task<AttendanceRecordResponse> StudentSignOffAsync(int id, SignAttendanceRecordRequest request, int studentAccountId, string? roleName, CancellationToken cancellationToken = default);
+    Task<AttendanceRecordResponse> AdminStudentSignOverrideAsync(int id, AdminSignOverrideRequest request, int adminAccountId, string? roleName, CancellationToken cancellationToken = default);
 }
 
