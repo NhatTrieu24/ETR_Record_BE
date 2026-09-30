@@ -62,5 +62,9 @@ public record EtrEvidenceFileResponse(
     string FileUrl,
     string FileType,
     int UploadedByAccountId,
-    DateTime UploadedAt
+    DateTime UploadedAt,
+    string VerificationStatus = "Pending",
+    string? VerificationComment = null,
+    int? VerifiedByAccountId = null,
+    DateTime? VerifiedAt = null
 );

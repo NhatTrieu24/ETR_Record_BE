@@ -148,7 +148,8 @@ public class EtrService : IEtrService
             var attachment = evidenceAttachments.GetValueOrDefault(ev.EvidenceFileId);
             return new EtrEvidenceFileResponse(
                 ev.EvidenceFileId, attachment?.FileName ?? string.Empty, attachment?.Url ?? string.Empty,
-                attachment?.MimeType ?? "unknown", ev.UploadedByAccountId, ev.UploadedAt
+                attachment?.MimeType ?? "unknown", ev.UploadedByAccountId, ev.UploadedAt,
+                ev.VerificationStatus, ev.VerificationComment, ev.VerifiedByAccountId, ev.VerifiedAt
             );
         }).ToList();
 
