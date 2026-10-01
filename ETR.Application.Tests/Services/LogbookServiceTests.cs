@@ -290,4 +290,92 @@ public class LogbookServiceTests
         Assert.Null(result.LastFlightDate);
         Assert.Empty(result.Entries);
     }
+
+    [Fact]
+    public async Task GetStudentLogbookSummaryAsync_InstructorViewingAssignedStudent_ReturnsSummary()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        var currentUserService = new Mock<ICurrentUserService>();
+
+        var studentProfile = new UserProfile
+        {
+            AccountId = 10,
+            UserCode = "STU-010",
+            FullName = "Nguyen Pilot"
+        };
+        var profileRepo = new Mock<IGenericRepository<UserProfile>>();
+        profileRepo.Setup(r => r.GetAllIncludingDeletedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<UserProfile> { studentProfile });
+        uow.Setup(u => u.UserProfileRepository).Returns(profileRepo.Object);
+
+        // Instructor 5 is assigned to Class 100
+        var classSubjects = new List<ClassSubject>
+        {
+            new() { ClassId = 100, SubjectId = 1, InstructorAccountId = 5, IsDeleted = false }
+        };
+        var csRepo = new Mock<IGenericRepository<ClassSubject>>();
+        csRepo.Setup(r => r.GetQueryable()).Returns(classSubjects.AsQueryable());
+        uow.Setup(u => u.ClassSubjectRepository).Returns(csRepo.Object);
+
+        var enrollments = new List<CourseEnrollment>
+        {
+            new() { EnrollmentId = 1, AccountId = 10, ClassId = 100, IsDeleted = false }
+        };
+        var enrRepo = new Mock<IGenericRepository<CourseEnrollment>>();
+        enrRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(enrollments);
+        uow.Setup(u => u.CourseEnrollmentRepository).Returns(enrRepo.Object);
+
+        var sessionRepo = new Mock<IGenericRepository<Session>>();
+        sessionRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<Session>());
+        uow.Setup(u => u.SessionRepository).Returns(sessionRepo.Object);
+
+        var attRepo = new Mock<IGenericRepository<AttendanceRecord>>();
+        attRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<AttendanceRecord>());
+        uow.Setup(u => u.AttendanceRecordRepository).Returns(attRepo.Object);
+
+        var service = new LogbookService(uow.Object, currentUserService.Object);
+
+        // Act: Instructor 5 views Student 10 who is enrolled in Class 100
+        var result = await service.GetStudentLogbookSummaryAsync(10, currentAccountId: 5, roleName: "Instructor");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(10, result.AccountId);
+        Assert.Equal("STU-010", result.UserCode);
+    }
+
+    [Fact]
+    public async Task GetStudentLogbookSummaryAsync_InstructorViewingUnassignedStudent_ThrowsKeyNotFoundException()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        var currentUserService = new Mock<ICurrentUserService>();
+
+        // Instructor 5 is assigned only to Class 200
+        var classSubjects = new List<ClassSubject>
+        {
+            new() { ClassId = 200, SubjectId = 1, InstructorAccountId = 5, IsDeleted = false }
+        };
+        var csRepo = new Mock<IGenericRepository<ClassSubject>>();
+        csRepo.Setup(r => r.GetQueryable()).Returns(classSubjects.AsQueryable());
+        uow.Setup(u => u.ClassSubjectRepository).Returns(csRepo.Object);
+
+        // Student 10 is enrolled only in Class 100 (not taught by Instructor 5)
+        var enrollments = new List<CourseEnrollment>
+        {
+            new() { EnrollmentId = 1, AccountId = 10, ClassId = 100, IsDeleted = false }
+        };
+        var enrRepo = new Mock<IGenericRepository<CourseEnrollment>>();
+        enrRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(enrollments);
+        uow.Setup(u => u.CourseEnrollmentRepository).Returns(enrRepo.Object);
+
+        var attRepo = new Mock<IGenericRepository<AttendanceRecord>>();
+        attRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<AttendanceRecord>());
+        uow.Setup(u => u.AttendanceRecordRepository).Returns(attRepo.Object);
+
+        var service = new LogbookService(uow.Object, currentUserService.Object);
+
+        // Act & Assert: Throws KeyNotFoundException (which translates to 404 in API)
+        await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+            service.GetStudentLogbookSummaryAsync(10, currentAccountId: 5, roleName: "Instructor"));
+    }
 }

@@ -19,12 +19,30 @@ public class LogbookService : ILogbookService
     private async Task<HashSet<int>> GetInstructorStudentIdsAsync(int instructorAccountId, CancellationToken cancellationToken)
     {
         var instructorClassIds = _unitOfWork.ClassSubjectRepository.GetQueryable()
-            .Where(cs => cs.InstructorAccountId == instructorAccountId)
+            .Where(cs => !cs.IsDeleted && cs.InstructorAccountId == instructorAccountId)
             .Select(cs => cs.ClassId)
             .ToHashSet();
 
         var enrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken);
-        return enrollments.Where(e => instructorClassIds.Contains(e.ClassId)).Select(e => e.AccountId).ToHashSet();
+        var activeEnrollments = enrollments.Where(e => !e.IsDeleted).ToList();
+        var studentIds = activeEnrollments
+            .Where(e => instructorClassIds.Contains(e.ClassId))
+            .Select(e => e.AccountId)
+            .ToHashSet();
+
+        // Also allow instructors who have signed flight/simulator sessions for this student
+        var records = await _unitOfWork.AttendanceRecordRepository.GetAllAsync(cancellationToken);
+        var signedEnrollmentIds = records
+            .Where(r => !r.IsDeleted && r.InstructorSignedByAccountId == instructorAccountId)
+            .Select(r => r.EnrollmentId)
+            .ToHashSet();
+
+        foreach (var e in activeEnrollments.Where(e => signedEnrollmentIds.Contains(e.EnrollmentId)))
+        {
+            studentIds.Add(e.AccountId);
+        }
+
+        return studentIds;
     }
 
     public async Task<LogbookSummaryResponse> GetStudentLogbookSummaryAsync(
