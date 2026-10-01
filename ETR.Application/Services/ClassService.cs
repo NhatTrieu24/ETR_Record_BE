@@ -318,7 +318,7 @@ public class ClassService : IClassService
                 if (missingSubjects.Any())
                 {
                     var allEnrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct);
-                    bool hasEnrolledStudents = allEnrollments.Any(e => e.ClassId == cls.ClassId && !e.IsDeleted && e.Status != "Withdrawn" && e.Status != "Deleted");
+                    bool hasEnrolledStudents = allEnrollments.Any(e => e.ClassId == cls.ClassId && !e.IsDeleted && e.Status != EnrollmentStatus.Withdrawn && e.Status != EnrollmentStatus.Deleted);
 
                     if (!existingSessions.Any() || !hasEnrolledStudents)
                     {

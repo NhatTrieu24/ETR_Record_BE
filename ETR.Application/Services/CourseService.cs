@@ -442,7 +442,7 @@ public class CourseService : ICourseService
 
                     foreach (var cls in activeClasses)
                     {
-                        bool hasEnrolledStudents = allEnrollments.Any(e => e.ClassId == cls.ClassId && !e.IsDeleted && e.Status != "Withdrawn" && e.Status != "Deleted");
+                        bool hasEnrolledStudents = allEnrollments.Any(e => e.ClassId == cls.ClassId && !e.IsDeleted && e.Status != EnrollmentStatus.Withdrawn && e.Status != EnrollmentStatus.Deleted);
                         if (!hasEnrolledStudents)
                         {
                             // 1. Thêm ClassSubject cho những môn mới chưa có trong lớp
