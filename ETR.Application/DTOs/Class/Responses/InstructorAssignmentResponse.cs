@@ -1,3 +1,3 @@
 namespace ETR.Application.DTOs;
 
-public record InstructorAssignmentResponse(int ClassSubjectId, int SubjectId, int? InstructorAccountId);
+public record InstructorAssignmentResponse(int ClassSubjectId, int SubjectId, int? InstructorAccountId, string? InstructorName = null);

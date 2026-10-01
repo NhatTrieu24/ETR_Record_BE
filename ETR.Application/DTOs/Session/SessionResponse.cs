@@ -26,5 +26,9 @@ public class SessionResponse
     // Phase 2: Flight / Simulator Training Extensions
     public ETR.Domain.Enums.TrainingType TrainingType { get; set; } = ETR.Domain.Enums.TrainingType.Theory;
     public string? LessonCode { get; set; }
+
+    // Phase 3: Instructor assignment details for session
+    public int? InstructorAccountId { get; set; }
+    public string? InstructorName { get; set; }
 }
 

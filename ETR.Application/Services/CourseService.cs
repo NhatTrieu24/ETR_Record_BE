@@ -424,6 +424,188 @@ public class CourseService : ICourseService
                     }
                 }
 
+                // Tự động đồng bộ môn học mới và sinh session cho các lớp thuộc khóa học CHƯA CÓ HỌC VIÊN ENROLL
+                var activeClasses = (await _unitOfWork.ClassRepository.GetAllAsync(ct))
+                    .Where(c => c.CourseId == id && !c.IsDeleted && c.Status != ClassStatus.Cancelled && c.Status != ClassStatus.Completed)
+                    .ToList();
+
+                if (activeClasses.Any())
+                {
+                    var allEnrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct);
+                    var allClassSubjects = await _unitOfWork.ClassSubjectRepository.GetAllAsync(ct);
+                    var allSessions = await _unitOfWork.SessionRepository.GetAllAsync(ct);
+                    var allSubjects = await _unitOfWork.SubjectRepository.GetAllAsync(ct);
+                    var subjectMap = allSubjects.ToDictionary(s => s.SubjectId, s => s.SubjectType);
+                    var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct))
+                        .Where(cs => cs.CourseId == id && !cs.IsDeleted)
+                        .ToList();
+
+                    foreach (var cls in activeClasses)
+                    {
+                        bool hasEnrolledStudents = allEnrollments.Any(e => e.ClassId == cls.ClassId && !e.IsDeleted && e.Status != "Withdrawn" && e.Status != "Deleted");
+                        if (!hasEnrolledStudents)
+                        {
+                            // 1. Thêm ClassSubject cho những môn mới chưa có trong lớp
+                            var existingSubIds = allClassSubjects
+                                .Where(cs => cs.ClassId == cls.ClassId && !cs.IsDeleted)
+                                .Select(cs => cs.SubjectId)
+                                .ToHashSet();
+
+                            var missingCourseSubs = courseSubjects
+                                .Where(cs => !existingSubIds.Contains(cs.SubjectId))
+                                .ToList();
+
+                            foreach (var mcs in missingCourseSubs)
+                            {
+                                var newClassSub = new ClassSubject
+                                {
+                                    ClassId = cls.ClassId,
+                                    SubjectId = mcs.SubjectId,
+                                    InstructorAccountId = null
+                                };
+                                await _unitOfWork.ClassSubjectRepository.AddAsync(newClassSub, ct);
+                            }
+
+                            // 2. Sinh Sessions cho những môn chưa có session
+                            var existingSessionSubIds = allSessions
+                                .Where(s => s.ClassId == cls.ClassId && !s.IsDeleted)
+                                .Select(s => s.SubjectId)
+                                .ToHashSet();
+
+                            var subsNeedingSessions = courseSubjects
+                                .Where(cs => !existingSessionSubIds.Contains(cs.SubjectId))
+                                .OrderBy(cs => cs.SequenceNo)
+                                .ToList();
+
+                            if (subsNeedingSessions.Any())
+                            {
+                                var existingClassSessions = allSessions
+                                    .Where(s => s.ClassId == cls.ClassId && !s.IsDeleted)
+                                    .ToList();
+                                var currentDate = cls.StartDate.Date;
+                                if (existingClassSessions.Any(s => s.SessionDate.HasValue))
+                                {
+                                    var maxDate = existingClassSessions.Where(s => s.SessionDate.HasValue).Max(s => s.SessionDate!.Value.Date);
+                                    currentDate = maxDate.AddDays(1);
+                                    if (currentDate.DayOfWeek == DayOfWeek.Sunday) currentDate = currentDate.AddDays(1);
+                                }
+
+                                int maxSessionIndex = existingClassSessions.Count;
+
+                                var assessments = (await _unitOfWork.AssessmentRepository.GetAllAsync(ct))
+                                    .Where(a => a.CourseId == cls.CourseId && !a.IsDeleted)
+                                    .ToList();
+                                var checklists = (await _unitOfWork.PracticalChecklistRepository.GetAllAsync(ct))
+                                    .Where(pc => (pc.CourseId == cls.CourseId || pc.CourseId == 0) && !pc.IsDeleted)
+                                    .ToList();
+
+                                foreach (var cs in subsNeedingSessions)
+                                {
+                                    subjectMap.TryGetValue(cs.SubjectId, out var subjectType);
+                                    var currentSubject = allSubjects.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
+                                    TrainingType trainingType = TrainingTypeClassifier.Classify(currentSubject?.SubjectCode, currentSubject?.SubjectName, subjectType);
+
+                                    string sessionLocation = trainingType == TrainingType.Simulator
+                                        ? "Buồng lái mô phỏng (SIM / FSTD Room)"
+                                        : trainingType == TrainingType.Flight
+                                            ? "Sân bay huấn luyện / Khu vực bay (Airfield)"
+                                            : "Phòng học lý thuyết (Ground Classroom)";
+
+                                    int sessionCount = cs.RequiredSessions > 0 ? cs.RequiredSessions : 1;
+
+                                    var subjectAssessments = assessments
+                                        .Where(a => a.SubjectId == cs.SubjectId)
+                                        .OrderBy(a => a.DisplayOrder)
+                                        .ThenBy(a => a.AssessmentId)
+                                        .ToList();
+                                    var subjectChecklists = checklists
+                                        .Where(c => c.SubjectId == cs.SubjectId)
+                                        .OrderBy(c => c.DisplayOrder)
+                                        .ThenBy(c => c.PracticalChecklistId)
+                                        .ToList();
+
+                                    var subjectAssessment = trainingType == TrainingType.Theory
+                                        ? (subjectAssessments.FirstOrDefault(a => string.Equals(a.AssessmentType, "Theory", StringComparison.OrdinalIgnoreCase)) ?? subjectAssessments.FirstOrDefault())
+                                        : subjectAssessments.FirstOrDefault(a => string.Equals(a.AssessmentType, "Practical", StringComparison.OrdinalIgnoreCase));
+                                    var subjectChecklist = subjectChecklists.FirstOrDefault();
+
+                                    for (int i = 1; i <= sessionCount; i++)
+                                    {
+                                        DateTime sessionDate = currentDate <= cls.EndDate.Date ? currentDate : cls.EndDate.Date;
+                                        bool isFinalSession = (i == sessionCount);
+                                        int? assessmentId = null;
+                                        int? checklistId = null;
+                                        bool isAssessmentRequired = false;
+                                        bool isChecklistRequired = false;
+                                        int sessionNumber = ++maxSessionIndex;
+                                        string title = $"Buổi {sessionNumber}";
+
+                                        if (isFinalSession && subjectAssessment != null)
+                                        {
+                                            assessmentId = subjectAssessment.AssessmentId;
+                                            isAssessmentRequired = true;
+                                        }
+
+                                        if (isFinalSession && subjectChecklist != null && trainingType != TrainingType.Theory)
+                                        {
+                                            checklistId = subjectChecklist.PracticalChecklistId;
+                                            isChecklistRequired = true;
+                                        }
+
+                                        if (assessmentId.HasValue && checklistId.HasValue)
+                                        {
+                                            title = $"Buổi {sessionNumber} (Đánh giá Lý thuyết & Thực hành)";
+                                        }
+                                        else if (assessmentId.HasValue)
+                                        {
+                                            title = $"Buổi {sessionNumber} (Đánh giá: {subjectAssessment!.ComponentName})";
+                                        }
+                                        else if (isChecklistRequired)
+                                        {
+                                            if (trainingType == TrainingType.Simulator)
+                                            {
+                                                title = $"Buổi {sessionNumber} (Đánh giá thực hành buồng lái mô phỏng)";
+                                            }
+                                            else if (trainingType == TrainingType.Flight)
+                                            {
+                                                title = $"Buổi {sessionNumber} (Đánh giá thực hành bay)";
+                                            }
+                                            else
+                                            {
+                                                title = $"Buổi {sessionNumber} (Đánh giá thực hành quy trình)";
+                                            }
+                                        }
+
+                                        var session = new Session
+                                        {
+                                            ClassId = cls.ClassId,
+                                            SubjectId = cs.SubjectId,
+                                            SessionTitle = title,
+                                            SessionDate = sessionDate,
+                                            Location = sessionLocation,
+                                            IsConfirmed = false,
+                                            IsAssessmentRequired = isAssessmentRequired,
+                                            AssessmentId = assessmentId,
+                                            IsChecklistRequired = isChecklistRequired,
+                                            PracticalChecklistId = checklistId,
+                                            TrainingType = trainingType,
+                                            LessonCode = null
+                                        };
+
+                                        await _unitOfWork.SessionRepository.AddAsync(session, ct);
+
+                                        currentDate = currentDate.AddDays(1);
+                                        if (currentDate.DayOfWeek == DayOfWeek.Sunday)
+                                        {
+                                            currentDate = currentDate.AddDays(1);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 await _unitOfWork.SaveAsync(ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
 

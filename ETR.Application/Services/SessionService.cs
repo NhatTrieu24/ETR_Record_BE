@@ -22,13 +22,29 @@ public class SessionService : ISessionService
         var checklists = await _unitOfWork.PracticalChecklistRepository.GetAllAsync(cancellationToken);
         var classes = await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken);
         var subjects = await _unitOfWork.SubjectRepository.GetAllAsync(cancellationToken);
-        return sessions.Select(s => MapToResponse(
-            s, 
-            assessments.FirstOrDefault(a => a.AssessmentId == s.AssessmentId),
-            checklists.FirstOrDefault(c => c.PracticalChecklistId == s.PracticalChecklistId),
-            classes.FirstOrDefault(c => c.ClassId == s.ClassId),
-            subjects.FirstOrDefault(sub => sub.SubjectId == s.SubjectId)
-        )).ToList();
+        var classSubjects = await _unitOfWork.ClassSubjectRepository.GetAllAsync(cancellationToken);
+        var profiles = await _unitOfWork.UserProfileRepository.GetAllIncludingDeletedAsync(cancellationToken);
+        var accounts = await _unitOfWork.AccountRepository.GetAllIncludingDeletedAsync(cancellationToken);
+
+        return sessions.Select(s => {
+            var cs = classSubjects.FirstOrDefault(x => x.ClassId == s.ClassId && x.SubjectId == s.SubjectId);
+            string? instructorName = null;
+            if (cs?.InstructorAccountId != null)
+            {
+                var p = profiles.FirstOrDefault(x => x.AccountId == cs.InstructorAccountId.Value);
+                var a = accounts.FirstOrDefault(x => x.AccountId == cs.InstructorAccountId.Value);
+                instructorName = p?.FullName ?? a?.Username ?? $"Instructor #{cs.InstructorAccountId.Value}";
+            }
+            return MapToResponse(
+                s, 
+                assessments.FirstOrDefault(a => a.AssessmentId == s.AssessmentId),
+                checklists.FirstOrDefault(c => c.PracticalChecklistId == s.PracticalChecklistId),
+                classes.FirstOrDefault(c => c.ClassId == s.ClassId),
+                subjects.FirstOrDefault(sub => sub.SubjectId == s.SubjectId),
+                cs,
+                instructorName
+            );
+        }).ToList();
     }
 
     public async Task<IEnumerable<SessionResponse>> GetSessionsByClassIdAsync(int classId, CancellationToken cancellationToken = default)
@@ -39,13 +55,29 @@ public class SessionService : ISessionService
         var checklists = await _unitOfWork.PracticalChecklistRepository.GetAllAsync(cancellationToken);
         var classes = await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken);
         var subjects = await _unitOfWork.SubjectRepository.GetAllAsync(cancellationToken);
-        return classSessions.Select(s => MapToResponse(
-            s, 
-            assessments.FirstOrDefault(a => a.AssessmentId == s.AssessmentId),
-            checklists.FirstOrDefault(c => c.PracticalChecklistId == s.PracticalChecklistId),
-            classes.FirstOrDefault(c => c.ClassId == s.ClassId),
-            subjects.FirstOrDefault(sub => sub.SubjectId == s.SubjectId)
-        )).ToList();
+        var classSubjects = await _unitOfWork.ClassSubjectRepository.GetAllAsync(cancellationToken);
+        var profiles = await _unitOfWork.UserProfileRepository.GetAllIncludingDeletedAsync(cancellationToken);
+        var accounts = await _unitOfWork.AccountRepository.GetAllIncludingDeletedAsync(cancellationToken);
+
+        return classSessions.Select(s => {
+            var cs = classSubjects.FirstOrDefault(x => x.ClassId == s.ClassId && x.SubjectId == s.SubjectId);
+            string? instructorName = null;
+            if (cs?.InstructorAccountId != null)
+            {
+                var p = profiles.FirstOrDefault(x => x.AccountId == cs.InstructorAccountId.Value);
+                var a = accounts.FirstOrDefault(x => x.AccountId == cs.InstructorAccountId.Value);
+                instructorName = p?.FullName ?? a?.Username ?? $"Instructor #{cs.InstructorAccountId.Value}";
+            }
+            return MapToResponse(
+                s, 
+                assessments.FirstOrDefault(a => a.AssessmentId == s.AssessmentId),
+                checklists.FirstOrDefault(c => c.PracticalChecklistId == s.PracticalChecklistId),
+                classes.FirstOrDefault(c => c.ClassId == s.ClassId),
+                subjects.FirstOrDefault(sub => sub.SubjectId == s.SubjectId),
+                cs,
+                instructorName
+            );
+        }).ToList();
     }
 
     public async Task<SessionResponse> GetSessionByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -69,7 +101,19 @@ public class SessionService : ISessionService
         Class? cls = await _unitOfWork.ClassRepository.GetByIdAsync(session.ClassId, cancellationToken);
         Subject? subject = await _unitOfWork.SubjectRepository.GetByIdAsync(session.SubjectId, cancellationToken);
 
-        return MapToResponse(session, assessment, checklist, cls, subject);
+        var cs = (await _unitOfWork.ClassSubjectRepository.GetAllAsync(cancellationToken))
+            .FirstOrDefault(x => x.ClassId == session.ClassId && x.SubjectId == session.SubjectId);
+        string? instructorName = null;
+        if (cs?.InstructorAccountId != null)
+        {
+            var p = (await _unitOfWork.UserProfileRepository.GetAllIncludingDeletedAsync(cancellationToken))
+                .FirstOrDefault(x => x.AccountId == cs.InstructorAccountId.Value);
+            var a = (await _unitOfWork.AccountRepository.GetAllIncludingDeletedAsync(cancellationToken))
+                .FirstOrDefault(x => x.AccountId == cs.InstructorAccountId.Value);
+            instructorName = p?.FullName ?? a?.Username ?? $"Instructor #{cs.InstructorAccountId.Value}";
+        }
+
+        return MapToResponse(session, assessment, checklist, cls, subject, cs, instructorName);
     }
 
     public Task<SessionResponse> CreateSessionAsync(CreateSessionRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
@@ -176,7 +220,19 @@ public class SessionService : ISessionService
         Class? cls = await _unitOfWork.ClassRepository.GetByIdAsync(session.ClassId, cancellationToken);
         Subject? subject = await _unitOfWork.SubjectRepository.GetByIdAsync(session.SubjectId, cancellationToken);
 
-        return MapToResponse(session, assessment, checklist, cls, subject);
+        var cs = (await _unitOfWork.ClassSubjectRepository.GetAllAsync(cancellationToken))
+            .FirstOrDefault(x => x.ClassId == session.ClassId && x.SubjectId == session.SubjectId);
+        string? instructorName = null;
+        if (cs?.InstructorAccountId != null)
+        {
+            var p = (await _unitOfWork.UserProfileRepository.GetAllIncludingDeletedAsync(cancellationToken))
+                .FirstOrDefault(x => x.AccountId == cs.InstructorAccountId.Value);
+            var a = (await _unitOfWork.AccountRepository.GetAllIncludingDeletedAsync(cancellationToken))
+                .FirstOrDefault(x => x.AccountId == cs.InstructorAccountId.Value);
+            instructorName = p?.FullName ?? a?.Username ?? $"Instructor #{cs.InstructorAccountId.Value}";
+        }
+
+        return MapToResponse(session, assessment, checklist, cls, subject, cs, instructorName);
     }
 
     public Task DeleteSessionAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default)
@@ -184,7 +240,14 @@ public class SessionService : ISessionService
         throw new NotSupportedException("Sessions are auto-provisioned and cannot be manually deleted.");
     }
 
-    private SessionResponse MapToResponse(Session session, Assessment? assessment = null, PracticalChecklist? practicalChecklist = null, Class? cls = null, Subject? subject = null)
+    private SessionResponse MapToResponse(
+        Session session, 
+        Assessment? assessment = null, 
+        PracticalChecklist? practicalChecklist = null, 
+        Class? cls = null, 
+        Subject? subject = null,
+        ClassSubject? classSubject = null,
+        string? instructorName = null)
     {
         return new SessionResponse
         {
@@ -219,7 +282,9 @@ public class SessionService : ISessionService
                 DisplayOrder = practicalChecklist.DisplayOrder
             } : null,
             TrainingType = session.TrainingType,
-            LessonCode = session.LessonCode
+            LessonCode = session.LessonCode,
+            InstructorAccountId = classSubject?.InstructorAccountId,
+            InstructorName = instructorName
         };
     }
 }

@@ -35,11 +35,17 @@ public class ClassService : IClassService
         }
         
         var allClassSubjects = await _unitOfWork.ClassSubjectRepository.GetAllAsync(cancellationToken);
+        var allProfiles = await _unitOfWork.UserProfileRepository.GetAllIncludingDeletedAsync(cancellationToken);
+        var allAccounts = await _unitOfWork.AccountRepository.GetAllIncludingDeletedAsync(cancellationToken);
 
         return visible.Select(c => {
             var assignments = allClassSubjects
                 .Where(cs => cs.ClassId == c.ClassId)
-                .Select(cs => new InstructorAssignmentResponse(cs.ClassSubjectId, cs.SubjectId, cs.InstructorAccountId))
+                .Select(cs => new InstructorAssignmentResponse(
+                    cs.ClassSubjectId, 
+                    cs.SubjectId, 
+                    cs.InstructorAccountId,
+                    ResolveInstructorName(cs.InstructorAccountId, allProfiles, allAccounts)))
                 .ToList();
 
             return new TrainingClassResponse(
@@ -55,9 +61,15 @@ public class ClassService : IClassService
         if (c.IsDeleted) throw new KeyNotFoundException("Class not found.");
 
         var allClassSubjects = await _unitOfWork.ClassSubjectRepository.GetAllAsync(cancellationToken);
+        var allProfiles = await _unitOfWork.UserProfileRepository.GetAllIncludingDeletedAsync(cancellationToken);
+        var allAccounts = await _unitOfWork.AccountRepository.GetAllIncludingDeletedAsync(cancellationToken);
         var assignments = allClassSubjects
             .Where(cs => cs.ClassId == c.ClassId)
-            .Select(cs => new InstructorAssignmentResponse(cs.ClassSubjectId, cs.SubjectId, cs.InstructorAccountId))
+            .Select(cs => new InstructorAssignmentResponse(
+                cs.ClassSubjectId, 
+                cs.SubjectId, 
+                cs.InstructorAccountId,
+                ResolveInstructorName(cs.InstructorAccountId, allProfiles, allAccounts)))
             .ToList();
 
         return new TrainingClassResponse(c.ClassId, c.ClassCode, c.ClassName, c.CourseId, c.StartDate, c.EndDate, c.Location, c.Capacity, c.Status, assignments, c.CourseVersionNo);
@@ -182,7 +194,13 @@ public class ClassService : IClassService
         sessions = await GenerateSessionsForClassCoreAsync(cls, courseSubjects, subjectMap, request.Location, ct);
         await _unitOfWork.SaveAsync(ct);
 
-        assignments = classSubjects.Select(x => new InstructorAssignmentResponse(x.ClassSubjectId, x.SubjectId, x.InstructorAccountId)).ToList();
+        var allProfiles = await _unitOfWork.UserProfileRepository.GetAllIncludingDeletedAsync(ct);
+        var allAccounts = await _unitOfWork.AccountRepository.GetAllIncludingDeletedAsync(ct);
+        assignments = classSubjects.Select(x => new InstructorAssignmentResponse(
+            x.ClassSubjectId, 
+            x.SubjectId, 
+            x.InstructorAccountId,
+            ResolveInstructorName(x.InstructorAccountId, allProfiles, allAccounts))).ToList();
 
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
         {
@@ -288,19 +306,36 @@ public class ClassService : IClassService
                 }
                 await _unitOfWork.SaveAsync(ct);
 
-                // 2. Kiểm tra nếu lớp này chưa có Session nào thì tự động sinh Sessions
+                // 2. Tự động sinh Sessions:
+                // - Nếu lớp chưa có Session nào: sinh toàn bộ Sessions cho các môn của khóa học
+                // - Nếu lớp đã có Session nhưng khóa học có thêm môn mới:
+                //   CHỈ sinh thêm Session cho môn mới nếu lớp CHƯA CÓ HỌC VIÊN ENROLL (đúng nghiệp vụ bảo vệ tiến độ ETR).
                 var existingSessions = (await _unitOfWork.SessionRepository.GetAllAsync(ct))
                     .Where(s => s.ClassId == cls.ClassId && !s.IsDeleted).ToList();
+                var existingSessionSubjectIds = existingSessions.Select(s => s.SubjectId).ToHashSet();
+                var missingSubjects = courseSubjects.Where(cs => !existingSessionSubjectIds.Contains(cs.SubjectId)).ToList();
 
-                if (!existingSessions.Any())
+                if (missingSubjects.Any())
                 {
-                    var subjectMap = (await _unitOfWork.SubjectRepository.GetAllAsync(ct))
-                        .ToDictionary(s => s.SubjectId, s => s.SubjectType);
-                    await GenerateSessionsForClassCoreAsync(cls, courseSubjects, subjectMap, request.Location, ct);
-                    await _unitOfWork.SaveAsync(ct);
+                    var allEnrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct);
+                    bool hasEnrolledStudents = allEnrollments.Any(e => e.ClassId == cls.ClassId && !e.IsDeleted && e.Status != "Withdrawn" && e.Status != "Deleted");
+
+                    if (!existingSessions.Any() || !hasEnrolledStudents)
+                    {
+                        var subjectMap = (await _unitOfWork.SubjectRepository.GetAllAsync(ct))
+                            .ToDictionary(s => s.SubjectId, s => s.SubjectType);
+                        await GenerateSessionsForClassCoreAsync(cls, courseSubjects, subjectMap, request.Location, ct);
+                        await _unitOfWork.SaveAsync(ct);
+                    }
                 }
 
-                assignments = classSubjects.Select(x => new InstructorAssignmentResponse(x.ClassSubjectId, x.SubjectId, x.InstructorAccountId)).ToList();
+                var allProfiles = await _unitOfWork.UserProfileRepository.GetAllIncludingDeletedAsync(ct);
+                var allAccounts = await _unitOfWork.AccountRepository.GetAllIncludingDeletedAsync(ct);
+                assignments = classSubjects.Select(x => new InstructorAssignmentResponse(
+                    x.ClassSubjectId, 
+                    x.SubjectId, 
+                    x.InstructorAccountId,
+                    ResolveInstructorName(x.InstructorAccountId, allProfiles, allAccounts))).ToList();
 
                 await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                 {
@@ -399,10 +434,29 @@ public class ClassService : IClassService
             .Where(pc => (pc.CourseId == cls.CourseId || pc.CourseId == 0) && !pc.IsDeleted)
             .ToList();
 
-        var orderedCourseSubjects = courseSubjects.OrderBy(cs => cs.SequenceNo).ToList();
-        var currentDate = cls.StartDate.Date;
+        var existingSessions = (await _unitOfWork.SessionRepository.GetAllAsync(ct))
+            .Where(s => s.ClassId == cls.ClassId && !s.IsDeleted).ToList();
+        var subjectsWithExistingSessions = existingSessions.Select(s => s.SubjectId).ToHashSet();
 
-        foreach (var cs in orderedCourseSubjects)
+        // Chỉ lọc các môn chưa có Session trong lớp
+        var missingCourseSubjects = courseSubjects
+            .Where(cs => !subjectsWithExistingSessions.Contains(cs.SubjectId))
+            .OrderBy(cs => cs.SequenceNo)
+            .ToList();
+
+        if (!missingCourseSubjects.Any()) return sessions;
+
+        var currentDate = cls.StartDate.Date;
+        if (existingSessions.Any(s => s.SessionDate.HasValue))
+        {
+            var maxExistingDate = existingSessions.Where(s => s.SessionDate.HasValue).Max(s => s.SessionDate!.Value.Date);
+            currentDate = maxExistingDate.AddDays(1);
+            if (currentDate.DayOfWeek == DayOfWeek.Sunday) currentDate = currentDate.AddDays(1);
+        }
+
+        int maxSessionIndex = existingSessions.Count;
+
+        foreach (var cs in missingCourseSubjects)
         {
             subjectMap.TryGetValue(cs.SubjectId, out var subjectType);
             var currentSubject = allSubjects.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
@@ -487,7 +541,8 @@ public class ClassService : IClassService
                 int? checklistId = null;
                 bool isAssessmentRequired = false;
                 bool isChecklistRequired = false;
-                string title = $"Buổi {i}";
+                int sessionNumber = ++maxSessionIndex;
+                string title = $"Buổi {sessionNumber}";
 
                 if (isFinalSession && subjectAssessment != null)
                 {
@@ -503,25 +558,25 @@ public class ClassService : IClassService
 
                 if (assessmentId.HasValue && checklistId.HasValue)
                 {
-                    title = $"Buổi {i} (Đánh giá Lý thuyết & Thực hành)";
+                    title = $"Buổi {sessionNumber} (Đánh giá Lý thuyết & Thực hành)";
                 }
                 else if (assessmentId.HasValue)
                 {
-                    title = $"Buổi {i} (Đánh giá: {subjectAssessment!.ComponentName})";
+                    title = $"Buổi {sessionNumber} (Đánh giá: {subjectAssessment!.ComponentName})";
                 }
                 else if (isChecklistRequired)
                 {
                     if (trainingType == TrainingType.Simulator)
                     {
-                        title = $"Buổi {i} (Đánh giá thực hành buồng lái mô phỏng)";
+                        title = $"Buổi {sessionNumber} (Đánh giá thực hành buồng lái mô phỏng)";
                     }
                     else if (trainingType == TrainingType.Flight)
                     {
-                        title = $"Buổi {i} (Đánh giá thực hành bay)";
+                        title = $"Buổi {sessionNumber} (Đánh giá thực hành bay)";
                     }
                     else
                     {
-                        title = $"Buổi {i} (Đánh giá thực hành quy trình)";
+                        title = $"Buổi {sessionNumber} (Đánh giá thực hành quy trình)";
                     }
                 }
 
@@ -561,5 +616,13 @@ public class ClassService : IClassService
         }
 
         return sessions;
+    }
+
+    private static string? ResolveInstructorName(int? instructorAccountId, IEnumerable<UserProfile> profiles, IEnumerable<Account> accounts)
+    {
+        if (!instructorAccountId.HasValue) return null;
+        var p = profiles.FirstOrDefault(x => x.AccountId == instructorAccountId.Value);
+        var a = accounts.FirstOrDefault(x => x.AccountId == instructorAccountId.Value);
+        return p?.FullName ?? a?.Username ?? $"Instructor #{instructorAccountId.Value}";
     }
 }
