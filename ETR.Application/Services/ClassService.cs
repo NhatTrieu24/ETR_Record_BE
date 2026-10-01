@@ -454,8 +454,28 @@ public class ClassService : IClassService
             }
 
             int sessionCount = cs.RequiredSessions > 0 ? cs.RequiredSessions : 1;
-            var subjectAssessment = assessments.FirstOrDefault(a => a.SubjectId == cs.SubjectId);
-            var subjectChecklist = checklists.FirstOrDefault(c => c.SubjectId == cs.SubjectId);
+
+            // Deterministic sorting by DisplayOrder then Id
+            var subjectAssessments = assessments
+                .Where(a => a.SubjectId == cs.SubjectId)
+                .OrderBy(a => a.DisplayOrder)
+                .ThenBy(a => a.AssessmentId)
+                .ToList();
+
+            var subjectChecklists = checklists
+                .Where(c => c.SubjectId == cs.SubjectId)
+                .OrderBy(c => c.DisplayOrder)
+                .ThenBy(c => c.PracticalChecklistId)
+                .ToList();
+
+            // Compatible assessment selection based on TrainingType:
+            // - Theory sessions receive Theory assessments
+            // - Flight/Simulator sessions receive PracticalChecklists and/or Practical assessments
+            var subjectAssessment = trainingType == TrainingType.Theory
+                ? (subjectAssessments.FirstOrDefault(a => string.Equals(a.AssessmentType, "Theory", StringComparison.OrdinalIgnoreCase)) ?? subjectAssessments.FirstOrDefault())
+                : subjectAssessments.FirstOrDefault(a => string.Equals(a.AssessmentType, "Practical", StringComparison.OrdinalIgnoreCase));
+
+            var subjectChecklist = subjectChecklists.FirstOrDefault();
 
             for (int i = 1; i <= sessionCount; i++)
             {

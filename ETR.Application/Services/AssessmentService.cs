@@ -37,6 +37,21 @@ public class AssessmentService : IAssessmentService
     {
         await _courseService.EnsureCourseNotLockedAsync(request.CourseId, cancellationToken);
 
+        var course = await _unitOfWork.CourseRepository.GetByIdAsync(request.CourseId, cancellationToken);
+        if (course == null || course.IsDeleted)
+            throw new KeyNotFoundException($"Course with ID {request.CourseId} not found.");
+
+        var subject = await _unitOfWork.SubjectRepository.GetByIdAsync(request.SubjectId, cancellationToken);
+        if (subject == null || subject.IsDeleted)
+            throw new KeyNotFoundException($"Subject with ID {request.SubjectId} not found.");
+
+        var isSubjectInCourse = _unitOfWork.CourseSubjectRepository.GetQueryable()
+            .Any(cs => cs.CourseId == request.CourseId && cs.SubjectId == request.SubjectId && !cs.IsDeleted);
+        if (!isSubjectInCourse)
+        {
+            throw new System.ComponentModel.DataAnnotations.ValidationException($"Môn học #{request.SubjectId} ({subject.SubjectCode}) không thuộc về Khóa học #{request.CourseId} ({course.CourseCode}).");
+        }
+
         var entity = new Assessment
         {
             CourseId = request.CourseId,
@@ -62,6 +77,17 @@ public class AssessmentService : IAssessmentService
         if (item == null) throw new KeyNotFoundException("Assessment not found.");
 
         await _courseService.EnsureCourseNotLockedAsync(item.CourseId, cancellationToken);
+
+        var subject = await _unitOfWork.SubjectRepository.GetByIdAsync(request.SubjectId, cancellationToken);
+        if (subject == null || subject.IsDeleted)
+            throw new KeyNotFoundException($"Subject with ID {request.SubjectId} not found.");
+
+        var isSubjectInCourse = _unitOfWork.CourseSubjectRepository.GetQueryable()
+            .Any(cs => cs.CourseId == item.CourseId && cs.SubjectId == request.SubjectId && !cs.IsDeleted);
+        if (!isSubjectInCourse)
+        {
+            throw new System.ComponentModel.DataAnnotations.ValidationException($"Môn học #{request.SubjectId} ({subject.SubjectCode}) không thuộc về Khóa học #{item.CourseId}.");
+        }
 
         item.SubjectId = request.SubjectId;
         item.ComponentName = request.ComponentName;

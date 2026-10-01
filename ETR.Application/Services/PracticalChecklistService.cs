@@ -41,10 +41,17 @@ public class PracticalChecklistService : IPracticalChecklistService
 
         // Basic validation for course/subject
         var course = await _unitOfWork.CourseRepository.GetByIdAsync(request.CourseId, cancellationToken);
-        if (course == null) throw new KeyNotFoundException("Course not found.");
+        if (course == null || course.IsDeleted) throw new KeyNotFoundException("Course not found.");
         
         var subject = await _unitOfWork.SubjectRepository.GetByIdAsync(request.SubjectId, cancellationToken);
-        if (subject == null) throw new KeyNotFoundException("Subject not found.");
+        if (subject == null || subject.IsDeleted) throw new KeyNotFoundException("Subject not found.");
+
+        var isSubjectInCourse = _unitOfWork.CourseSubjectRepository.GetQueryable()
+            .Any(cs => cs.CourseId == request.CourseId && cs.SubjectId == request.SubjectId && !cs.IsDeleted);
+        if (!isSubjectInCourse)
+        {
+            throw new System.ComponentModel.DataAnnotations.ValidationException($"Môn học #{request.SubjectId} ({subject.SubjectCode}) không thuộc về Khóa học #{request.CourseId} ({course.CourseCode}).");
+        }
 
         var item = new PracticalChecklist
         {

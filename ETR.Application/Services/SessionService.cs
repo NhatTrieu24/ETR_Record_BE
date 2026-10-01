@@ -83,6 +83,8 @@ public class SessionService : ISessionService
         if (session == null)
             throw new KeyNotFoundException($"Session with ID {id} not found.");
 
+        var effectiveTrainingType = request.TrainingType ?? session.TrainingType;
+
         Assessment? assessment = null;
         if (request.AssessmentId.HasValue)
         {
@@ -92,6 +94,13 @@ public class SessionService : ISessionService
                 throw new ValidationException($"Assessment with ID {request.AssessmentId.Value} does not exist.");
             if (assessment.CourseId != classExists?.CourseId || assessment.SubjectId != session.SubjectId)
                 throw new ValidationException("Assessment does not match the class's course or the specified subject.");
+
+            // Validate TrainingType compatibility:
+            if (string.Equals(assessment.AssessmentType, "Theory", StringComparison.OrdinalIgnoreCase) &&
+                effectiveTrainingType != TrainingType.Theory)
+            {
+                throw new ValidationException($"Không thể gán bài thi lý thuyết (Theory Assessment: '{assessment.ComponentName}') vào buổi huấn luyện thực hành ({effectiveTrainingType}). Buổi thực hành bay hoặc buồng lái mô phỏng phải sử dụng Practical Checklist để đánh giá năng lực thực hành.");
+            }
         }
 
         PracticalChecklist? checklist = null;
