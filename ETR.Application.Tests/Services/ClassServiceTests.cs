@@ -368,5 +368,97 @@ public class ClassServiceTests
         Assert.Contains("Xưởng thực hành / Phòng huấn luyện an toàn", session.Location);
         Assert.DoesNotContain("SIM Room", session.Location);
     }
+
+    [Fact]
+    public async Task CreateClassCoreAsync_CompletedStatus_ThrowsBusinessRuleViolationException()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        var courseRepo = new Mock<IGenericRepository<Course>>();
+        courseRepo.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Course { CourseId = 1, CourseCode = "CRS-01", Status = CourseStatus.Active, VersionNo = 1 });
+        uow.Setup(u => u.CourseRepository).Returns(courseRepo.Object);
+
+        var currentUserService = new Mock<ICurrentUserService>();
+        var service = new ClassService(uow.Object, currentUserService.Object);
+
+        var request = new CreateClassRequest(
+            "CLS-01", "Class 1", 1, DateTime.UtcNow.AddDays(1), DateTime.UtcNow.AddDays(30),
+            "Phòng Sim A320", 30, ClassStatus.Completed);
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            service.CreateClassCoreAsync(request, createdByAccountId: 1));
+
+        Assert.Contains("Không thể tạo mới lớp học với trạng thái 'Completed'", ex.Message);
+    }
+
+    [Fact]
+    public async Task UpdateClassAsync_ManualCompletedStatus_ThrowsBusinessRuleViolationException()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        var existingClass = new Class
+        {
+            ClassId = 1,
+            ClassCode = "CLS-01",
+            ClassName = "Class 1",
+            CourseId = 1,
+            Status = ClassStatus.InProgress,
+            IsDeleted = false
+        };
+
+        var classRepo = new Mock<IGenericRepository<Class>>();
+        classRepo.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(existingClass);
+        classRepo.Setup(r => r.GetQueryable()).Returns(new List<Class> { existingClass }.AsQueryable());
+        uow.Setup(u => u.ClassRepository).Returns(classRepo.Object);
+
+        uow.Setup(u => u.ExecuteInStrategyAsync(It.IsAny<Func<CancellationToken, Task<TrainingClassResponse>>>(), It.IsAny<CancellationToken>()))
+            .Returns<Func<CancellationToken, Task<TrainingClassResponse>>, CancellationToken>((op, ct) => op(ct));
+
+        var currentUserService = new Mock<ICurrentUserService>();
+        var service = new ClassService(uow.Object, currentUserService.Object);
+
+        var request = new UpdateClassRequest(
+            1, "CLS-01", "Class 1", 1, DateTime.UtcNow.AddDays(1), DateTime.UtcNow.AddDays(30),
+            "Phòng Sim A320", 30, ClassStatus.Completed, null);
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            service.UpdateClassAsync(1, request, updatedByAccountId: 1));
+
+        Assert.Contains("Không thể chuyển trạng thái lớp sang 'Completed' thủ công", ex.Message);
+    }
+
+    [Fact]
+    public async Task UpdateClassAsync_AlreadyCompletedClass_ThrowsBusinessRuleViolationException()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        var existingClass = new Class
+        {
+            ClassId = 1,
+            ClassCode = "CLS-01",
+            ClassName = "Class 1",
+            CourseId = 1,
+            Status = ClassStatus.Completed,
+            IsDeleted = false
+        };
+
+        var classRepo = new Mock<IGenericRepository<Class>>();
+        classRepo.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(existingClass);
+        classRepo.Setup(r => r.GetQueryable()).Returns(new List<Class> { existingClass }.AsQueryable());
+        uow.Setup(u => u.ClassRepository).Returns(classRepo.Object);
+
+        uow.Setup(u => u.ExecuteInStrategyAsync(It.IsAny<Func<CancellationToken, Task<TrainingClassResponse>>>(), It.IsAny<CancellationToken>()))
+            .Returns<Func<CancellationToken, Task<TrainingClassResponse>>, CancellationToken>((op, ct) => op(ct));
+
+        var currentUserService = new Mock<ICurrentUserService>();
+        var service = new ClassService(uow.Object, currentUserService.Object);
+
+        var request = new UpdateClassRequest(
+            1, "CLS-01", "Class 1", 1, DateTime.UtcNow.AddDays(1), DateTime.UtcNow.AddDays(30),
+            "Phòng Sim A320", 30, ClassStatus.InProgress, null);
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            service.UpdateClassAsync(1, request, updatedByAccountId: 1));
+
+        Assert.Contains("Không thể thay đổi trạng thái của lớp học đã hoàn thành", ex.Message);
+    }
 }
 

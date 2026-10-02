@@ -242,6 +242,47 @@ public class AttendanceService : IAttendanceService
                     await RecalculateAttendanceRateAsync(sr, enrollment.EnrollmentId, session.SubjectId, session.ClassId, ct);
                 }
 
+                // Tự động hoàn thành lớp (Completed) khi toàn bộ các buổi đào tạo của lớp đã được xác nhận (Confirm)
+                if (trainingClass != null && trainingClass.Status == ClassStatus.InProgress && !trainingClass.IsDeleted)
+                {
+                    var allSessions = (await _unitOfWork.SessionRepository.GetAllAsync(ct))
+                        ?.Where(s => s.ClassId == session.ClassId && !s.IsDeleted).ToList()
+                        ?? new List<Session>();
+
+                    bool allSessionsConfirmed = allSessions.Count > 0 && allSessions.All(s => s.SessionId == sessionId || s.IsConfirmed);
+
+                    if (allSessionsConfirmed)
+                    {
+                        var courseSubjects = _unitOfWork.CourseSubjectRepository != null
+                            ? (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct))
+                                ?.Where(cs => cs.CourseId == trainingClass.CourseId).ToList()
+                            : null;
+
+                        var sessionSubjectIds = allSessions.Select(s => s.SubjectId).Distinct().ToHashSet();
+                        bool allSubjectsCovered = courseSubjects == null || courseSubjects.Count == 0 || courseSubjects.All(cs => sessionSubjectIds.Contains(cs.SubjectId));
+
+                        if (allSubjectsCovered)
+                        {
+                            var oldClassStatus = trainingClass.Status;
+                            trainingClass.Status = ClassStatus.Completed;
+                            trainingClass.UpdatedAt = DateTime.UtcNow;
+                            trainingClass.UpdatedByAccountId = confirmedByAccountId;
+                            _unitOfWork.ClassRepository.Update(trainingClass);
+
+                            await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                            {
+                                AccountId = confirmedByAccountId,
+                                ActionType = AuditActionType.UPDATE.ToString(),
+                                EntityName = nameof(Class),
+                                RecordId = trainingClass.ClassId,
+                                OldValue = $"Status: {oldClassStatus}",
+                                NewValue = $"Status: {ClassStatus.Completed}",
+                                Description = $"Lớp học #{trainingClass.ClassId} ('{trainingClass.ClassName}') đã hoàn thành tất cả các môn học và buổi đào tạo, tự động chuyển sang trạng thái Completed."
+                            }, ct);
+                        }
+                    }
+                }
+
                 await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                 {
                     AccountId = confirmedByAccountId,

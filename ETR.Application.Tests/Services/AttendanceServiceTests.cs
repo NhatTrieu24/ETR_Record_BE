@@ -658,4 +658,55 @@ public class AttendanceServiceTests
 
         Assert.Contains("chưa bắt đầu hoặc không còn hoạt động", ex.Message);
     }
+
+    [Fact]
+    public async Task ConfirmSessionAsync_LastSessionConfirmed_AutoCompletesClass()
+    {
+        int sessionId = 10;
+        int classId = 20;
+        int subjectId = 30;
+
+        var session = new Session
+        {
+            SessionId = sessionId,
+            ClassId = classId,
+            SubjectId = subjectId,
+            TrainingType = TrainingType.Theory,
+            IsConfirmed = false
+        };
+
+        var trainingClass = new Class
+        {
+            ClassId = classId,
+            ClassName = "Class 101",
+            CourseId = 5,
+            Status = ClassStatus.InProgress,
+            IsDeleted = false
+        };
+
+        var otherSession = new Session
+        {
+            SessionId = 9,
+            ClassId = classId,
+            SubjectId = subjectId,
+            TrainingType = TrainingType.Theory,
+            IsConfirmed = true
+        };
+
+        var allSessions = new List<Session> { otherSession, session };
+
+        _mockSessionRepo.Setup(r => r.GetByIdAsync(sessionId, It.IsAny<CancellationToken>())).ReturnsAsync(session);
+        _mockSessionRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(allSessions);
+        _mockClassRepo.Setup(r => r.GetByIdAsync(classId, It.IsAny<CancellationToken>())).ReturnsAsync(trainingClass);
+        _mockAttendanceRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<AttendanceRecord>());
+        _mockEnrollmentRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<CourseEnrollment>());
+        _mockEtrRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<ETRCourseRecord>());
+        _mockSubjectResultRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<SubjectResult>());
+
+        var result = await _service.ConfirmSessionAsync(sessionId, 99, "Admin");
+
+        Assert.NotNull(result);
+        Assert.True(result.IsConfirmed);
+        Assert.Equal(ClassStatus.Completed, trainingClass.Status);
+    }
 }

@@ -98,6 +98,11 @@ public class ClassService : IClassService
     {
         var ct = cancellationToken;
 
+        if (request.Status == ClassStatus.Completed)
+        {
+            throw new BusinessRuleViolationException("Không thể tạo mới lớp học với trạng thái 'Completed'. Lớp học mới chỉ có thể bắt đầu với trạng thái Planned hoặc InProgress.");
+        }
+
         var course = await _unitOfWork.CourseRepository.GetByIdAsync(request.CourseId, ct)
             ?? throw new BusinessRuleViolationException("Course not found.");
 
@@ -238,6 +243,16 @@ public class ClassService : IClassService
 
                 var oldStatus = cls.Status;
 
+                if (oldStatus == ClassStatus.Completed && request.Status != ClassStatus.Completed)
+                {
+                    throw new BusinessRuleViolationException("Không thể thay đổi trạng thái của lớp học đã hoàn thành (Completed).");
+                }
+
+                if (request.Status == ClassStatus.Completed && oldStatus != ClassStatus.Completed)
+                {
+                    throw new BusinessRuleViolationException("Không thể chuyển trạng thái lớp sang 'Completed' thủ công. Lớp học sẽ được hệ thống tự động hoàn thành sau khi tất cả các môn học và buổi học kết thúc.");
+                }
+
                 // Aviation Safety Enforcement:
                 // Khi bắt đầu lớp học (chuyển sang InProgress), TẤT CẢ học viên đang ghi danh (Active)
                 // trong lớp này bắt buộc phải có hồ sơ năng định hợp lệ (đã được Academic duyệt, không bị Grounded, không quá hạn).
@@ -298,16 +313,6 @@ public class ClassService : IClassService
                                 string.Join("\n- ", unqualifiedLearners) +
                                 "\nVui lòng hoàn tất thẩm định tại mục 'Hồ sơ năng định' hoặc loại học viên chưa đạt khỏi danh sách lớp trước khi bắt đầu.");
                         }
-                    }
-                }
-
-                if (request.Status == ClassStatus.Completed && oldStatus != ClassStatus.Completed)
-                {
-                    var unconfirmedSessions = _unitOfWork.SessionRepository.GetQueryable()
-                        .Any(s => s.ClassId == id && !s.IsConfirmed && !s.IsDeleted);
-                    if (unconfirmedSessions)
-                    {
-                        throw new BusinessRuleViolationException("Cannot mark class as Completed because there are still unconfirmed sessions.");
                     }
                 }
 
