@@ -41,7 +41,7 @@ public class PracticalChecklistsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin,Academic")]
+    [Authorize(Roles = "Admin,Academic,Instructor")]
     public async Task<IActionResult> Create([FromBody] CreatePracticalChecklistRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -50,7 +50,7 @@ public class PracticalChecklistsController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    [Authorize(Roles = "Admin,Academic")]
+    [Authorize(Roles = "Admin,Academic,Instructor")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdatePracticalChecklistRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -59,7 +59,7 @@ public class PracticalChecklistsController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Admin,Academic")]
+    [Authorize(Roles = "Admin,Academic,Instructor")]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
