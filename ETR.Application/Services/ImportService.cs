@@ -191,6 +191,10 @@ public class ImportService : IImportService
 
         // Ownership check — one check for the whole batch (all rows → same session → same subject)
         var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(session!.ClassId, ct);
+        if (trainingClass != null && trainingClass.Status != ClassStatus.InProgress)
+        {
+            throw new BusinessRuleViolationException($"Không thể import điểm danh. Lớp học '{trainingClass.ClassName}' chưa bắt đầu hoặc không còn hoạt động (Trạng thái: {trainingClass.Status}). Chỉ có thể import điểm danh khi lớp học đang ở trạng thái 'Đang diễn ra' (InProgress).");
+        }
         var isAssigned = trainingClass != null && _unitOfWork.ClassSubjectRepository.GetQueryable()
             .Any(cs => cs.ClassId == trainingClass.ClassId
                     && cs.SubjectId == session.SubjectId
@@ -564,6 +568,13 @@ public class ImportService : IImportService
             return errors;
         }
 
+        var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(session.ClassId, ct);
+        if (trainingClass != null && trainingClass.Status != ClassStatus.InProgress)
+        {
+            errors.Add(new ImportRowError(0, "ClassStatus", $"Không thể import điểm danh. Lớp học '{trainingClass.ClassName}' chưa bắt đầu hoặc không còn hoạt động (Trạng thái: {trainingClass.Status}). Chỉ có thể import điểm danh khi lớp học đang ở trạng thái 'Đang diễn ra' (InProgress)."));
+            return errors;
+        }
+
         var validEnrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct))
             .Where(e => e.ClassId == session.ClassId && !e.IsDeleted)
             .Select(e => e.EnrollmentId)
@@ -636,11 +647,10 @@ public class ImportService : IImportService
 
         var classesInCourse = (await _unitOfWork.ClassRepository.GetAllAsync(ct))
             .Where(c => c.CourseId == assessment.CourseId && !c.IsDeleted)
-            .Select(c => c.ClassId)
-            .ToHashSet();
+            .ToDictionary(c => c.ClassId);
 
         var activeEnrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct))
-            .Where(e => !e.IsDeleted && e.Status == EnrollmentStatus.Active && classesInCourse.Contains(e.ClassId))
+            .Where(e => !e.IsDeleted && e.Status == EnrollmentStatus.Active && classesInCourse.ContainsKey(e.ClassId))
             .ToList();
 
         var validAccountIds = activeEnrollments.Select(e => e.AccountId).ToHashSet();
@@ -661,6 +671,13 @@ public class ImportService : IImportService
             if (!validAccountIds.Contains(row.AccountId))
                 errors.Add(new ImportRowError(row.RowNumber, "AccountId",
                     $"AccountId {row.AccountId} không có enrollment active trong hệ thống."));
+
+            var enrollment = activeEnrollments.FirstOrDefault(e => e.AccountId == row.AccountId);
+            if (enrollment != null && classesInCourse.TryGetValue(enrollment.ClassId, out var cls) && cls.Status != ClassStatus.InProgress)
+            {
+                errors.Add(new ImportRowError(row.RowNumber, "ClassStatus",
+                    $"Lớp học '{cls.ClassName}' của học viên này chưa bắt đầu hoặc không còn hoạt động (Trạng thái: {cls.Status}). Chỉ có thể nhập điểm khi lớp học đang ở trạng thái 'Đang diễn ra' (InProgress)."));
+            }
 
             if (row.SubjectResultId <= 0)
                 errors.Add(new ImportRowError(row.RowNumber, "SubjectResultId",

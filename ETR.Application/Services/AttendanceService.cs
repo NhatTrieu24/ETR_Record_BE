@@ -83,6 +83,10 @@ public class AttendanceService : IAttendanceService
 
                 // Instructor ownership check
                 var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(session.ClassId, ct);
+                if (trainingClass != null && trainingClass.Status != ClassStatus.InProgress)
+                {
+                    throw new BusinessRuleViolationException($"Không thể điểm danh. Lớp học '{trainingClass.ClassName}' chưa bắt đầu hoặc không còn hoạt động (Trạng thái: {trainingClass.Status}). Chỉ có thể điểm danh khi lớp học đang ở trạng thái 'Đang diễn ra' (InProgress).");
+                }
                 var isAssigned = trainingClass != null && _unitOfWork.ClassSubjectRepository.GetQueryable()
                     .Any(cs => cs.ClassId == trainingClass.ClassId && cs.SubjectId == session.SubjectId && cs.InstructorAccountId == recordedByAccountId);
                 ClassOwnershipValidator.EnsureInstructorOwnsSubject(recordedByRoleName, isAssigned);
@@ -181,6 +185,10 @@ public class AttendanceService : IAttendanceService
 
                 // Instructor assignment check (Admin is permitted by ClassOwnershipValidator policy)
                 var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(session.ClassId, ct);
+                if (trainingClass != null && trainingClass.Status != ClassStatus.InProgress)
+                {
+                    throw new BusinessRuleViolationException($"Không thể xác nhận buổi học. Lớp học '{trainingClass.ClassName}' chưa bắt đầu hoặc không còn hoạt động (Trạng thái: {trainingClass.Status}). Chỉ có thể xác nhận khi lớp học đang ở trạng thái 'Đang diễn ra' (InProgress).");
+                }
                 var isAssigned = trainingClass != null && _unitOfWork.ClassSubjectRepository.GetQueryable()
                     .Any(cs => cs.ClassId == trainingClass.ClassId && cs.SubjectId == session.SubjectId && cs.InstructorAccountId == confirmedByAccountId);
                 ClassOwnershipValidator.EnsureInstructorOwnsSubject(roleName, isAssigned);
@@ -284,6 +292,10 @@ public class AttendanceService : IAttendanceService
                 {
                     // Instructor ownership check
                     var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(session.ClassId, ct);
+                    if (trainingClass != null && trainingClass.Status != ClassStatus.InProgress)
+                    {
+                        throw new BusinessRuleViolationException($"Không thể cập nhật điểm danh. Lớp học '{trainingClass.ClassName}' chưa bắt đầu hoặc không còn hoạt động (Trạng thái: {trainingClass.Status}). Chỉ có thể chỉnh sửa điểm danh khi lớp học đang ở trạng thái 'Đang diễn ra' (InProgress).");
+                    }
                     var isAssigned = trainingClass != null && _unitOfWork.ClassSubjectRepository.GetQueryable()
                         .Any(cs => cs.ClassId == trainingClass.ClassId && cs.SubjectId == session.SubjectId && cs.InstructorAccountId == updatedByAccountId);
                     ClassOwnershipValidator.EnsureInstructorOwnsSubject(roleName, isAssigned);

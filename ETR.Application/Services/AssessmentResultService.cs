@@ -82,6 +82,11 @@ public class AssessmentResultService : IAssessmentResultService
                     throw new BusinessRuleViolationException($"Account (ID: {request.AccountId}) is not enrolled in a class for this assessment's course.");
                 }
 
+                if (targetClass.Status != ClassStatus.InProgress)
+                {
+                    throw new BusinessRuleViolationException($"Không thể nhập điểm. Lớp học '{targetClass.ClassName}' chưa bắt đầu hoặc không còn hoạt động (Trạng thái: {targetClass.Status}). Chỉ có thể chấm điểm khi lớp học đang ở trạng thái 'Đang diễn ra' (InProgress).");
+                }
+
                 // "Sân nhà ai nấy đá" — Instructor can only grade a class they are actually
                 // assigned to (see ClassOwnershipValidator).
                 var isAssigned = _unitOfWork.ClassSubjectRepository.GetQueryable()

@@ -173,7 +173,7 @@ public class AttendanceServiceTests
             IsConfirmed = false,
             SessionDate = DateTime.UtcNow.Date
         };
-        var trainingClass = new Class { ClassId = classId };
+        var trainingClass = new Class { ClassId = classId, Status = ClassStatus.InProgress };
         var enrollment = new CourseEnrollment { EnrollmentId = enrollmentId, ClassId = classId, AccountId = 100 };
         var classSubject = new ClassSubject { ClassId = classId, SubjectId = subjectId, InstructorAccountId = instructorId };
 
@@ -239,7 +239,7 @@ public class AttendanceServiceTests
             FlightHours = 2.0m
         };
         var session = new Session { SessionId = sessionId, ClassId = classId, SubjectId = subjectId, TrainingType = TrainingType.Flight };
-        var trainingClass = new Class { ClassId = classId };
+        var trainingClass = new Class { ClassId = classId, Status = ClassStatus.InProgress };
         var classSubject = new ClassSubject { ClassId = classId, SubjectId = subjectId, InstructorAccountId = instructorId };
 
         _mockAttendanceRepo.Setup(r => r.GetByIdAsync(recordId, It.IsAny<CancellationToken>())).ReturnsAsync(record);
@@ -339,7 +339,7 @@ public class AttendanceServiceTests
             StudentSignedByAccountId = 77
         };
         var session = new Session { SessionId = sessionId, ClassId = classId, SubjectId = subjectId, TrainingType = TrainingType.Flight, IsConfirmed = false };
-        var trainingClass = new Class { ClassId = classId };
+        var trainingClass = new Class { ClassId = classId, Status = ClassStatus.InProgress };
         var classSubject = new ClassSubject { ClassId = classId, SubjectId = subjectId, InstructorAccountId = instructorId };
 
         _mockAttendanceRepo.Setup(r => r.GetByIdAsync(recordId, It.IsAny<CancellationToken>())).ReturnsAsync(record);
@@ -381,7 +381,7 @@ public class AttendanceServiceTests
             TrainingType = TrainingType.Flight,
             IsConfirmed = false
         };
-        var trainingClass = new Class { ClassId = classId };
+        var trainingClass = new Class { ClassId = classId, Status = ClassStatus.InProgress };
         var classSubject = new ClassSubject { ClassId = classId, SubjectId = subjectId, InstructorAccountId = 50 }; // assigned to 50, not 99
 
         _mockSessionRepo.Setup(r => r.GetByIdAsync(sessionId, It.IsAny<CancellationToken>())).ReturnsAsync(session);
@@ -594,5 +594,68 @@ public class AttendanceServiceTests
             _service.RecordAttendanceAsync(request, 99, "Admin"));
 
         Assert.Contains(expectedErrorSubstr, ex.Message);
+    }
+
+    [Fact]
+    public async Task RecordAttendanceAsync_ClassNotInProgress_ShouldThrow()
+    {
+        int sessionId = 10;
+        int classId = 20;
+        int subjectId = 30;
+        int enrollmentId = 40;
+        int instructorId = 50;
+
+        var session = new Session
+        {
+            SessionId = sessionId,
+            ClassId = classId,
+            SubjectId = subjectId,
+            TrainingType = TrainingType.Flight,
+            LessonCode = "NAV-L01",
+            IsConfirmed = false,
+            SessionDate = DateTime.UtcNow.Date
+        };
+        var trainingClass = new Class { ClassId = classId, ClassName = "Class 101", Status = ClassStatus.Planned };
+
+        _mockSessionRepo.Setup(r => r.GetByIdAsync(sessionId, It.IsAny<CancellationToken>())).ReturnsAsync(session);
+        _mockClassRepo.Setup(r => r.GetByIdAsync(classId, It.IsAny<CancellationToken>())).ReturnsAsync(trainingClass);
+
+        var request = new CreateAttendanceRecordRequest(
+            SessionId: sessionId,
+            EnrollmentId: enrollmentId,
+            Status: AttendanceStatus.Present
+        );
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            _service.RecordAttendanceAsync(request, instructorId, "Instructor"));
+
+        Assert.Contains("chưa bắt đầu hoặc không còn hoạt động", ex.Message);
+    }
+
+    [Fact]
+    public async Task ConfirmSessionAsync_ClassNotInProgress_ShouldThrow()
+    {
+        int sessionId = 10;
+        int classId = 20;
+        int subjectId = 30;
+        int instructorId = 50;
+
+        var session = new Session
+        {
+            SessionId = sessionId,
+            ClassId = classId,
+            SubjectId = subjectId,
+            TrainingType = TrainingType.Flight,
+            IsConfirmed = false
+        };
+        var trainingClass = new Class { ClassId = classId, ClassName = "Class 101", Status = ClassStatus.Planned };
+
+        _mockSessionRepo.Setup(r => r.GetByIdAsync(sessionId, It.IsAny<CancellationToken>())).ReturnsAsync(session);
+        _mockClassRepo.Setup(r => r.GetByIdAsync(classId, It.IsAny<CancellationToken>())).ReturnsAsync(trainingClass);
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            _service.ConfirmSessionAsync(sessionId, instructorId, "Admin"));
+
+        Assert.Contains("chưa bắt đầu hoặc không còn hoạt động", ex.Message);
     }
 }
