@@ -1477,10 +1477,16 @@ public class EtrService : IEtrService
         
         var etrs = await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken);
         
+        // Chỉ những hồ sơ ETR đã Completed hoặc Approved, đã có IssuedDate mới được xem là chứng chỉ đã cấp
+        var completedEtrs = etrs.Where(etr =>
+            !etr.IsDeleted &&
+            (etr.Status == EtrStatus.Completed || etr.Status == EtrStatus.Approved) &&
+            etr.IssuedDate.HasValue).ToList();
+
         var result = new List<StudentEtrStatusResponse>();
         var groupedByCourse = studentEnrollments
             .Join(classes, e => e.ClassId, c => c.ClassId, (e, c) => new { e.EnrollmentId, c.CourseId })
-            .Join(etrs, ec => ec.EnrollmentId, etr => etr.EnrollmentId, (ec, etr) => new { ec.CourseId, Etr = etr })
+            .Join(completedEtrs, ec => ec.EnrollmentId, etr => etr.EnrollmentId, (ec, etr) => new { ec.CourseId, Etr = etr })
             .GroupBy(x => x.CourseId);
 
         foreach (var group in groupedByCourse)
@@ -1529,13 +1535,18 @@ public class EtrService : IEtrService
         var courseEnrollments = enrollments.Where(e => classIds.Contains(e.ClassId)).ToList();
         
         var etrs = await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken);
+        var completedEtrs = etrs.Where(etr =>
+            !etr.IsDeleted &&
+            (etr.Status == EtrStatus.Completed || etr.Status == EtrStatus.Approved) &&
+            etr.IssuedDate.HasValue).ToList();
+
         var accounts = await _unitOfWork.AccountRepository.GetAllAsync(cancellationToken);
         var userProfiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
         
         var result = new List<ExpiringStudentResponse>();
         
         var groupedByStudent = courseEnrollments
-            .Join(etrs, e => e.EnrollmentId, etr => etr.EnrollmentId, (e, etr) => new { e.AccountId, Etr = etr })
+            .Join(completedEtrs, e => e.EnrollmentId, etr => etr.EnrollmentId, (e, etr) => new { e.AccountId, Etr = etr })
             .GroupBy(x => x.AccountId);
 
         foreach (var group in groupedByStudent)

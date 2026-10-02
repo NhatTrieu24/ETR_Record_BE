@@ -876,4 +876,74 @@ public class EtrServiceTests
         Assert.Contains("qualified flight hours", ex.Message);
         Assert.Contains("45", ex.Message);
     }
+
+    [Fact]
+    public async Task GetStudentEtrCurrentStatusAsync_ExcludesUnapprovedOrUnissuedEtrs()
+    {
+        int studentId = 101;
+        int course1Id = 1;
+        int course2Id = 2;
+        int class1Id = 11;
+        int class2Id = 12;
+        int enrollment1Id = 21;
+        int enrollment2Id = 22;
+
+        _mockCurrentUserService.Setup(u => u.RoleName).Returns("Student");
+        _mockCurrentUserService.Setup(u => u.AccountId).Returns(studentId);
+
+        _mockEnrollmentRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CourseEnrollment>
+            {
+                new() { EnrollmentId = enrollment1Id, AccountId = studentId, ClassId = class1Id },
+                new() { EnrollmentId = enrollment2Id, AccountId = studentId, ClassId = class2Id }
+            });
+
+        _mockClassRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Class>
+            {
+                new() { ClassId = class1Id, CourseId = course1Id },
+                new() { ClassId = class2Id, CourseId = course2Id }
+            });
+
+        _mockCourseRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Course>
+            {
+                new() { CourseId = course1Id, CourseName = "Course In Progress" },
+                new() { CourseId = course2Id, CourseName = "Course Completed" }
+            });
+
+        _mockEtrRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<ETRCourseRecord>
+            {
+                // Unapproved / In-progress ETR (should NOT be returned as a certificate)
+                new()
+                {
+                    ETRCourseRecordId = 1001,
+                    EnrollmentId = enrollment1Id,
+                    Status = EtrStatus.UnderReview,
+                    IssuedDate = null,
+                    CreatedAt = DateTime.UtcNow
+                },
+                // Approved / Completed ETR with IssuedDate (SHOULD be returned)
+                new()
+                {
+                    ETRCourseRecordId = 1002,
+                    EnrollmentId = enrollment2Id,
+                    Status = EtrStatus.Completed,
+                    IssuedDate = DateTime.UtcNow.AddDays(-10),
+                    ExpiryDate = DateTime.UtcNow.AddYears(1),
+                    CreatedAt = DateTime.UtcNow.AddDays(-15)
+                }
+            });
+
+        var results = (await _service.GetStudentEtrCurrentStatusAsync(studentId)).ToList();
+
+        Assert.Single(results);
+        Assert.Equal(course2Id, results[0].CourseId);
+        Assert.Equal("Course Completed", results[0].CourseName);
+        Assert.Equal(1002, results[0].ETRCourseRecordId);
+        Assert.NotNull(results[0].IssuedDate);
+        Assert.Equal("Valid", results[0].ValidityStatus);
+    }
 }
+
