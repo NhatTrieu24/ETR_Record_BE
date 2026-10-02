@@ -238,6 +238,69 @@ public class ClassService : IClassService
 
                 var oldStatus = cls.Status;
 
+                // Aviation Safety Enforcement:
+                // Khi bắt đầu lớp học (chuyển sang InProgress), TẤT CẢ học viên đang ghi danh (Active)
+                // trong lớp này bắt buộc phải có hồ sơ năng định hợp lệ (đã được Academic duyệt, không bị Grounded, không quá hạn).
+                if (request.Status == ClassStatus.InProgress && oldStatus != ClassStatus.InProgress)
+                {
+                    var activeEnrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct))
+                        .Where(e => e.ClassId == id && e.Status == EnrollmentStatus.Active && !e.IsDeleted)
+                        .ToList();
+
+                    if (activeEnrollments.Count > 0)
+                    {
+                        var studentAccountIds = activeEnrollments.Select(e => e.AccountId).Distinct().ToList();
+
+                        // Luôn truy vấn trực tiếp từ database để đảm bảo dữ liệu mới nhất ngay khi Academic vừa duyệt ở tab khác
+                        var studentProfiles = (await _unitOfWork.UserProfileRepository.GetAllAsync(ct))
+                            .Where(p => studentAccountIds.Contains(p.AccountId) && !p.IsDeleted)
+                            .ToList();
+
+                        var unqualifiedLearners = new List<string>();
+
+                        foreach (var enrollment in activeEnrollments)
+                        {
+                            var profile = studentProfiles.FirstOrDefault(p => p.AccountId == enrollment.AccountId);
+                            if (profile == null)
+                            {
+                                unqualifiedLearners.Add($"Học viên #{enrollment.AccountId} (chưa có hồ sơ cá nhân hoàn chỉnh)");
+                                continue;
+                            }
+
+                            var issues = new List<string>();
+                            if (!profile.IsCredentialsVerified)
+                            {
+                                issues.Add("chưa được duyệt hồ sơ năng định");
+                            }
+                            if (profile.Status == LearnerStatus.Grounded)
+                            {
+                                issues.Add("đang bị đình chỉ bay (Grounded)");
+                            }
+                            if (profile.LicenseExpiryDate.HasValue && profile.LicenseExpiryDate.Value.Date < DateTime.UtcNow.Date)
+                            {
+                                issues.Add($"bằng lái đã hết hạn ({profile.LicenseExpiryDate.Value:dd/MM/yyyy})");
+                            }
+                            if (profile.MedicalExpiryDate.HasValue && profile.MedicalExpiryDate.Value.Date < DateTime.UtcNow.Date)
+                            {
+                                issues.Add($"giấy KSK đã hết hạn ({profile.MedicalExpiryDate.Value:dd/MM/yyyy})");
+                            }
+
+                            if (issues.Count > 0)
+                            {
+                                unqualifiedLearners.Add($"{profile.FullName} ({profile.UserCode}): {string.Join(", ", issues)}");
+                            }
+                        }
+
+                        if (unqualifiedLearners.Count > 0)
+                        {
+                            throw new BusinessRuleViolationException(
+                                $"Không thể bắt đầu lớp học '{cls.ClassName}'. Có {unqualifiedLearners.Count} học viên chưa đủ điều kiện năng định:\n- " +
+                                string.Join("\n- ", unqualifiedLearners) +
+                                "\nVui lòng hoàn tất thẩm định tại mục 'Hồ sơ năng định' hoặc loại học viên chưa đạt khỏi danh sách lớp trước khi bắt đầu.");
+                        }
+                    }
+                }
+
                 if (request.Status == ClassStatus.Completed && oldStatus != ClassStatus.Completed)
                 {
                     var unconfirmedSessions = _unitOfWork.SessionRepository.GetQueryable()
