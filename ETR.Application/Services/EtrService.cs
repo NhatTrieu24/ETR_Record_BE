@@ -1349,6 +1349,44 @@ public class EtrService : IEtrService
             }
         }
 
+        // Tự động hoàn thành lớp (Completed) khi toàn bộ học viên trong lớp đã hoàn tất hồ sơ ETR và được Training Manager phê duyệt
+        if (trainingClass != null && trainingClass.Status == ClassStatus.InProgress && !trainingClass.IsDeleted)
+        {
+            var classEnrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken))
+                ?.Where(e => e.ClassId == trainingClass.ClassId && !e.IsDeleted).ToList() ?? new List<CourseEnrollment>();
+
+            if (classEnrollments.Count > 0)
+            {
+                var classEnrollmentIds = classEnrollments.Select(e => e.EnrollmentId).ToList();
+                var classEtrs = (await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken))
+                    ?.Where(e => classEnrollmentIds.Contains(e.EnrollmentId) && !e.IsDeleted).ToList() ?? new List<ETRCourseRecord>();
+
+                bool allEtrsCompleted = classEnrollments.All(en => classEtrs.Any(e => e.EnrollmentId == en.EnrollmentId && 
+                    (e.ETRCourseRecordId == etr.ETRCourseRecordId || e.Status == EtrStatus.Completed || e.Status == EtrStatus.Approved)));
+
+                if (allEtrsCompleted)
+                {
+                    trainingClass.Status = ClassStatus.Completed;
+                    trainingClass.UpdatedAt = DateTime.UtcNow;
+                    trainingClass.UpdatedByAccountId = accountId;
+                    _unitOfWork.ClassRepository.Update(trainingClass);
+
+                    await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
+                    {
+                        AccountId = accountId,
+                        ActionType = AuditActionType.UPDATE.ToString(),
+                        EntityName = nameof(Class),
+                        RecordId = trainingClass.ClassId,
+                        OldValue = $"Status: {ClassStatus.InProgress}",
+                        NewValue = $"Status: {ClassStatus.Completed}",
+                        Description = $"Lớp học #{trainingClass.ClassId} ('{trainingClass.ClassName}') đã kết thúc đào tạo: toàn bộ học viên trong lớp đã hoàn thành và được phê duyệt hồ sơ ETR."
+                    }, cancellationToken);
+
+                    await _unitOfWork.SaveAsync(cancellationToken);
+                }
+            }
+        }
+
         return new EtrRecordResponse(etr.ETRCourseRecordId, etr.EnrollmentId, etr.Status, etr.IsLocked, etr.SubmittedAt, etr.VerifiedAt, etr.CompletedAt, etr.IssuedDate, etr.ExpiryDate, etr.PreviousRecordId);
     }
 

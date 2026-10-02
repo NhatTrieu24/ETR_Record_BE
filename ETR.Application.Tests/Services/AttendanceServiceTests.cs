@@ -660,7 +660,7 @@ public class AttendanceServiceTests
     }
 
     [Fact]
-    public async Task ConfirmSessionAsync_LastSessionConfirmed_AutoCompletesClass()
+    public async Task ConfirmSessionAsync_ConfirmedSession_ClassRemainsInProgress()
     {
         int sessionId = 10;
         int classId = 20;
@@ -707,6 +707,6 @@ public class AttendanceServiceTests
 
         Assert.NotNull(result);
         Assert.True(result.IsConfirmed);
-        Assert.Equal(ClassStatus.Completed, trainingClass.Status);
+        Assert.Equal(ClassStatus.InProgress, trainingClass.Status);
     }
 }

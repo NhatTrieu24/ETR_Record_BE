@@ -168,6 +168,32 @@ public class AmendmentService : IAmendmentService
                     _unitOfWork.SubjectSignoffRepository.Update(signoff);
                 }
 
+                // Unlock assessment and practical results by resetting IsPublished to false
+                // so Instructor can edit the scores and re-evaluate/sign off again.
+                var assessmentResults = (await _unitOfWork.AssessmentResultRepository.GetAllAsync(ct))
+                    .Where(ar => ar.SubjectResultId == amendment.SubjectResultId && !ar.IsDeleted)
+                    .ToList();
+                foreach (var ar in assessmentResults)
+                {
+                    ar.IsPublished = false;
+                    ar.PublishedAt = null;
+                    ar.UpdatedAt = DateTime.UtcNow;
+                    ar.UpdatedByAccountId = approvedByAccountId;
+                    _unitOfWork.AssessmentResultRepository.Update(ar);
+                }
+
+                var practicalResults = (await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(ct))
+                    .Where(pr => pr.SubjectResultId == amendment.SubjectResultId && !pr.IsDeleted)
+                    .ToList();
+                foreach (var pr in practicalResults)
+                {
+                    pr.IsPublished = false;
+                    pr.PublishedAt = null;
+                    pr.UpdatedAt = DateTime.UtcNow;
+                    pr.UpdatedByAccountId = approvedByAccountId;
+                    _unitOfWork.PracticalChecklistResultRepository.Update(pr);
+                }
+
                 amendment.Status = AmendmentStatus.Approved;
                 amendment.NewValue = reopenedStatus.ToString();
                 amendment.ApprovedByAccountId = approvedByAccountId;
