@@ -28,7 +28,71 @@ public class AmendmentService : IAmendmentService
     public async Task<IEnumerable<AmendmentRequestResponse>> GetAllAmendmentRequestsAsync(CancellationToken cancellationToken = default)
     {
         var requests = await _unitOfWork.AmendmentRequestRepository.GetAllAsync(cancellationToken);
-        return requests.Select(MapToResponse).ToList();
+        if (!requests.Any()) return Enumerable.Empty<AmendmentRequestResponse>();
+
+        var subjectResultIds = requests.Select(r => r.SubjectResultId).Distinct().ToList();
+        var allSubjectResults = (await _unitOfWork.SubjectResultRepository.GetAllAsync(cancellationToken))
+            .Where(sr => subjectResultIds.Contains(sr.SubjectResultId))
+            .ToDictionary(sr => sr.SubjectResultId, sr => sr);
+
+        var allSubjects = (await _unitOfWork.SubjectRepository.GetAllAsync(cancellationToken))
+            .ToDictionary(s => s.SubjectId, s => s);
+
+        var etrIds = allSubjectResults.Values.Select(sr => sr.EtrId).Distinct().ToList();
+        var allEtrs = (await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken))
+            .Where(e => etrIds.Contains(e.ETRCourseRecordId))
+            .ToDictionary(e => e.ETRCourseRecordId, e => e);
+
+        var enrollmentIds = allEtrs.Values.Select(e => e.EnrollmentId).Distinct().ToList();
+        var allEnrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken))
+            .Where(enr => enrollmentIds.Contains(enr.EnrollmentId))
+            .ToDictionary(enr => enr.EnrollmentId, enr => enr);
+
+        var allProfiles = (await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken))
+            .ToDictionary(p => p.AccountId, p => p);
+
+        var allAccounts = (await _unitOfWork.AccountRepository.GetAllAsync(cancellationToken))
+            .ToDictionary(a => a.AccountId, a => a);
+
+        return requests.Select(a =>
+        {
+            allSubjectResults.TryGetValue(a.SubjectResultId, out var sr);
+            Subject? subject = null;
+            if (sr != null) allSubjects.TryGetValue(sr.SubjectId, out subject);
+
+            string? learnerName = null;
+            if (sr != null && allEtrs.TryGetValue(sr.EtrId, out var etr) && allEnrollments.TryGetValue(etr.EnrollmentId, out var enr))
+            {
+                if (allProfiles.TryGetValue(enr.AccountId, out var lp))
+                    learnerName = lp.FullName;
+                else if (allAccounts.TryGetValue(enr.AccountId, out var la))
+                    learnerName = la.Username;
+            }
+
+            string? requestedByName = null;
+            if (allProfiles.TryGetValue(a.RequestedByAccountId, out var rp))
+                requestedByName = rp.FullName;
+            else if (allAccounts.TryGetValue(a.RequestedByAccountId, out var ra))
+                requestedByName = ra.Username;
+
+            return new AmendmentRequestResponse(
+                a.AmendmentRequestId,
+                a.SubjectResultId,
+                a.RequestedByAccountId,
+                a.Reason,
+                a.OldValue,
+                a.NewValue,
+                a.Status,
+                a.ApprovedByAccountId,
+                a.ApprovedAt,
+                a.DecisionComment,
+                a.CreatedAt,
+                sr?.SubjectCodeSnapshot ?? subject?.SubjectCode,
+                sr?.SubjectNameSnapshot ?? subject?.SubjectName,
+                learnerName,
+                requestedByName
+            );
+        }).ToList();
     }
 
     public async Task<AmendmentRequestResponse> GetAmendmentRequestByIdAsync(int id, CancellationToken cancellationToken = default)

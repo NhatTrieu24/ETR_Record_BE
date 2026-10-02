@@ -13,5 +13,9 @@ public record AmendmentRequestResponse(
     int? ApprovedByAccountId,
     DateTime? ApprovedAt,
     string? DecisionComment,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    string? SubjectCode = null,
+    string? SubjectName = null,
+    string? LearnerName = null,
+    string? RequestedByName = null
 );
