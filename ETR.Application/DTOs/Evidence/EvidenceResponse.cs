@@ -19,4 +19,14 @@ public class EvidenceResponse
     public DateTime? VerifiedAt { get; set; }
     public string? VerificationComment { get; set; }
     public DateTime UploadedAt { get; set; }
+
+    // Enriched metadata fields for UI display (QA verification, Instructor view, Auditor)
+    public string? EvidenceTypeName { get; set; }
+    public string? UploadedByName { get; set; }
+    public string? LearnerName { get; set; }
+    public string? LearnerCode { get; set; }
+    public string? SubjectName { get; set; }
+    public string? SubjectCode { get; set; }
+    public string? CourseName { get; set; }
+    public string? ClassName { get; set; }
 }

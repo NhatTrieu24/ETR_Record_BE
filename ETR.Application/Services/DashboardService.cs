@@ -348,18 +348,44 @@ public class DashboardService : IDashboardService
         if (evidenceFiles.Count == 0) return [];
 
         var profiles = (await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken)).ToList();
+        var profileMap = profiles.GroupBy(p => p.AccountId).ToDictionary(g => g.Key, g => g.First());
+
+        var subjectResults = (await _unitOfWork.SubjectResultRepository.GetAllAsync(cancellationToken)).ToList();
+        var srMap = subjectResults.GroupBy(sr => sr.SubjectResultId).ToDictionary(g => g.Key, g => g.First());
+
+        var etrs = (await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken)).ToList();
+        var etrMap = etrs.GroupBy(e => e.ETRCourseRecordId).ToDictionary(g => g.Key, g => g.First());
+
+        var enrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken)).ToList();
+        var enrollmentMap = enrollments.GroupBy(en => en.EnrollmentId).ToDictionary(g => g.Key, g => g.First());
+
         var attachments = (await _unitOfWork.AttachmentRepository.GetAllAsync(cancellationToken))
             .Where(a => a.OwnerType == nameof(EvidenceFile) && evidenceFiles.Select(e => e.EvidenceFileId).Contains(a.OwnerId))
             .GroupBy(a => a.OwnerId)
             .ToDictionary(g => g.Key, g => g.First());
 
         return evidenceFiles
-            .Select(e => new RecentEvidenceFileSummary(
-                e.EvidenceFileId,
-                attachments.GetValueOrDefault(e.EvidenceFileId)?.FileName ?? string.Empty,
-                profiles.FirstOrDefault(p => p.AccountId == e.AccountId)?.FullName ?? "-",
-                e.VerificationStatus,
-                e.UploadedAt))
+            .Select(e => {
+                string learnerName = "-";
+                if (profileMap.TryGetValue(e.AccountId, out var p))
+                {
+                    learnerName = p.FullName;
+                }
+                else if (srMap.TryGetValue(e.SubjectResultId, out var sr) &&
+                         etrMap.TryGetValue(sr.EtrId, out var etr) &&
+                         enrollmentMap.TryGetValue(etr.EnrollmentId, out var enr) &&
+                         profileMap.TryGetValue(enr.AccountId, out var enrP))
+                {
+                    learnerName = enrP.FullName;
+                }
+
+                return new RecentEvidenceFileSummary(
+                    e.EvidenceFileId,
+                    attachments.GetValueOrDefault(e.EvidenceFileId)?.FileName ?? string.Empty,
+                    learnerName,
+                    e.VerificationStatus,
+                    e.UploadedAt);
+            })
             .ToList();
     }
 

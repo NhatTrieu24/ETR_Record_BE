@@ -64,10 +64,28 @@ public class EvidenceService : IEvidenceService
         // TrainingManager chỉ xem metadata (không nhận URL tệp)
         bool isMetadataOnly = roleName == "TrainingManager";
 
+        var profiles = (await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken)).ToList();
+        var profileMap = profiles.GroupBy(p => p.AccountId).ToDictionary(g => g.Key, g => g.First());
+        var evidenceTypes = (await _unitOfWork.EvidenceTypeRepository.GetAllAsync(cancellationToken)).ToList();
+        var evidenceTypeMap = evidenceTypes.GroupBy(et => et.EvidenceTypeId).ToDictionary(g => g.Key, g => g.First());
+        var subjectResults = (await _unitOfWork.SubjectResultRepository.GetAllAsync(cancellationToken)).ToList();
+        var srMap = subjectResults.GroupBy(sr => sr.SubjectResultId).ToDictionary(g => g.Key, g => g.First());
+        var subjects = (await _unitOfWork.SubjectRepository.GetAllAsync(cancellationToken)).ToList();
+        var subjectMap = subjects.GroupBy(s => s.SubjectId).ToDictionary(g => g.Key, g => g.First());
+        var etrs = (await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken)).ToList();
+        var etrMap = etrs.GroupBy(e => e.ETRCourseRecordId).ToDictionary(g => g.Key, g => g.First());
+        var enrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken)).ToList();
+        var enrollmentMap = enrollments.GroupBy(en => en.EnrollmentId).ToDictionary(g => g.Key, g => g.First());
+        var courses = (await _unitOfWork.CourseRepository.GetAllAsync(cancellationToken)).ToList();
+        var courseMap = courses.GroupBy(c => c.CourseId).ToDictionary(g => g.Key, g => g.First());
+        var classes = (await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken)).ToList();
+        var classMap = classes.GroupBy(cl => cl.ClassId).ToDictionary(g => g.Key, g => g.First());
+
         return evidences.Select(e =>
         {
             var att = attachments.GetValueOrDefault(e.EvidenceFileId);
             var resp = MapToResponse(e, att);
+            EnrichResponse(resp, e, profileMap, evidenceTypeMap, srMap, subjectMap, etrMap, enrollmentMap, courseMap, classMap);
             if (isMetadataOnly)
             {
                 resp.FileUrl = string.Empty;
@@ -90,6 +108,25 @@ public class EvidenceService : IEvidenceService
 
         var attachment = await GetAttachmentAsync(id, cancellationToken);
         var resp = MapToResponse(evidence, attachment);
+
+        var profiles = (await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken)).ToList();
+        var profileMap = profiles.GroupBy(p => p.AccountId).ToDictionary(g => g.Key, g => g.First());
+        var evidenceTypes = (await _unitOfWork.EvidenceTypeRepository.GetAllAsync(cancellationToken)).ToList();
+        var evidenceTypeMap = evidenceTypes.GroupBy(et => et.EvidenceTypeId).ToDictionary(g => g.Key, g => g.First());
+        var subjectResults = (await _unitOfWork.SubjectResultRepository.GetAllAsync(cancellationToken)).ToList();
+        var srMap = subjectResults.GroupBy(sr => sr.SubjectResultId).ToDictionary(g => g.Key, g => g.First());
+        var subjects = (await _unitOfWork.SubjectRepository.GetAllAsync(cancellationToken)).ToList();
+        var subjectMap = subjects.GroupBy(s => s.SubjectId).ToDictionary(g => g.Key, g => g.First());
+        var etrs = (await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(cancellationToken)).ToList();
+        var etrMap = etrs.GroupBy(e => e.ETRCourseRecordId).ToDictionary(g => g.Key, g => g.First());
+        var enrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken)).ToList();
+        var enrollmentMap = enrollments.GroupBy(en => en.EnrollmentId).ToDictionary(g => g.Key, g => g.First());
+        var courses = (await _unitOfWork.CourseRepository.GetAllAsync(cancellationToken)).ToList();
+        var courseMap = courses.GroupBy(c => c.CourseId).ToDictionary(g => g.Key, g => g.First());
+        var classes = (await _unitOfWork.ClassRepository.GetAllAsync(cancellationToken)).ToList();
+        var classMap = classes.GroupBy(cl => cl.ClassId).ToDictionary(g => g.Key, g => g.First());
+
+        EnrichResponse(resp, evidence, profileMap, evidenceTypeMap, srMap, subjectMap, etrMap, enrollmentMap, courseMap, classMap);
 
         // TrainingManager chỉ xem metadata (không nhận URL tệp)
         if (roleName == "TrainingManager")
@@ -408,5 +445,79 @@ public class EvidenceService : IEvidenceService
             VerificationComment = file.VerificationComment,
             UploadedAt = file.UploadedAt
         };
+    }
+
+    private static void EnrichResponse(
+        EvidenceResponse resp,
+        EvidenceFile file,
+        IReadOnlyDictionary<int, UserProfile> profileMap,
+        IReadOnlyDictionary<int, EvidenceType> evidenceTypeMap,
+        IReadOnlyDictionary<int, SubjectResult> srMap,
+        IReadOnlyDictionary<int, Subject> subjectMap,
+        IReadOnlyDictionary<int, ETRCourseRecord> etrMap,
+        IReadOnlyDictionary<int, CourseEnrollment> enrollmentMap,
+        IReadOnlyDictionary<int, Course> courseMap,
+        IReadOnlyDictionary<int, Class> classMap)
+    {
+        // 1. Evidence Type
+        if (evidenceTypeMap.TryGetValue(file.EvidenceTypeId, out var et))
+        {
+            resp.EvidenceTypeName = et.TypeName;
+        }
+
+        // 2. Uploaded By
+        if (profileMap.TryGetValue(file.UploadedByAccountId, out var up))
+        {
+            resp.UploadedByName = up.FullName;
+        }
+
+        // 3. Subject Result -> Subject
+        srMap.TryGetValue(file.SubjectResultId, out var sr);
+        if (sr != null && subjectMap.TryGetValue(sr.SubjectId, out var s))
+        {
+            resp.SubjectName = s.SubjectName;
+            resp.SubjectCode = s.SubjectCode;
+        }
+
+        // 4. ETR & Enrollment -> Learner, Course, Class
+        ETRCourseRecord? etr = null;
+        if (sr != null && etrMap.TryGetValue(sr.EtrId, out var foundEtr))
+        {
+            etr = foundEtr;
+        }
+
+        CourseEnrollment? enr = null;
+        if (etr != null && enrollmentMap.TryGetValue(etr.EnrollmentId, out var foundEnr))
+        {
+            enr = foundEnr;
+        }
+
+        // Learner: prioritize AccountId on file, fallback to enrollment.AccountId
+        int learnerAccId = file.AccountId > 0 ? file.AccountId : (enr?.AccountId ?? 0);
+        if (profileMap.TryGetValue(learnerAccId, out var lp))
+        {
+            resp.LearnerName = lp.FullName;
+            resp.LearnerCode = lp.UserCode;
+        }
+        else if (enr != null && profileMap.TryGetValue(enr.AccountId, out var enrLp))
+        {
+            resp.LearnerName = enrLp.FullName;
+            resp.LearnerCode = enrLp.UserCode;
+        }
+
+        // Course & Class
+        int classId = enr?.ClassId ?? 0;
+        Class? cls = null;
+        if (classId > 0 && classMap.TryGetValue(classId, out var foundCls))
+        {
+            cls = foundCls;
+            resp.ClassName = cls.ClassName;
+        }
+
+        int courseId = cls?.CourseId ?? 0;
+        if (courseId > 0 && courseMap.TryGetValue(courseId, out var course))
+        {
+            resp.CourseName = course.CourseName;
+        }
     }
 }
