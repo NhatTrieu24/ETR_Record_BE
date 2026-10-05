@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ETR.API.Controllers;
 
 /// <summary>
-/// [Module/Flow]: Facility & Training Location Management
+/// [Module/Flow]: Facility &amp; Training Location Management
 /// [Core Responsibility]: Quản lý danh mục cơ sở đào tạo, phòng học, thiết bị mô phỏng, sân bay huấn luyện và kiểm tra tính khả dụng.
 /// </summary>
 [ApiController]

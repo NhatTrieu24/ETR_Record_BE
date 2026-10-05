@@ -6,6 +6,7 @@ public enum EnrollmentStatus
 {
     Active,
     Enrolled,
+    InProgress,
     Withdrawn,
     Completed,
     Deleted
