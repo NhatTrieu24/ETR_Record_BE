@@ -592,12 +592,9 @@ public class CourseService : ICourseService
                                     subjectMap.TryGetValue(cs.SubjectId, out var subjectType);
                                     var currentSubject = allSubjects.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
                                     TrainingType trainingType = TrainingTypeClassifier.Classify(currentSubject?.SubjectCode, currentSubject?.SubjectName, subjectType);
-
-                                    string sessionLocation = trainingType == TrainingType.Simulator
-                                        ? "Buồng lái mô phỏng (SIM / FSTD Room)"
-                                        : trainingType == TrainingType.Flight
-                                            ? "Sân bay huấn luyện / Khu vực bay (Airfield)"
-                                            : "Phòng học lý thuyết (Ground Classroom)";
+                                    bool isWorkshopOrNonFstdPractical = FacilityCompatibilityHelper.IsWorkshopOrPracticalSubject(
+                                        currentSubject?.SubjectCode, currentSubject?.SubjectName, subjectType);
+                                    var compatTypes = FacilityCompatibilityHelper.GetCompatibleFacilityTypes(trainingType, isWorkshopOrNonFstdPractical);
 
                                     int sessionCount = cs.RequiredSessions > 0 ? cs.RequiredSessions : 1;
 
@@ -664,12 +661,63 @@ public class CourseService : ICourseService
                                             }
                                         }
 
+                                        DateTime sessionStart = sessionDate.Date.AddHours(8);
+                                        DateTime sessionEnd = sessionStart.AddHours(2);
+
+                                        var allFacilities = (await _unitOfWork.TrainingFacilityRepository.GetAllAsync(ct))
+                                            .Where(f => !f.IsDeleted && f.IsActive)
+                                            .ToList();
+
+                                        TrainingFacility? assignedFacility = null;
+                                        if (cls.DefaultFacilityId.HasValue)
+                                        {
+                                            var defFac = allFacilities.FirstOrDefault(f => f.FacilityId == cls.DefaultFacilityId.Value);
+                                            if (defFac != null && compatTypes.Contains(defFac.FacilityType))
+                                            {
+                                                bool conflict = allSessions.Any(s =>
+                                                    s.FacilityId == defFac.FacilityId &&
+                                                    FacilityCompatibilityHelper.HasTimeOverlap(
+                                                        sessionStart, sessionEnd,
+                                                        s.StartAt ?? s.SessionDate ?? DateTime.MinValue,
+                                                        s.EndAt ?? (s.SessionDate.HasValue ? s.SessionDate.Value.AddHours(2) : DateTime.MinValue)));
+
+                                                if (!conflict) assignedFacility = defFac;
+                                            }
+                                        }
+
+                                        if (assignedFacility == null)
+                                        {
+                                            foreach (var fac in allFacilities.Where(f => compatTypes.Contains(f.FacilityType)))
+                                            {
+                                                bool conflict = allSessions.Any(s =>
+                                                    s.FacilityId == fac.FacilityId &&
+                                                    FacilityCompatibilityHelper.HasTimeOverlap(
+                                                        sessionStart, sessionEnd,
+                                                        s.StartAt ?? s.SessionDate ?? DateTime.MinValue,
+                                                        s.EndAt ?? (s.SessionDate.HasValue ? s.SessionDate.Value.AddHours(2) : DateTime.MinValue)));
+
+                                                if (!conflict)
+                                                {
+                                                    assignedFacility = fac;
+                                                    break;
+                                                }
+                                            }
+                                        }
+
+                                        int? facilityId = assignedFacility?.FacilityId;
+                                        string? sessionLocation = assignedFacility != null 
+                                            ? assignedFacility.FacilityName 
+                                            : (!string.IsNullOrWhiteSpace(cls.Location) ? cls.Location : "Chưa xếp cơ sở (TBA)");
+
                                         var session = new Session
                                         {
                                             ClassId = cls.ClassId,
                                             SubjectId = cs.SubjectId,
                                             SessionTitle = title,
-                                            SessionDate = sessionDate,
+                                            SessionDate = sessionStart,
+                                            StartAt = sessionStart,
+                                            EndAt = sessionEnd,
+                                            FacilityId = facilityId,
                                             Location = sessionLocation,
                                             IsConfirmed = false,
                                             IsAssessmentRequired = isAssessmentRequired,
@@ -681,6 +729,7 @@ public class CourseService : ICourseService
                                         };
 
                                         await _unitOfWork.SessionRepository.AddAsync(session, ct);
+                                        allSessions.Add(session);
 
                                         currentDate = currentDate.AddDays(1);
                                         if (currentDate.DayOfWeek == DayOfWeek.Sunday)

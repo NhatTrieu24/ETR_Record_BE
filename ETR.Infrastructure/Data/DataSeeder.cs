@@ -17,6 +17,7 @@ public static class DataSeeder
     {
         await SeedIdentityAsync(context);
         await SeedCatalogAsync(context);
+        await SeedTrainingFacilitiesAsync(context);
         await SeedClassSchedulingAsync(context);
         await SeedEnrollmentAsync(context);
         await SeedEtrAndSubjectResultsAsync(context);
@@ -312,6 +313,107 @@ public static class DataSeeder
         }
     }
 
+    /// <summary>
+    /// Dữ liệu mẫu cơ sở đào tạo / địa điểm (Training Facilities).
+    /// Được đánh dấu là dữ liệu mẫu có thể cấu hình theo từng cơ sở thực tế (Sample Configurable Seed Data).
+    /// </summary>
+    private static async Task SeedTrainingFacilitiesAsync(AppDbContext context)
+    {
+        if (!await context.TrainingFacilities.AnyAsync())
+        {
+            context.TrainingFacilities.AddRange(
+                // 1. Phòng học lý thuyết (Ground Classrooms)
+                new TrainingFacility
+                {
+                    FacilityCode = "CR-101",
+                    FacilityName = "Phòng học lý thuyết 101 (Classroom 101)",
+                    FacilityType = FacilityType.Classroom,
+                    Capacity = 35,
+                    IsActive = true,
+                    Description = "[Mẫu/Sample] Phòng học lý thuyết trang bị máy chiếu và điều hòa tiêu chuẩn ICAO.",
+                    LocationDetail = "Tầng 1 - Khu giảng đường A"
+                },
+                new TrainingFacility
+                {
+                    FacilityCode = "CR-102",
+                    FacilityName = "Phòng học lý thuyết 102 (Classroom 102)",
+                    FacilityType = FacilityType.Classroom,
+                    Capacity = 30,
+                    IsActive = true,
+                    Description = "[Mẫu/Sample] Phòng học lý thuyết trang bị bảng tương tác.",
+                    LocationDetail = "Tầng 1 - Khu giảng đường A"
+                },
+
+                // 2. Xưởng thực hành bảo dưỡng & cứu nguy cabin (Workshops)
+                new TrainingFacility
+                {
+                    FacilityCode = "WS-MAINT",
+                    FacilityName = "Xưởng bảo dưỡng kỹ thuật tàu bay (Hangar Workshop A)",
+                    FacilityType = FacilityType.Workshop,
+                    Capacity = 25,
+                    IsActive = true,
+                    Description = "[Mẫu/Sample] Xưởng thực hành động cơ, hệ thống cơ khí và điện tử tàu bay.",
+                    LocationDetail = "Hangar Bảo dưỡng số 1"
+                },
+                new TrainingFacility
+                {
+                    FacilityCode = "WS-CABIN",
+                    FacilityName = "Khu huấn luyện an toàn cabin (Cabin Mockup Safety Center)",
+                    FacilityType = FacilityType.Workshop,
+                    Capacity = 30,
+                    IsActive = true,
+                    Description = "[Mẫu/Sample] Mô hình thân máy bay thực hành thoát hiểm, khói lửa và cứu sinh.",
+                    LocationDetail = "Tòa nhà Huấn luyện An toàn & Khẩn nguy"
+                },
+
+                // 3. Buồng lái mô phỏng (Simulators - FSTD / FNPT / FFS)
+                new TrainingFacility
+                {
+                    FacilityCode = "SIM-A320",
+                    FacilityName = "Phòng mô phỏng A320 Full Flight Simulator (FFS-01)",
+                    FacilityType = FacilityType.Simulator,
+                    Capacity = 4,
+                    IsActive = true,
+                    Description = "[Mẫu/Sample] Thiết bị buồng lái mô phỏng A320 mức Level D chuẩn CAAV/EASA.",
+                    LocationDetail = "Tòa nhà Trung tâm Mô phỏng FSTD - Tầng trệt"
+                },
+                new TrainingFacility
+                {
+                    FacilityCode = "SIM-DA42",
+                    FacilityName = "Phòng mô phỏng Diamond DA42 (FNPT II - 02)",
+                    FacilityType = FacilityType.Simulator,
+                    Capacity = 4,
+                    IsActive = true,
+                    Description = "[Mẫu/Sample] Thiết bị FNPT II phục vụ huấn luyện IFR và đa động cơ ME.",
+                    LocationDetail = "Tòa nhà Trung tâm Mô phỏng FSTD - Phòng 204"
+                },
+
+                // 4. Sân bay huấn luyện / Căn cứ bay (Airfields)
+                new TrainingFacility
+                {
+                    FacilityCode = "AIRPORT-VVPQ",
+                    FacilityName = "Căn cứ huấn luyện bay Phú Quốc (PQC Flight Base)",
+                    FacilityType = FacilityType.Airfield,
+                    Capacity = 100,
+                    IsActive = true,
+                    Description = "[Mẫu/Sample] Sân bay căn cứ huấn luyện thực hành bay VFR/IFR.",
+                    LocationDetail = "Cảng Hàng không Quốc tế Phú Quốc"
+                },
+                new TrainingFacility
+                {
+                    FacilityCode = "AIRPORT-VVBM",
+                    FacilityName = "Căn cứ huấn luyện bay Buôn Ma Thuột (BMV Airfield Base)",
+                    FacilityType = FacilityType.Airfield,
+                    Capacity = 100,
+                    IsActive = true,
+                    Description = "[Mẫu/Sample] Sân bay huấn luyện thực hành bay đường dài Cross-Country.",
+                    LocationDetail = "Cảng Hàng không Buôn Ma Thuột"
+                }
+            );
+            await context.SaveChangesAsync();
+        }
+    }
+
     private static async Task SeedClassSchedulingAsync(AppDbContext context)
     {
         if (!await context.Classes.AnyAsync())
@@ -384,20 +486,24 @@ public static class DataSeeder
                 var checklist = checklists.FirstOrDefault(c => c.SubjectId == cs.SubjectId);
 
                 var baseDate = DateTime.UtcNow.Date.AddDays(rand.Next(-14, 14)).AddHours(rand.Next(8, 17));
+                var s1Date = baseDate;
+                var s2Date = baseDate.AddDays(2).Date.AddHours(rand.Next(8, 17));
 
                 // Session 1 is confirmed, Session 2 is unconfirmed so instructor can test attendance
-                context.Sessions.Add(new Session { ClassId = cs.ClassId, SubjectId = cs.SubjectId, SessionTitle = "Session 1", SessionDate = baseDate, IsConfirmed = true, ConfirmedByAccountId = cs.InstructorAccountId });
-                context.Sessions.Add(new Session { ClassId = cs.ClassId, SubjectId = cs.SubjectId, SessionTitle = "Session 2", SessionDate = baseDate.AddDays(2).Date.AddHours(rand.Next(8, 17)), IsConfirmed = false, ConfirmedByAccountId = null });
+                context.Sessions.Add(new Session { ClassId = cs.ClassId, SubjectId = cs.SubjectId, SessionTitle = "Session 1", SessionDate = s1Date, StartAt = s1Date, EndAt = s1Date.AddHours(2), IsConfirmed = true, ConfirmedByAccountId = cs.InstructorAccountId });
+                context.Sessions.Add(new Session { ClassId = cs.ClassId, SubjectId = cs.SubjectId, SessionTitle = "Session 2", SessionDate = s2Date, StartAt = s2Date, EndAt = s2Date.AddHours(2), IsConfirmed = false, ConfirmedByAccountId = null });
 
                 // Add exam sessions
                 if (assessment != null)
                 {
-                    context.Sessions.Add(new Session { ClassId = cs.ClassId, SubjectId = cs.SubjectId, SessionTitle = "Theory Exam", SessionDate = baseDate.AddDays(4).Date.AddHours(rand.Next(8, 17)), IsConfirmed = false, ConfirmedByAccountId = null, IsAssessmentRequired = true, AssessmentId = assessment.AssessmentId });
+                    var examDate = baseDate.AddDays(4).Date.AddHours(rand.Next(8, 17));
+                    context.Sessions.Add(new Session { ClassId = cs.ClassId, SubjectId = cs.SubjectId, SessionTitle = "Theory Exam", SessionDate = examDate, StartAt = examDate, EndAt = examDate.AddHours(2), IsConfirmed = false, ConfirmedByAccountId = null, IsAssessmentRequired = true, AssessmentId = assessment.AssessmentId });
                 }
 
                 if (checklist != null)
                 {
-                    context.Sessions.Add(new Session { ClassId = cs.ClassId, SubjectId = cs.SubjectId, SessionTitle = "Practical Exam", SessionDate = baseDate.AddDays(5).Date.AddHours(rand.Next(8, 17)), IsConfirmed = false, ConfirmedByAccountId = null, IsChecklistRequired = true, PracticalChecklistId = checklist.PracticalChecklistId });
+                    var pracDate = baseDate.AddDays(5).Date.AddHours(rand.Next(8, 17));
+                    context.Sessions.Add(new Session { ClassId = cs.ClassId, SubjectId = cs.SubjectId, SessionTitle = "Practical Exam", SessionDate = pracDate, StartAt = pracDate, EndAt = pracDate.AddHours(2), IsConfirmed = false, ConfirmedByAccountId = null, IsChecklistRequired = true, PracticalChecklistId = checklist.PracticalChecklistId });
                 }
             }
             await context.SaveChangesAsync();

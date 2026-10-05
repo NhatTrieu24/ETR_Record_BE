@@ -22,5 +22,11 @@ public class UpdateSessionRequest
     // Phase 2: Flight / Simulator Training Extensions
     public ETR.Domain.Enums.TrainingType? TrainingType { get; set; }
     public string? LessonCode { get; set; }
+
+    // Phase 4: Facility & Time Slot Extensions
+    public int? FacilityId { get; set; }
+    public DateTime? StartAt { get; set; }
+    public DateTime? EndAt { get; set; }
+    public bool? IsRemedial { get; set; }
 }
 

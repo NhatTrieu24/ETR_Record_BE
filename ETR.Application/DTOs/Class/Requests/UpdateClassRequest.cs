@@ -13,7 +13,8 @@ public record UpdateClassRequest(
     [MaxLength(200), RegularExpression(@"^[^<>]+$", ErrorMessage = "Invalid characters in Location")] string? Location,
     [Range(1, int.MaxValue, ErrorMessage = "Capacity must be at least 1")] int Capacity,
     [Required] ClassStatus Status,
-    List<InstructorAssignmentRequest>? InstructorAssignments = null) : IValidatableObject
+    List<InstructorAssignmentRequest>? InstructorAssignments = null,
+    int? DefaultFacilityId = null) : IValidatableObject
 {
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {

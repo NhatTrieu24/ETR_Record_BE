@@ -30,5 +30,14 @@ public class SessionResponse
     // Phase 3: Instructor assignment details for session
     public int? InstructorAccountId { get; set; }
     public string? InstructorName { get; set; }
+
+    // Phase 4: Facility & Time Slot Extensions
+    public int? FacilityId { get; set; }
+    public string? FacilityCode { get; set; }
+    public string? FacilityName { get; set; }
+    public ETR.Domain.Enums.FacilityType? FacilityType { get; set; }
+    public DateTime? StartAt { get; set; }
+    public DateTime? EndAt { get; set; }
+    public bool IsRemedial { get; set; }
 }
 

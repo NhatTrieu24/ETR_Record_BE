@@ -20,7 +20,7 @@ public class EvidenceService : IEvidenceService
 
     private static readonly HashSet<string> AllowedMimeTypes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "image/jpeg", "image/pjpeg", "image/png", "image/x-png", "image/gif", "image/webp", "application/pdf"
+        "image/jpeg", "image/pjpeg", "image/png", "image/x-png", "image/apng", "application/x-png", "image/x-citrix-png", "image/gif", "image/webp", "application/pdf"
     };
 
     private static readonly Dictionary<string, string> ExtensionToMimeMap = new(StringComparer.OrdinalIgnoreCase)

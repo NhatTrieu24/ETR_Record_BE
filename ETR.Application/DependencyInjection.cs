@@ -37,6 +37,7 @@ public static class DependencyInjection
         services.AddScoped<ICertificateExpiryNotificationService, CertificateExpiryNotificationService>();
         services.AddScoped<IAuthSecurityService, AuthSecurityService>();
         services.AddScoped<ILogbookService, LogbookService>();
+        services.AddScoped<ITrainingFacilityService, TrainingFacilityService>();
 
         return services;
     }

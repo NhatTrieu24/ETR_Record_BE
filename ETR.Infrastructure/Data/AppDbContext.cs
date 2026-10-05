@@ -48,6 +48,7 @@ public partial class AppDbContext : DbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<ExportJob> ExportJobs => Set<ExportJob>();
     public DbSet<Attachment> Attachments => Set<Attachment>();
+    public DbSet<TrainingFacility> TrainingFacilities => Set<TrainingFacility>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -85,6 +86,7 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<Session>().Property(s => s.TrainingType).HasConversion<string>();
         modelBuilder.Entity<AmendmentRequest>().Property(a => a.Status).HasConversion<string>();
         modelBuilder.Entity<UserProfile>().Property(u => u.Status).HasConversion<string>();
+        modelBuilder.Entity<TrainingFacility>().Property(f => f.FacilityType).HasConversion<string>();
     }
 
     private static void ConfigureKeys(ModelBuilder modelBuilder)
@@ -124,6 +126,7 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<AuditLog>().HasKey(e => e.AuditLogId);
         modelBuilder.Entity<ExportJob>().HasKey(e => e.ExportJobId);
         modelBuilder.Entity<Attachment>().HasKey(e => e.AttachmentId);
+        modelBuilder.Entity<TrainingFacility>().HasKey(e => e.FacilityId);
     }
 
     private static void ConfigureUniqueConstraints(ModelBuilder modelBuilder)
@@ -185,6 +188,11 @@ public partial class AppDbContext : DbContext
         // association that can point at ANY entity, which EF Core cannot express as a real FK.
         modelBuilder.Entity<Attachment>()
             .HasIndex(a => new { a.OwnerType, a.OwnerId });
+
+        modelBuilder.Entity<TrainingFacility>()
+            .HasIndex(tf => tf.FacilityCode)
+            .IsUnique()
+            .HasFilter("[IsDeleted] = 0");
     }
 
     private static void ConfigureDecimalPrecision(ModelBuilder modelBuilder)
@@ -235,6 +243,7 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<CourseDepartment>().HasOne(cd => cd.Course).WithMany().HasForeignKey(cd => cd.CourseId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<CourseDepartment>().HasOne(cd => cd.Department).WithMany().HasForeignKey(cd => cd.DepartmentId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<Class>().HasOne<Course>().WithMany().HasForeignKey(tc => tc.CourseId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<Class>().HasOne(tc => tc.DefaultFacility).WithMany().HasForeignKey(tc => tc.DefaultFacilityId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<ClassSubject>().HasOne<Class>().WithMany().HasForeignKey(cs => cs.ClassId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<ClassSubject>().HasOne<Subject>().WithMany().HasForeignKey(cs => cs.SubjectId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<ClassSubject>().HasOne<Account>().WithMany().HasForeignKey(cs => cs.InstructorAccountId).OnDelete(cascadeDeleteConfig);
@@ -254,6 +263,7 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<Session>().HasOne<Account>().WithMany().HasForeignKey(s => s.ConfirmedByAccountId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<Session>().HasOne<Assessment>().WithMany().HasForeignKey(s => s.AssessmentId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<Session>().HasOne<PracticalChecklist>().WithMany().HasForeignKey(s => s.PracticalChecklistId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<Session>().HasOne(s => s.Facility).WithMany().HasForeignKey(s => s.FacilityId).OnDelete(cascadeDeleteConfig);
 
         // Attendance Setup
         modelBuilder.Entity<AttendanceRecord>().HasOne<Session>().WithMany().HasForeignKey(ar => ar.SessionId).OnDelete(cascadeDeleteConfig);

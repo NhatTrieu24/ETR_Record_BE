@@ -37,6 +37,7 @@ public class ClassService : IClassService
         var allClassSubjects = await _unitOfWork.ClassSubjectRepository.GetAllAsync(cancellationToken);
         var allProfiles = await _unitOfWork.UserProfileRepository.GetAllIncludingDeletedAsync(cancellationToken);
         var allAccounts = await _unitOfWork.AccountRepository.GetAllIncludingDeletedAsync(cancellationToken);
+        var allFacilities = await _unitOfWork.TrainingFacilityRepository.GetAllAsync(cancellationToken);
 
         return visible.Select(c => {
             var assignments = allClassSubjects
@@ -48,8 +49,10 @@ public class ClassService : IClassService
                     ResolveInstructorName(cs.InstructorAccountId, allProfiles, allAccounts)))
                 .ToList();
 
+            var defFac = allFacilities.FirstOrDefault(f => f.FacilityId == c.DefaultFacilityId);
+
             return new TrainingClassResponse(
-                c.ClassId, c.ClassCode, c.ClassName, c.CourseId, c.StartDate, c.EndDate, c.Location, c.Capacity, c.Status, assignments, c.CourseVersionNo);
+                c.ClassId, c.ClassCode, c.ClassName, c.CourseId, c.StartDate, c.EndDate, c.Location, c.Capacity, c.Status, assignments, c.CourseVersionNo, c.DefaultFacilityId, defFac?.FacilityName);
         });
     }
 
@@ -63,6 +66,10 @@ public class ClassService : IClassService
         var allClassSubjects = await _unitOfWork.ClassSubjectRepository.GetAllAsync(cancellationToken);
         var allProfiles = await _unitOfWork.UserProfileRepository.GetAllIncludingDeletedAsync(cancellationToken);
         var allAccounts = await _unitOfWork.AccountRepository.GetAllIncludingDeletedAsync(cancellationToken);
+        var defFac = c.DefaultFacilityId.HasValue
+            ? await _unitOfWork.TrainingFacilityRepository.GetByIdAsync(c.DefaultFacilityId.Value, cancellationToken)
+            : null;
+
         var assignments = allClassSubjects
             .Where(cs => cs.ClassId == c.ClassId)
             .Select(cs => new InstructorAssignmentResponse(
@@ -72,7 +79,7 @@ public class ClassService : IClassService
                 ResolveInstructorName(cs.InstructorAccountId, allProfiles, allAccounts)))
             .ToList();
 
-        return new TrainingClassResponse(c.ClassId, c.ClassCode, c.ClassName, c.CourseId, c.StartDate, c.EndDate, c.Location, c.Capacity, c.Status, assignments, c.CourseVersionNo);
+        return new TrainingClassResponse(c.ClassId, c.ClassCode, c.ClassName, c.CourseId, c.StartDate, c.EndDate, c.Location, c.Capacity, c.Status, assignments, c.CourseVersionNo, c.DefaultFacilityId, defFac?.FacilityName);
     }
 
     public async Task<TrainingClassResponse> CreateClassAsync(CreateClassRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
@@ -157,6 +164,16 @@ public class ClassService : IClassService
                 $"Thời gian kết thúc quá ngắn so với tổng số giờ học chuẩn ICAO/CAAV. Lớp học yêu cầu tối thiểu {totalMinDays} ngày đào tạo (kết thúc từ ngày {minEndDate:dd/MM/yyyy}, bao gồm {minTrainingDays} ngày học và {minBufferDays} ngày đệm).");
         }
 
+        TrainingFacility? defaultFacility = null;
+        if (request.DefaultFacilityId.HasValue)
+        {
+            defaultFacility = await _unitOfWork.TrainingFacilityRepository.GetByIdAsync(request.DefaultFacilityId.Value, ct);
+            if (defaultFacility == null || defaultFacility.IsDeleted || !defaultFacility.IsActive)
+            {
+                throw new ValidationException($"Cơ sở đào tạo mặc định với ID {request.DefaultFacilityId.Value} không tồn tại hoặc đã ngừng hoạt động.");
+            }
+        }
+
         var cls = new Class
         {
             ClassCode = request.ClassCode,
@@ -165,7 +182,8 @@ public class ClassService : IClassService
             CourseVersionNo = course.VersionNo,
             StartDate = request.StartDate,
             EndDate = request.EndDate,
-            Location = request.Location,
+            DefaultFacilityId = request.DefaultFacilityId,
+            Location = defaultFacility?.FacilityName ?? request.Location,
             Capacity = request.Capacity,
             Status = request.Status,
             CreatedAt = DateTime.UtcNow,
@@ -227,7 +245,7 @@ public class ClassService : IClassService
 
         await _unitOfWork.SaveAsync(ct);
 
-        return new TrainingClassResponse(cls.ClassId, cls.ClassCode, cls.ClassName, cls.CourseId, cls.StartDate, cls.EndDate, cls.Location, cls.Capacity, cls.Status, assignments, cls.CourseVersionNo);
+        return new TrainingClassResponse(cls.ClassId, cls.ClassCode, cls.ClassName, cls.CourseId, cls.StartDate, cls.EndDate, cls.Location, cls.Capacity, cls.Status, assignments, cls.CourseVersionNo, cls.DefaultFacilityId, defaultFacility?.FacilityName);
     }
 
     public async Task<TrainingClassResponse> UpdateClassAsync(int id, UpdateClassRequest request, int updatedByAccountId, CancellationToken cancellationToken = default)
@@ -343,11 +361,27 @@ public class ClassService : IClassService
                     cls.CourseVersionNo = targetCourse.VersionNo;
                 }
 
+                TrainingFacility? defaultFacility = null;
+                if (request.DefaultFacilityId.HasValue)
+                {
+                    defaultFacility = await _unitOfWork.TrainingFacilityRepository.GetByIdAsync(request.DefaultFacilityId.Value, ct);
+                    if (defaultFacility == null || defaultFacility.IsDeleted || !defaultFacility.IsActive)
+                    {
+                        throw new ValidationException($"Cơ sở đào tạo mặc định với ID {request.DefaultFacilityId.Value} không tồn tại hoặc đã ngừng hoạt động.");
+                    }
+                    cls.DefaultFacilityId = request.DefaultFacilityId.Value;
+                    cls.Location = defaultFacility.FacilityName;
+                }
+                else
+                {
+                    cls.DefaultFacilityId = null;
+                    if (request.Location != null) cls.Location = request.Location;
+                }
+
                 cls.ClassCode = request.ClassCode;
                 cls.ClassName = request.ClassName;
                 cls.StartDate = request.StartDate;
                 cls.EndDate = request.EndDate;
-                cls.Location = request.Location;
                 cls.Capacity = request.Capacity;
                 cls.Status = request.Status;
                 cls.UpdatedAt = DateTime.UtcNow;
@@ -445,7 +479,7 @@ public class ClassService : IClassService
                 await _unitOfWork.SaveAsync(ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
 
-                return new TrainingClassResponse(cls.ClassId, cls.ClassCode, cls.ClassName, cls.CourseId, cls.StartDate, cls.EndDate, cls.Location, cls.Capacity, cls.Status, assignments, cls.CourseVersionNo);
+                return new TrainingClassResponse(cls.ClassId, cls.ClassCode, cls.ClassName, cls.CourseId, cls.StartDate, cls.EndDate, cls.Location, cls.Capacity, cls.Status, assignments, cls.CourseVersionNo, cls.DefaultFacilityId, defaultFacility?.FacilityName);
             }
             catch
             {
@@ -518,6 +552,9 @@ public class ClassService : IClassService
         var sessions = new List<Session>();
 
         var allSubjects = (await _unitOfWork.SubjectRepository.GetAllAsync(ct))?.ToList() ?? new List<Subject>();
+        var allFacilities = (await _unitOfWork.TrainingFacilityRepository.GetAllAsync(ct))?
+            .Where(f => !f.IsDeleted && f.IsActive)
+            .ToList() ?? new List<TrainingFacility>();
 
         // Tải danh sách Assessments và PracticalChecklists thuộc khóa học để tự động gắn vào các buổi kiểm tra
         var assessments = (await _unitOfWork.AssessmentRepository.GetAllAsync(ct))?
@@ -561,50 +598,9 @@ public class ClassService : IClassService
             var currentSubject = allSubjects.FirstOrDefault(s => s.SubjectId == cs.SubjectId);
             TrainingType trainingType = TrainingTypeClassifier.Classify(currentSubject?.SubjectCode, currentSubject?.SubjectName, subjectType);
 
-            // 1. Phân bổ địa điểm theo TrainingType và SubjectType (Facility / Location Routing)
-            string sessionLocation;
-            if (trainingType == TrainingType.Simulator)
-            {
-                sessionLocation = !string.IsNullOrWhiteSpace(classLocation)
-                    ? (classLocation.Contains("Sim", StringComparison.OrdinalIgnoreCase) ? classLocation : $"{classLocation} (SIM Room)")
-                    : "Buồng lái mô phỏng (SIM / FSTD Room)";
-            }
-            else if (trainingType == TrainingType.Flight)
-            {
-                sessionLocation = !string.IsNullOrWhiteSpace(classLocation)
-                    ? (classLocation.Contains("Bay", StringComparison.OrdinalIgnoreCase) ||
-                       classLocation.Contains("Airport", StringComparison.OrdinalIgnoreCase) ||
-                       classLocation.Contains("Sân bay", StringComparison.OrdinalIgnoreCase) ||
-                       classLocation.Contains("Flight", StringComparison.OrdinalIgnoreCase)
-                        ? classLocation
-                        : $"{classLocation} (Khu vực bay)")
-                    : "Sân bay huấn luyện / Khu vực bay (Airfield)";
-            }
-            else
-            {
-                bool isWorkshopOrNonFstdPractical = (!string.IsNullOrEmpty(subjectType) && subjectType.Contains("Practical", StringComparison.OrdinalIgnoreCase)) ||
-                    (!string.IsNullOrEmpty(currentSubject?.SubjectName) && (
-                        currentSubject.SubjectName.Contains("Maintenance", StringComparison.OrdinalIgnoreCase) ||
-                        currentSubject.SubjectName.Contains("Bảo dưỡng", StringComparison.OrdinalIgnoreCase) ||
-                        currentSubject.SubjectName.Contains("Cabin", StringComparison.OrdinalIgnoreCase) ||
-                        currentSubject.SubjectName.Contains("Workshop", StringComparison.OrdinalIgnoreCase) ||
-                        currentSubject.SubjectName.Contains("Xưởng", StringComparison.OrdinalIgnoreCase) ||
-                        currentSubject.SubjectName.Contains("Thực hành", StringComparison.OrdinalIgnoreCase)
-                    ));
-
-                if (!string.IsNullOrWhiteSpace(classLocation))
-                {
-                    sessionLocation = classLocation;
-                }
-                else if (isWorkshopOrNonFstdPractical)
-                {
-                    sessionLocation = "Xưởng thực hành / Phòng huấn luyện an toàn (Ground Workshop)";
-                }
-                else
-                {
-                    sessionLocation = "Phòng học lý thuyết (Ground Classroom)";
-                }
-            }
+            bool isWorkshopOrNonFstdPractical = FacilityCompatibilityHelper.IsWorkshopOrPracticalSubject(
+                currentSubject?.SubjectCode, currentSubject?.SubjectName, subjectType);
+            var compatTypes = FacilityCompatibilityHelper.GetCompatibleFacilityTypes(trainingType, isWorkshopOrNonFstdPractical);
 
             int sessionCount = cs.RequiredSessions > 0 ? cs.RequiredSessions : 1;
 
@@ -632,10 +628,21 @@ public class ClassService : IClassService
 
             for (int i = 1; i <= sessionCount; i++)
             {
-                // 1. Phân bổ ca học thông minh (Smart Time Slot Routing) & Tránh xung đột phòng/lớp
+                // 1. Phân bổ ca học thông minh & Gán cơ sở vật chất (Smart Time Slot & Facility Routing)
                 DateTime candidateDate = currentDate.Date;
-                DateTime allocatedDateTime = candidateDate.Add(new TimeSpan(0, 30, 0)); // default 07:30 GMT+7
+                DateTime allocatedStart = candidateDate.AddHours(8);
+                DateTime allocatedEnd = allocatedStart.AddHours(2);
+                TrainingFacility? assignedFacility = null;
                 bool allocated = false;
+
+                // Các ca học tiêu chuẩn (UTC: 00:30, 02:45, 06:30, 08:45 tương đương 07:30, 09:45, 13:30, 15:45 GMT+7)
+                var standardSlots = new[]
+                {
+                    new TimeSpan(0, 30, 0),
+                    new TimeSpan(2, 45, 0),
+                    new TimeSpan(6, 30, 0),
+                    new TimeSpan(8, 45, 0)
+                };
 
                 while (!allocated)
                 {
@@ -645,31 +652,64 @@ public class ClassService : IClassService
                         continue;
                     }
 
-                    // Các ca học tiêu chuẩn (UTC: 00:30, 02:45, 06:30, 08:45 tương đương 07:30, 09:45, 13:30, 15:45 GMT+7)
-                    var standardSlots = new[]
-                    {
-                        new TimeSpan(0, 30, 0),
-                        new TimeSpan(2, 45, 0),
-                        new TimeSpan(6, 30, 0),
-                        new TimeSpan(8, 45, 0)
-                    };
-
                     foreach (var slot in standardSlots)
                     {
-                        var candidateSlotTime = candidateDate.Add(slot);
+                        var slotStart = candidateDate.Add(slot);
+                        var slotEnd = slotStart.AddHours(2);
 
-                        bool hasConflict = scheduledSessionsPool.Any(s =>
-                            s.SessionDate.HasValue &&
-                            (s.ClassId == cls.ClassId || (!string.IsNullOrWhiteSpace(sessionLocation) && string.Equals(s.Location, sessionLocation, StringComparison.OrdinalIgnoreCase))) &&
-                            Math.Abs((s.SessionDate.Value - candidateSlotTime).TotalMinutes) < 110
-                        );
+                        // Kiểm tra xung đột với lớp này
+                        bool classConflict = scheduledSessionsPool.Any(s =>
+                            s.ClassId == cls.ClassId &&
+                            FacilityCompatibilityHelper.HasTimeOverlap(
+                                slotStart, slotEnd,
+                                s.StartAt ?? s.SessionDate ?? DateTime.MinValue,
+                                s.EndAt ?? (s.SessionDate.HasValue ? s.SessionDate.Value.AddHours(2) : DateTime.MinValue)));
 
-                        if (!hasConflict)
+                        if (classConflict) continue;
+
+                        // Tìm cơ sở đào tạo phù hợp
+                        TrainingFacility? candidateFacility = null;
+                        if (cls.DefaultFacilityId.HasValue)
                         {
-                            allocatedDateTime = candidateSlotTime;
-                            allocated = true;
-                            break;
+                            var defFac = allFacilities.FirstOrDefault(f => f.FacilityId == cls.DefaultFacilityId.Value);
+                            if (defFac != null && compatTypes.Contains(defFac.FacilityType))
+                            {
+                                bool facConflict = scheduledSessionsPool.Any(s =>
+                                    s.FacilityId == defFac.FacilityId &&
+                                    FacilityCompatibilityHelper.HasTimeOverlap(
+                                        slotStart, slotEnd,
+                                        s.StartAt ?? s.SessionDate ?? DateTime.MinValue,
+                                        s.EndAt ?? (s.SessionDate.HasValue ? s.SessionDate.Value.AddHours(2) : DateTime.MinValue)));
+
+                                if (!facConflict) candidateFacility = defFac;
+                            }
                         }
+
+                        if (candidateFacility == null)
+                        {
+                            foreach (var fac in allFacilities.Where(f => compatTypes.Contains(f.FacilityType)))
+                            {
+                                bool facConflict = scheduledSessionsPool.Any(s =>
+                                    s.FacilityId == fac.FacilityId &&
+                                    FacilityCompatibilityHelper.HasTimeOverlap(
+                                        slotStart, slotEnd,
+                                        s.StartAt ?? s.SessionDate ?? DateTime.MinValue,
+                                        s.EndAt ?? (s.SessionDate.HasValue ? s.SessionDate.Value.AddHours(2) : DateTime.MinValue)));
+
+                                if (!facConflict)
+                                {
+                                    candidateFacility = fac;
+                                    break;
+                                }
+                            }
+                        }
+
+                        // Nếu tìm được slot và không xung đột lớp (có thể có hoặc chưa có facility nếu tất cả phòng đầy)
+                        allocatedStart = slotStart;
+                        allocatedEnd = slotEnd;
+                        assignedFacility = candidateFacility;
+                        allocated = true;
+                        break;
                     }
 
                     if (!allocated)
@@ -678,7 +718,12 @@ public class ClassService : IClassService
                     }
                 }
 
-                DateTime sessionDate = allocatedDateTime;
+                DateTime sessionStart = allocatedStart;
+                DateTime sessionEnd = allocatedEnd;
+                int? facilityId = assignedFacility?.FacilityId;
+                string? sessionLocation = assignedFacility != null 
+                    ? assignedFacility.FacilityName 
+                    : (!string.IsNullOrWhiteSpace(classLocation) ? classLocation : "Chưa xếp cơ sở (TBA)");
 
                 // 2. Gán bài kiểm tra / đánh giá vào buổi học cuối của môn (Assessment Assignment)
                 bool isFinalSession = (i == sessionCount);
@@ -732,7 +777,10 @@ public class ClassService : IClassService
                     ClassId = cls.ClassId,
                     SubjectId = cs.SubjectId,
                     SessionTitle = title,
-                    SessionDate = sessionDate,
+                    SessionDate = sessionStart,
+                    StartAt = sessionStart,
+                    EndAt = sessionEnd,
+                    FacilityId = facilityId,
                     Location = sessionLocation,
                     AssessmentId = assessmentId,
                     PracticalChecklistId = checklistId,

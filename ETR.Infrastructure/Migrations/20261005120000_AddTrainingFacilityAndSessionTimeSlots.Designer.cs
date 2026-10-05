@@ -11,7 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ETR.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261005120000_AddTrainingFacilityAndSessionTimeSlots")]
+    partial class AddTrainingFacilityAndSessionTimeSlots
     {
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
@@ -38,6 +39,15 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
 
                     b.Property<int>("DepartmentId")
                         .HasColumnType("int");
@@ -104,6 +114,15 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
@@ -173,6 +192,15 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
@@ -223,6 +251,15 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
 
                     b.Property<int>("ETRCourseRecordId")
                         .HasColumnType("int");
@@ -276,6 +313,15 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
 
                     b.Property<int>("DisplayOrder")
                         .HasColumnType("int");
@@ -333,6 +379,15 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
 
                     b.Property<int>("GradedByAccountId")
                         .HasColumnType("int");
@@ -417,6 +472,15 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
+
                     b.Property<string>("DocType")
                         .HasColumnType("nvarchar(max)");
 
@@ -497,6 +561,15 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
 
                     b.Property<string>("DepartureIcao")
                         .HasColumnType("nvarchar(max)");
@@ -658,6 +731,9 @@ namespace ETR.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("DefaultFacilityId")
+                        .HasColumnType("int");
+
                     b.Property<int>("CourseId")
                         .HasColumnType("int");
 
@@ -675,8 +751,14 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("DefaultFacilityId")
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
                         .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
 
                     b.Property<DateTime>("EndDate")
                         .HasColumnType("datetime2");
@@ -733,6 +815,15 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
+
                     b.Property<int?>("InstructorAccountId")
                         .HasColumnType("int");
 
@@ -780,6 +871,15 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
 
                     b.Property<string>("Description")
                         .HasColumnType("nvarchar(max)");
@@ -851,6 +951,15 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -892,39 +1001,6 @@ namespace ETR.Infrastructure.Migrations
                     b.ToTable("Courses");
                 });
 
-            modelBuilder.Entity("ETR.Domain.Entities.CourseDepartment", b =>
-                {
-                    b.Property<int>("CourseId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("DepartmentId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CreatedByAccountId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("UpdatedByAccountId")
-                        .HasColumnType("int");
-
-                    b.HasKey("CourseId", "DepartmentId");
-
-                    b.HasIndex("DepartmentId");
-
-                    b.ToTable("CourseDepartments");
-                });
-
             modelBuilder.Entity("ETR.Domain.Entities.CourseEnrollment", b =>
                 {
                     b.Property<int>("EnrollmentId")
@@ -950,6 +1026,15 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
 
                     b.Property<DateTime>("EnrolledAt")
                         .HasColumnType("datetime2");
@@ -1000,6 +1085,15 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
@@ -1052,9 +1146,14 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("DepartmentCode")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
 
                     b.Property<string>("DepartmentName")
                         .IsRequired()
@@ -1065,9 +1164,6 @@ namespace ETR.Infrastructure.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsTrainingAudience")
                         .HasColumnType("bit");
 
                     b.Property<DateTime?>("UpdatedAt")
@@ -1110,6 +1206,15 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
 
                     b.Property<int>("EnrollmentId")
                         .HasColumnType("int");
@@ -1179,6 +1284,15 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
 
                     b.Property<int>("EvidenceTypeId")
                         .HasColumnType("int");
@@ -1250,6 +1364,15 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -1295,6 +1418,15 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
 
                     b.Property<DateTime?>("DownloadExpiredAt")
                         .HasColumnType("datetime2");
@@ -1358,6 +1490,15 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Description")
                         .HasColumnType("nvarchar(max)");
 
@@ -1409,6 +1550,15 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
@@ -1486,6 +1636,15 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
@@ -1534,6 +1693,15 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -1596,6 +1764,9 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<int?>("FacilityId")
                         .HasColumnType("int");
 
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsAssessmentRequired")
                         .HasColumnType("bit");
 
@@ -1606,9 +1777,6 @@ namespace ETR.Infrastructure.Migrations
                         .HasColumnType("bit");
 
                     b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsRemedial")
                         .HasColumnType("bit");
 
                     b.Property<string>("LessonCode")
@@ -1623,12 +1791,12 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("SessionDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("StartAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("SessionTitle")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("StartAt")
-                        .HasColumnType("datetime2");
 
                     b.Property<int>("SubjectId")
                         .HasColumnType("int");
@@ -1662,6 +1830,68 @@ namespace ETR.Infrastructure.Migrations
                     b.ToTable("Sessions");
                 });
 
+            modelBuilder.Entity("ETR.Domain.Entities.TrainingFacility", b =>
+                {
+                    b.Property<int>("FacilityId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("FacilityId"));
+
+                    b.Property<int>("Capacity")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("CreatedByAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("DeletedByAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FacilityCode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("FacilityName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FacilityType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LocationDetail")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("UpdatedByAccountId")
+                        .HasColumnType("int");
+
+                    b.HasKey("FacilityId");
+
+                    b.HasIndex("FacilityCode")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.ToTable("TrainingFacilities");
+                });
+
             modelBuilder.Entity("ETR.Domain.Entities.Subject", b =>
                 {
                     b.Property<int>("SubjectId")
@@ -1684,6 +1914,15 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
 
                     b.Property<string>("Description")
                         .HasColumnType("nvarchar(max)");
@@ -1753,6 +1992,15 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
 
                     b.Property<int>("EtrId")
                         .HasColumnType("int");
@@ -1840,6 +2088,15 @@ namespace ETR.Infrastructure.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
@@ -1871,68 +2128,6 @@ namespace ETR.Infrastructure.Migrations
                     b.ToTable("SubjectSignoffs");
                 });
 
-            modelBuilder.Entity("ETR.Domain.Entities.TrainingFacility", b =>
-                {
-                    b.Property<int>("FacilityId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("FacilityId"));
-
-                    b.Property<int>("Capacity")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CreatedByAccountId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("DeletedByAccountId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("FacilityCode")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("FacilityName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("FacilityType")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("LocationDetail")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("UpdatedByAccountId")
-                        .HasColumnType("int");
-
-                    b.HasKey("FacilityId");
-
-                    b.HasIndex("FacilityCode")
-                        .IsUnique()
-                        .HasFilter("[IsDeleted] = 0");
-
-                    b.ToTable("TrainingFacilities");
-                });
-
             modelBuilder.Entity("ETR.Domain.Entities.UserProfile", b =>
                 {
                     b.Property<int>("AccountId")
@@ -1955,6 +2150,15 @@ namespace ETR.Infrastructure.Migrations
 
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("FacilityId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsRemedial")
+                        .HasColumnType("bit");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -2158,25 +2362,13 @@ namespace ETR.Infrastructure.Migrations
                         .HasForeignKey("SubjectId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-                });
 
-            modelBuilder.Entity("ETR.Domain.Entities.CourseDepartment", b =>
-                {
-                    b.HasOne("ETR.Domain.Entities.Course", "Course")
+                    b.HasOne("ETR.Domain.Entities.TrainingFacility", "Facility")
                         .WithMany()
-                        .HasForeignKey("CourseId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .HasForeignKey("FacilityId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("ETR.Domain.Entities.Department", "Department")
-                        .WithMany()
-                        .HasForeignKey("DepartmentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Course");
-
-                    b.Navigation("Department");
+                    b.Navigation("Facility");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.CourseEnrollment", b =>
@@ -2207,6 +2399,13 @@ namespace ETR.Infrastructure.Migrations
                         .HasForeignKey("SubjectId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("ETR.Domain.Entities.TrainingFacility", "Facility")
+                        .WithMany()
+                        .HasForeignKey("FacilityId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Facility");
                 });
 
             modelBuilder.Entity("ETR.Domain.Entities.ETRCourseRecord", b =>
@@ -2399,3 +2598,4 @@ namespace ETR.Infrastructure.Migrations
         }
     }
 }
+

@@ -34,6 +34,7 @@ public interface IUnitOfWork
     IAuditLogRepository AuditLogRepository { get; }
     IGenericRepository<ExportJob> ExportJobRepository { get; }
     IGenericRepository<Attachment> AttachmentRepository { get; }
+    IGenericRepository<TrainingFacility> TrainingFacilityRepository { get; }
 
     Task BeginTransactionAsync(CancellationToken cancellationToken = default);
     Task CommitTransactionAsync(CancellationToken cancellationToken = default);

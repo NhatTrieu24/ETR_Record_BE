@@ -14,4 +14,10 @@ public class Class : BaseEntity
     public int Capacity { get; set; }
     public ClassStatus Status { get; set; }
     public int CourseVersionNo { get; set; } = 1;
+
+    /// <summary>
+    /// Cơ sở vật chất mặc định của lớp học (gợi ý template cho các buổi học của lớp).
+    /// </summary>
+    public int? DefaultFacilityId { get; set; }
+    public TrainingFacility? DefaultFacility { get; set; }
 }
