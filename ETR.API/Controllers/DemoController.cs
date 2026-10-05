@@ -630,6 +630,41 @@ public class DemoController : ControllerBase
             updatedCount
         });
     }
+
+    /// <summary>
+    /// Tạo nhanh 1 yêu cầu mở khóa môn học (Amendment Request) mẫu ở trạng thái Pending để kiểm tra UI/UX.
+    /// </summary>
+    [HttpPost("amendment/create-sample-request")]
+    public async Task<IActionResult> CreateSampleAmendmentRequest(CancellationToken ct)
+    {
+        var sr = await _context.SubjectResults.FirstOrDefaultAsync(s => s.Status == SubjectResultStatus.Passed, ct)
+                 ?? await _context.SubjectResults.FirstOrDefaultAsync(ct);
+        if (sr == null)
+            return BadRequest(new { message = "No SubjectResult exists in the system to create an unlock request for." });
+
+        var instructor = await _context.Accounts.FirstOrDefaultAsync(a => a.Username == "instructor1" || a.Username == "instructor", ct);
+        var instructorId = instructor?.AccountId ?? sr.EvaluatedByAccountId ?? 1;
+
+        var amendment = new AmendmentRequest
+        {
+            SubjectResultId = sr.SubjectResultId,
+            RequestedByAccountId = instructorId,
+            Reason = "Instructor requested unlock to update practical assessment score following re-evaluation.",
+            OldValue = sr.Status.ToString(),
+            Status = AmendmentStatus.Pending,
+            CreatedAt = DateTime.UtcNow
+        };
+        _context.AmendmentRequests.Add(amendment);
+        await _context.SaveChangesAsync(ct);
+
+        return Ok(new
+        {
+            message = $"Created sample Amendment/Unlock request #{amendment.AmendmentRequestId} for SubjectResult #{sr.SubjectResultId} successfully!",
+            amendmentRequestId = amendment.AmendmentRequestId,
+            subjectResultId = sr.SubjectResultId,
+            status = "Pending"
+        });
+    }
 }
 
 public class QuickCohortRequest

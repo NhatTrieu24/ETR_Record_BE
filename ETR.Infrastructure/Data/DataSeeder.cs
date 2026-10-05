@@ -926,9 +926,10 @@ public static class DataSeeder
 
     private static async Task SeedAmendmentRequestsAsync(AppDbContext context)
     {
-        if (!await context.AmendmentRequests.AnyAsync())
+        if (!await context.AmendmentRequests.AnyAsync(a => a.Status == AmendmentStatus.Pending))
         {
-            var sr = await context.SubjectResults.FirstOrDefaultAsync();
+            var sr = await context.SubjectResults.FirstOrDefaultAsync(s => s.Status == SubjectResultStatus.Passed)
+                     ?? await context.SubjectResults.FirstOrDefaultAsync();
             if (sr != null)
             {
                 var instructor = await context.Accounts.FirstOrDefaultAsync(a => a.Username == InstructorUsername);
