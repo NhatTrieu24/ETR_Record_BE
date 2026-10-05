@@ -73,6 +73,16 @@ public static class FacilityCompatibilityHelper
     }
 
     /// <summary>
+    /// Overload tiện ích kiểm tra trực tiếp qua FacilityType, TrainingType và Subject.
+    /// </summary>
+    public static bool IsCompatible(FacilityType facilityType, TrainingType trainingType, Subject? subject = null)
+    {
+        bool isWorkshopOrPractical = IsWorkshopOrPracticalSubject(
+            subject?.SubjectCode, subject?.SubjectName, subject?.SubjectType);
+        return IsCompatible(trainingType, isWorkshopOrPractical, facilityType);
+    }
+
+    /// <summary>
     /// Kiểm tra xem 2 khoảng thời gian [start1, end1) và [start2, end2) có đè/trùng nhau hay không.
     /// </summary>
     public static bool HasTimeOverlap(DateTime start1, DateTime end1, DateTime start2, DateTime end2)

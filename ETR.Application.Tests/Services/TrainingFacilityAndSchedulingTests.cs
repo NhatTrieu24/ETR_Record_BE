@@ -18,18 +18,25 @@ public class TrainingFacilityAndSchedulingTests
     private readonly Mock<IGenericRepository<Subject>> _mockSubjectRepo = new();
     private readonly Mock<IGenericRepository<Assessment>> _mockAssessmentRepo = new();
     private readonly Mock<IGenericRepository<PracticalChecklist>> _mockChecklistRepo = new();
+    private readonly Mock<IGenericRepository<ClassSubject>> _mockClassSubjectRepo = new();
     private readonly Mock<IGenericRepository<TrainingFacility>> _mockFacilityRepo = new();
+    private readonly Mock<IGenericRepository<UserProfile>> _mockUserProfileRepo = new();
+    private readonly Mock<IGenericRepository<Account>> _mockAccountRepo = new();
     private readonly Mock<IAuditLogRepository> _mockAuditRepo = new();
 
     public TrainingFacilityAndSchedulingTests()
     {
         _mockUow.Setup(u => u.SessionRepository).Returns(_mockSessionRepo.Object);
         _mockUow.Setup(u => u.ClassRepository).Returns(_mockClassRepo.Object);
+        _mockUow.Setup(u => u.ClassSubjectRepository).Returns(_mockClassSubjectRepo.Object);
         _mockUow.Setup(u => u.SubjectRepository).Returns(_mockSubjectRepo.Object);
         _mockUow.Setup(u => u.AssessmentRepository).Returns(_mockAssessmentRepo.Object);
         _mockUow.Setup(u => u.PracticalChecklistRepository).Returns(_mockChecklistRepo.Object);
         _mockUow.Setup(u => u.TrainingFacilityRepository).Returns(_mockFacilityRepo.Object);
+        _mockUow.Setup(u => u.UserProfileRepository).Returns(_mockUserProfileRepo.Object);
+        _mockUow.Setup(u => u.AccountRepository).Returns(_mockAccountRepo.Object);
         _mockUow.Setup(u => u.AuditLogRepository).Returns(_mockAuditRepo.Object);
+        _mockUow.Setup(u => u.SaveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(1);
     }
 
     [Theory]
@@ -136,7 +143,7 @@ public class TrainingFacilityAndSchedulingTests
         var ex = await Assert.ThrowsAsync<ValidationException>(() =>
             service.UpdateSessionAsync(101, request, 1));
 
-        Assert.Contains("không phù hợp với hình thức đào tạo Flight", ex.Message);
+        Assert.Contains("không tương thích với buổi đào tạo", ex.Message);
     }
 
     [Fact]
@@ -198,7 +205,7 @@ public class TrainingFacilityAndSchedulingTests
         {
             SessionId = 100,
             ClassId = 1,
-            InstructorId = 99,
+            SubjectId = 10,
             SessionDate = new DateTime(2026, 10, 10),
             StartAt = new DateTime(2026, 10, 10, 8, 0, 0),
             EndAt = new DateTime(2026, 10, 10, 10, 0, 0)
@@ -208,15 +215,22 @@ public class TrainingFacilityAndSchedulingTests
         {
             SessionId = 102,
             ClassId = 2,
-            InstructorId = 99,
             SubjectId = 5,
             TrainingType = TrainingType.Theory,
             SessionDate = new DateTime(2026, 10, 10)
         };
 
+        var classSubjects = new List<ClassSubject>
+        {
+            new ClassSubject { ClassId = 1, SubjectId = 10, InstructorAccountId = 99 },
+            new ClassSubject { ClassId = 2, SubjectId = 5, InstructorAccountId = 99 }
+        };
+
         _mockSessionRepo.Setup(r => r.GetByIdAsync(102, It.IsAny<CancellationToken>())).ReturnsAsync(targetSession);
-        _mockClassRepo.Setup(r => r.GetByIdAsync(2, It.IsAny<CancellationToken>())).ReturnsAsync(new Class { ClassId = 2, CourseId = 10 });
-        _mockSessionRepo.Setup(r => r.GetQueryable()).Returns(new List<Session> { existingSession }.AsQueryable());
+        _mockClassRepo.Setup(r => r.GetByIdAsync(2, It.IsAny<CancellationToken>())).ReturnsAsync(new Class { ClassId = 2, CourseId = 10, ClassCode = "CLS-02" });
+        _mockClassRepo.Setup(r => r.GetQueryable()).Returns(new List<Class> { new Class { ClassId = 1, ClassCode = "CLS-01" }, new Class { ClassId = 2, ClassCode = "CLS-02" } }.AsQueryable());
+        _mockSessionRepo.Setup(r => r.GetQueryable()).Returns(new List<Session> { existingSession, targetSession }.AsQueryable());
+        _mockClassSubjectRepo.Setup(r => r.GetQueryable()).Returns(classSubjects.AsQueryable());
 
         var service = new SessionService(_mockUow.Object);
         var request = new UpdateSessionRequest
@@ -231,7 +245,7 @@ public class TrainingFacilityAndSchedulingTests
         var ex = await Assert.ThrowsAsync<ValidationException>(() =>
             service.UpdateSessionAsync(102, request, 1));
 
-        Assert.Contains("Giảng viên đã có lịch dạy trùng khung giờ", ex.Message);
+        Assert.Contains("Xung đột lịch giảng viên", ex.Message);
     }
 
     [Fact]
@@ -243,24 +257,37 @@ public class TrainingFacilityAndSchedulingTests
 
         var service = new SessionService(_mockUow.Object);
 
-        // 1. Standard session creation attempted manually => throws NotSupportedException
+        // 1. Standard session creation attempted manually => throws BusinessRuleViolationException
         var standardRequest = new CreateSessionRequest
         {
             ClassId = 1,
+            SubjectId = 5,
             SessionTitle = "Buổi học tiêu chuẩn thủ công",
             SessionDate = DateTime.UtcNow.AddDays(1),
             TrainingType = TrainingType.Theory,
             IsRemedial = false
         };
 
-        var ex = await Assert.ThrowsAsync<NotSupportedException>(() =>
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
             service.CreateSessionAsync(standardRequest, 1));
-        Assert.Contains("Buổi học tiêu chuẩn được tự động sinh", ex.Message);
+        Assert.Contains("Buổi học chính khóa được hệ thống tự động sinh", ex.Message);
 
         // 2. Remedial session creation attempted manually => succeeds
+        var remedialSubject = new Subject { SubjectId = 5, SubjectName = "Thực hành Buồng lái", SubjectCode = "SIM-01" };
+        var remedialClassSubject = new ClassSubject { ClassId = 1, SubjectId = 5, InstructorAccountId = 99 };
+        var remedialSession = new Session { SessionId = 55, ClassId = 1, SubjectId = 5, IsRemedial = true, SessionTitle = "Buổi phụ đạo thực hành SIM" };
+
+        _mockSubjectRepo.Setup(r => r.GetByIdAsync(5, It.IsAny<CancellationToken>())).ReturnsAsync(remedialSubject);
+        _mockClassSubjectRepo.Setup(r => r.GetQueryable()).Returns(new List<ClassSubject> { remedialClassSubject }.AsQueryable());
+        _mockClassSubjectRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<ClassSubject> { remedialClassSubject });
+        _mockSessionRepo.Setup(r => r.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>())).ReturnsAsync(remedialSession);
+        _mockUserProfileRepo.Setup(r => r.GetAllIncludingDeletedAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<UserProfile>());
+        _mockAccountRepo.Setup(r => r.GetAllIncludingDeletedAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<Account>());
+
         var remedialRequest = new CreateSessionRequest
         {
             ClassId = 1,
+            SubjectId = 5,
             SessionTitle = "Buổi phụ đạo thực hành SIM",
             SessionDate = DateTime.UtcNow.AddDays(1),
             StartAt = DateTime.UtcNow.AddDays(1).Date.AddHours(14),
@@ -273,7 +300,7 @@ public class TrainingFacilityAndSchedulingTests
         Assert.NotNull(result);
         Assert.True(result.IsRemedial);
         _mockSessionRepo.Verify(r => r.AddAsync(It.Is<Session>(s => s.IsRemedial), It.IsAny<CancellationToken>()), Times.Once);
-        _mockUow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _mockUow.Verify(u => u.SaveAsync(It.IsAny<CancellationToken>()), Times.AtLeastOnce);
     }
 
     [Fact]
@@ -287,14 +314,14 @@ public class TrainingFacilityAndSchedulingTests
 
         var service = new SessionService(_mockUow.Object);
 
-        // Deleting regular curriculum session => ValidationException
-        var ex = await Assert.ThrowsAsync<ValidationException>(() =>
+        // Deleting regular curriculum session => BusinessRuleViolationException
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
             service.DeleteSessionAsync(10, 1));
-        Assert.Contains("Không thể xóa buổi học tiêu chuẩn", ex.Message);
+        Assert.Contains("Buổi học chính khóa được sinh tự động", ex.Message);
 
         // Deleting remedial session => Success
-        var result = await service.DeleteSessionAsync(11, 1);
-        Assert.True(result);
-        _mockSessionRepo.Verify(r => r.DeleteAsync(remedialSession, It.IsAny<CancellationToken>()), Times.Once);
+        await service.DeleteSessionAsync(11, 1);
+        _mockSessionRepo.Verify(r => r.Update(remedialSession), Times.Once);
+        _mockUow.Verify(u => u.SaveAsync(It.IsAny<CancellationToken>()), Times.AtLeastOnce);
     }
 }
