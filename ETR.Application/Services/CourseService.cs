@@ -521,7 +521,7 @@ public class CourseService : ICourseService
                 {
                     var allEnrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct);
                     var allClassSubjects = await _unitOfWork.ClassSubjectRepository.GetAllAsync(ct);
-                    var allSessions = await _unitOfWork.SessionRepository.GetAllAsync(ct);
+                    var allSessions = (await _unitOfWork.SessionRepository.GetAllAsync(ct)).ToList();
                     var allSubjects = await _unitOfWork.SubjectRepository.GetAllAsync(ct);
                     var subjectMap = allSubjects.ToDictionary(s => s.SubjectId, s => s.SubjectType);
                     var courseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct))
@@ -707,7 +707,15 @@ public class CourseService : ICourseService
                                         int? facilityId = assignedFacility?.FacilityId;
                                         string? sessionLocation = assignedFacility != null 
                                             ? assignedFacility.FacilityName 
-                                            : (!string.IsNullOrWhiteSpace(cls.Location) ? cls.Location : "Chưa xếp cơ sở (TBA)");
+                                            : (!string.IsNullOrWhiteSpace(cls.Location) 
+                                                ? cls.Location 
+                                                : (trainingType == TrainingType.Simulator
+                                                    ? "Buồng lái mô phỏng (SIM / FSTD Room)"
+                                                    : trainingType == TrainingType.Flight
+                                                        ? "Sân bay huấn luyện / Khu vực bay (Airfield)"
+                                                        : isWorkshopOrNonFstdPractical
+                                                            ? "Xưởng thực hành / Phòng huấn luyện an toàn (Ground Workshop)"
+                                                            : "Phòng học lý thuyết (Ground Classroom)"));
 
                                         var session = new Session
                                         {

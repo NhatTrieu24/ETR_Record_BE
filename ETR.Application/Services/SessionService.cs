@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using ETR.Application.Compliance;
 using ETR.Application.DTOs.Session;
 using ETR.Application.Exceptions;
 using ETR.Application.Interfaces;
@@ -362,7 +363,8 @@ public class SessionService : ISessionService
 
         session.IsDeleted = true;
         session.DeletedAt = DateTime.UtcNow;
-        session.DeletedByAccountId = deletedByAccountId;
+        session.UpdatedAt = DateTime.UtcNow;
+        session.UpdatedByAccountId = deletedByAccountId;
 
         _unitOfWork.SessionRepository.Update(session);
         await _unitOfWork.SaveAsync(cancellationToken);

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using ETR.Application.Compliance;
 using ETR.Application.DTOs.Facility;
 using ETR.Application.Exceptions;
 using ETR.Application.Interfaces;
@@ -155,7 +156,7 @@ public class TrainingFacilityService : ITrainingFacilityService
         facility.UpdatedAt = DateTime.UtcNow;
         facility.UpdatedByAccountId = updatedByAccountId;
 
-        await _unitOfWork.TrainingFacilityRepository.UpdateAsync(facility, cancellationToken);
+        _unitOfWork.TrainingFacilityRepository.Update(facility);
         await _unitOfWork.SaveAsync(cancellationToken);
 
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
@@ -181,9 +182,10 @@ public class TrainingFacilityService : ITrainingFacilityService
 
         facility.IsDeleted = true;
         facility.DeletedAt = DateTime.UtcNow;
-        facility.DeletedByAccountId = deletedByAccountId;
+        facility.UpdatedAt = DateTime.UtcNow;
+        facility.UpdatedByAccountId = deletedByAccountId;
 
-        await _unitOfWork.TrainingFacilityRepository.UpdateAsync(facility, cancellationToken);
+        _unitOfWork.TrainingFacilityRepository.Update(facility);
         await _unitOfWork.SaveAsync(cancellationToken);
 
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog

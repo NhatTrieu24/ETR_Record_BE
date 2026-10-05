@@ -37,7 +37,9 @@ public class ClassService : IClassService
         var allClassSubjects = await _unitOfWork.ClassSubjectRepository.GetAllAsync(cancellationToken);
         var allProfiles = await _unitOfWork.UserProfileRepository.GetAllIncludingDeletedAsync(cancellationToken);
         var allAccounts = await _unitOfWork.AccountRepository.GetAllIncludingDeletedAsync(cancellationToken);
-        var allFacilities = await _unitOfWork.TrainingFacilityRepository.GetAllAsync(cancellationToken);
+        var allFacilities = _unitOfWork.TrainingFacilityRepository != null
+            ? await _unitOfWork.TrainingFacilityRepository.GetAllAsync(cancellationToken)
+            : (IReadOnlyList<TrainingFacility>)Array.Empty<TrainingFacility>();
 
         return visible.Select(c => {
             var assignments = allClassSubjects
@@ -66,7 +68,7 @@ public class ClassService : IClassService
         var allClassSubjects = await _unitOfWork.ClassSubjectRepository.GetAllAsync(cancellationToken);
         var allProfiles = await _unitOfWork.UserProfileRepository.GetAllIncludingDeletedAsync(cancellationToken);
         var allAccounts = await _unitOfWork.AccountRepository.GetAllIncludingDeletedAsync(cancellationToken);
-        var defFac = c.DefaultFacilityId.HasValue
+        var defFac = (c.DefaultFacilityId.HasValue && _unitOfWork.TrainingFacilityRepository != null)
             ? await _unitOfWork.TrainingFacilityRepository.GetByIdAsync(c.DefaultFacilityId.Value, cancellationToken)
             : null;
 
@@ -170,7 +172,7 @@ public class ClassService : IClassService
             defaultFacility = await _unitOfWork.TrainingFacilityRepository.GetByIdAsync(request.DefaultFacilityId.Value, ct);
             if (defaultFacility == null || defaultFacility.IsDeleted || !defaultFacility.IsActive)
             {
-                throw new ValidationException($"Cơ sở đào tạo mặc định với ID {request.DefaultFacilityId.Value} không tồn tại hoặc đã ngừng hoạt động.");
+                throw new BusinessRuleViolationException($"Cơ sở đào tạo mặc định với ID {request.DefaultFacilityId.Value} không tồn tại hoặc đã ngừng hoạt động.");
             }
         }
 
@@ -367,7 +369,7 @@ public class ClassService : IClassService
                     defaultFacility = await _unitOfWork.TrainingFacilityRepository.GetByIdAsync(request.DefaultFacilityId.Value, ct);
                     if (defaultFacility == null || defaultFacility.IsDeleted || !defaultFacility.IsActive)
                     {
-                        throw new ValidationException($"Cơ sở đào tạo mặc định với ID {request.DefaultFacilityId.Value} không tồn tại hoặc đã ngừng hoạt động.");
+                        throw new BusinessRuleViolationException($"Cơ sở đào tạo mặc định với ID {request.DefaultFacilityId.Value} không tồn tại hoặc đã ngừng hoạt động.");
                     }
                     cls.DefaultFacilityId = request.DefaultFacilityId.Value;
                     cls.Location = defaultFacility.FacilityName;
@@ -552,9 +554,11 @@ public class ClassService : IClassService
         var sessions = new List<Session>();
 
         var allSubjects = (await _unitOfWork.SubjectRepository.GetAllAsync(ct))?.ToList() ?? new List<Subject>();
-        var allFacilities = (await _unitOfWork.TrainingFacilityRepository.GetAllAsync(ct))?
-            .Where(f => !f.IsDeleted && f.IsActive)
-            .ToList() ?? new List<TrainingFacility>();
+        var allFacilities = _unitOfWork.TrainingFacilityRepository != null
+            ? (await _unitOfWork.TrainingFacilityRepository.GetAllAsync(ct))?
+                .Where(f => !f.IsDeleted && f.IsActive)
+                .ToList() ?? new List<TrainingFacility>()
+            : new List<TrainingFacility>();
 
         // Tải danh sách Assessments và PracticalChecklists thuộc khóa học để tự động gắn vào các buổi kiểm tra
         var assessments = (await _unitOfWork.AssessmentRepository.GetAllAsync(ct))?
@@ -723,7 +727,15 @@ public class ClassService : IClassService
                 int? facilityId = assignedFacility?.FacilityId;
                 string? sessionLocation = assignedFacility != null 
                     ? assignedFacility.FacilityName 
-                    : (!string.IsNullOrWhiteSpace(classLocation) ? classLocation : "Chưa xếp cơ sở (TBA)");
+                    : (!string.IsNullOrWhiteSpace(classLocation) 
+                        ? classLocation 
+                        : (trainingType == TrainingType.Simulator
+                            ? "Buồng lái mô phỏng (SIM / FSTD Room)"
+                            : trainingType == TrainingType.Flight
+                                ? "Sân bay huấn luyện / Khu vực bay (Airfield)"
+                                : isWorkshopOrNonFstdPractical
+                                    ? "Xưởng thực hành / Phòng huấn luyện an toàn (Ground Workshop)"
+                                    : "Phòng học lý thuyết (Ground Classroom)"));
 
                 // 2. Gán bài kiểm tra / đánh giá vào buổi học cuối của môn (Assessment Assignment)
                 bool isFinalSession = (i == sessionCount);

@@ -1,4 +1,5 @@
 using ETR.Domain.Enums;
+using ETR.Domain.Entities;
 
 namespace ETR.Application.Services;
 

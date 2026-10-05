@@ -1,3 +1,4 @@
+using ETR.Application.Compliance;
 using ETR.Application.DTOs.Facility;
 using ETR.Application.DTOs.Session;
 using ETR.Application.Interfaces;
@@ -195,7 +196,7 @@ public class TrainingFacilityAndSchedulingTests
         var ex = await Assert.ThrowsAsync<ValidationException>(() =>
             service.UpdateSessionAsync(102, request, 1));
 
-        Assert.Contains("đã có lịch sử dụng trùng khung giờ", ex.Message);
+        Assert.Contains("Xung đột cơ sở vật chất", ex.Message);
     }
 
     [Fact]
