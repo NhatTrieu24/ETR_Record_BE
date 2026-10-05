@@ -939,7 +939,7 @@ public static class DataSeeder
                     SubjectResultId = sr.SubjectResultId,
                     RequestedByAccountId = instructorId,
                     Reason = "Instructor requested unlock to update practical assessment score following re-evaluation.",
-                    OldValue = sr.Status,
+                    OldValue = sr.Status.ToString(),
                     Status = AmendmentStatus.Pending,
                     CreatedAt = DateTime.UtcNow.AddHours(-2)
                 });
