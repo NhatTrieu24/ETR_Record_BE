@@ -1,0 +1,25 @@
+# ------------------------------------------------------------------------------
+# GitHub Linguist Overrides: Language Detection & Repository Statistics
+# ------------------------------------------------------------------------------
+# Exclude all SQL scripts, migrations, and database seed dumps from language stats
+*.sql linguist-detectable=false
+*.sql linguist-vendored=true
+Database/**/*.sql linguist-detectable=false
+Database/**/*.sql linguist-vendored=true
+Report/**/*.sql linguist-detectable=false
+Report/**/*.sql linguist-vendored=true
+Scripts/**/*.sql linguist-detectable=false
+Scripts/**/*.sql linguist-vendored=true
+
+# Exclude documentation, assets, and auxiliary scripts from language stats
+*.md linguist-documentation=true
+*.ps1 linguist-detectable=false
+*.py linguist-detectable=false
+*.json linguist-detectable=false
+*.http linguist-detectable=false
+*.jpeg binary
+*.jpg binary
+*.png binary
+
+# Explicitly ensure C# is detected as the primary codebase language
+*.cs linguist-detectable=true
