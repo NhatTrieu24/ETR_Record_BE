@@ -103,8 +103,16 @@ public class ClassService : IClassService
             throw new BusinessRuleViolationException("Không thể tạo mới lớp học với trạng thái 'Completed'. Lớp học mới chỉ có thể bắt đầu với trạng thái Planned hoặc InProgress.");
         }
 
-        var course = await _unitOfWork.CourseRepository.GetByIdAsync(request.CourseId, ct)
-            ?? throw new BusinessRuleViolationException("Course not found.");
+        if (request.CourseId <= 0)
+        {
+            throw new BusinessRuleViolationException("Khóa học không hợp lệ. Vui lòng chọn một khóa học cụ thể.");
+        }
+
+        var course = await _unitOfWork.CourseRepository.GetByIdAsync(request.CourseId, ct);
+        if (course == null || course.IsDeleted)
+        {
+            throw new BusinessRuleViolationException($"Khóa học (ID: #{request.CourseId}) không tồn tại trong hệ thống hoặc đã bị xóa. Vui lòng chọn một khóa học hợp lệ đang hoạt động.");
+        }
 
         if (course.Status != CourseStatus.Active)
         {
@@ -316,9 +324,27 @@ public class ClassService : IClassService
                     }
                 }
 
+                if (request.CourseId > 0 && request.CourseId != cls.CourseId)
+                {
+                    var targetCourse = await _unitOfWork.CourseRepository.GetByIdAsync(request.CourseId, ct);
+                    if (targetCourse == null || targetCourse.IsDeleted)
+                    {
+                        throw new BusinessRuleViolationException($"Không thể chuyển lớp học sang khóa học (ID: #{request.CourseId}) vì khóa học này không tồn tại hoặc đã bị xóa.");
+                    }
+
+                    var hasEnrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct))
+                        .Any(e => e.ClassId == id && !e.IsDeleted);
+                    if (hasEnrollments)
+                    {
+                        throw new BusinessRuleViolationException("Không thể thay đổi khóa học của lớp học đã có học viên ghi danh.");
+                    }
+
+                    cls.CourseId = request.CourseId;
+                    cls.CourseVersionNo = targetCourse.VersionNo;
+                }
+
                 cls.ClassCode = request.ClassCode;
                 cls.ClassName = request.ClassName;
-                cls.CourseId = request.CourseId; // Although this shouldn't normally change
                 cls.StartDate = request.StartDate;
                 cls.EndDate = request.EndDate;
                 cls.Location = request.Location;

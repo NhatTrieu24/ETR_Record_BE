@@ -50,15 +50,44 @@ public class CourseService : ICourseService
         }
     }
 
+    private async Task<(List<CourseDepartment> courseDepartments, Dictionary<int, string> departments)> SafeGetCourseDepartmentsAsync(CancellationToken cancellationToken)
+    {
+        var courseDepartments = new List<CourseDepartment>();
+        var departments = new Dictionary<int, string>();
+
+        try
+        {
+            if (_unitOfWork.CourseDepartmentRepository != null)
+            {
+                var cds = await _unitOfWork.CourseDepartmentRepository.GetAllAsync(cancellationToken);
+                if (cds != null) courseDepartments = cds.Where(cd => !cd.IsDeleted).ToList();
+            }
+        }
+        catch
+        {
+            // Fallback gracefully if CourseDepartments table has not been created yet by migration
+        }
+
+        try
+        {
+            if (_unitOfWork.DepartmentRepository != null)
+            {
+                var depts = await _unitOfWork.DepartmentRepository.GetAllAsync(cancellationToken);
+                if (depts != null) departments = depts.ToDictionary(d => d.DepartmentId, d => d.DepartmentName);
+            }
+        }
+        catch
+        {
+            // Fallback gracefully if DepartmentCode/IsTrainingAudience columns have not been added yet by migration
+        }
+
+        return (courseDepartments, departments);
+    }
+
     public async Task<IEnumerable<CourseResponse>> GetAllCoursesAsync(CancellationToken cancellationToken = default)
     {
         var courses = await _unitOfWork.CourseRepository.GetAllAsync(cancellationToken);
-        var courseDepartments = _unitOfWork.CourseDepartmentRepository != null
-            ? (await _unitOfWork.CourseDepartmentRepository.GetAllAsync(cancellationToken)).Where(cd => !cd.IsDeleted).ToList()
-            : new List<CourseDepartment>();
-        var departments = _unitOfWork.DepartmentRepository != null
-            ? (await _unitOfWork.DepartmentRepository.GetAllAsync(cancellationToken)).ToDictionary(d => d.DepartmentId, d => d.DepartmentName)
-            : new Dictionary<int, string>();
+        var (courseDepartments, departments) = await SafeGetCourseDepartmentsAsync(cancellationToken);
 
         return courses.Where(c => !c.IsDeleted).Select(c =>
         {
@@ -88,12 +117,8 @@ public class CourseService : ICourseService
                 cs.CourseId, cs.SubjectId, cs.SequenceNo, cs.RequiredHours, cs.RequiredSessions, cs.IsMandatory, cs.PassingScore, cs.SubjectVersion
             )).ToList();
 
-        var cdList = _unitOfWork.CourseDepartmentRepository != null
-            ? (await _unitOfWork.CourseDepartmentRepository.GetAllAsync(cancellationToken)).Where(cd => cd.CourseId == id && !cd.IsDeleted).ToList()
-            : new List<CourseDepartment>();
-        var departments = _unitOfWork.DepartmentRepository != null
-            ? (await _unitOfWork.DepartmentRepository.GetAllAsync(cancellationToken)).ToDictionary(d => d.DepartmentId, d => d.DepartmentName)
-            : new Dictionary<int, string>();
+        var (courseDepartments, departments) = await SafeGetCourseDepartmentsAsync(cancellationToken);
+        var cdList = courseDepartments.Where(cd => cd.CourseId == id).ToList();
         var deptIds = cdList.Select(cd => cd.DepartmentId).ToList();
         var deptNames = deptIds.Where(deptId => departments.ContainsKey(deptId)).Select(deptId => departments[deptId]).ToList();
 

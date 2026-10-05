@@ -29,14 +29,20 @@ namespace ETR.Infrastructure.Migrations
 
             // 2. Data cleansing, seed, backfill, and collision resolution (executed BEFORE creating unique index)
             migrationBuilder.Sql(@"
-                -- 2.1 Resolve potential collisions: Any non-standard department currently holding standard codes
+                -- 2.1 Backfill empty or whitespace codes with unique DEPT-{DepartmentId}
+                UPDATE [Departments]
+                SET [DepartmentCode] = CONCAT(N'DEPT-', [DepartmentId])
+                WHERE ([DepartmentCode] IS NULL OR [DepartmentCode] = N'' OR LTRIM(RTRIM([DepartmentCode])) = N'')
+                  AND [IsDeleted] = 0;
+
+                -- 2.2 Resolve collisions: Release standard codes if held by non-standard custom departments
                 UPDATE [Departments]
                 SET [DepartmentCode] = CONCAT(N'DEPT-', [DepartmentId])
                 WHERE [DepartmentCode] IN (N'ADM', N'TRN', N'FC', N'CC', N'ENG', N'GND')
                   AND [DepartmentName] NOT IN (N'Administration', N'Training', N'Flight Crew', N'Cabin Crew', N'Engineering & Maintenance', N'Ground Operations')
                   AND [IsDeleted] = 0;
 
-                -- 2.2 Upsert standard departments (ensuring exactly one active row receives the standard code)
+                -- 2.3 Upsert 6 standard departments (ensuring exactly one active row receives each standard code)
                 -- Administration (Internal Admin)
                 IF EXISTS (SELECT 1 FROM [Departments] WHERE [DepartmentName] = N'Administration' AND [IsDeleted] = 0)
                     UPDATE [Departments] SET [DepartmentCode] = N'ADM', [IsTrainingAudience] = 0, [Description] = COALESCE(NULLIF([Description], N''), N'Ban giám hiệu & Quản trị hệ thống')
@@ -85,13 +91,7 @@ namespace ETR.Infrastructure.Migrations
                     INSERT INTO [Departments] ([DepartmentName], [DepartmentCode], [Description], [IsTrainingAudience], [CreatedAt], [IsDeleted])
                     VALUES (N'Ground Operations', N'GND', N'Khoa Khai thác mặt đất & Dịch vụ sân đỗ', 1, GETUTCDATE(), 0);
 
-                -- 2.3 Backfill missing DepartmentCode for custom departments
-                UPDATE [Departments]
-                SET [DepartmentCode] = CONCAT(N'DEPT-', [DepartmentId])
-                WHERE ([DepartmentCode] IS NULL OR [DepartmentCode] = N'')
-                  AND [IsDeleted] = 0;
-
-                -- 2.4 Deduplicate any duplicate codes among active departments (keep lowest Id, rename others)
+                -- 2.4 Deduplicate any duplicate codes among active departments (keep lowest Id, rename duplicate to DEPT-{DepartmentId} which is intrinsically unique)
                 ;WITH DupCte AS (
                     SELECT [DepartmentId], [DepartmentCode],
                            ROW_NUMBER() OVER (PARTITION BY [DepartmentCode] ORDER BY [DepartmentId]) AS rn
@@ -99,7 +99,7 @@ namespace ETR.Infrastructure.Migrations
                     WHERE [DepartmentCode] IS NOT NULL AND [DepartmentCode] <> N'' AND [IsDeleted] = 0
                 )
                 UPDATE d
-                SET [DepartmentCode] = CONCAT(LEFT(d.[DepartmentCode], 12), N'-', d.[DepartmentId])
+                SET [DepartmentCode] = CONCAT(N'DEPT-', d.[DepartmentId])
                 FROM [Departments] d
                 INNER JOIN DupCte c ON d.[DepartmentId] = c.[DepartmentId]
                 WHERE c.rn > 1;

@@ -49,6 +49,12 @@ public partial class AppDbContext : DbContext
     public DbSet<ExportJob> ExportJobs => Set<ExportJob>();
     public DbSet<Attachment> Attachments => Set<Attachment>();
 
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        base.OnConfiguring(optionsBuilder);
+        optionsBuilder.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

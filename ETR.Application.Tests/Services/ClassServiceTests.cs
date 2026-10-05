@@ -460,5 +460,116 @@ public class ClassServiceTests
 
         Assert.Contains("Không thể thay đổi trạng thái của lớp học đã hoàn thành", ex.Message);
     }
+
+    [Fact]
+    public async Task CreateClassCoreAsync_ThrowsWhenCourseDoesNotExistOrDeleted()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        var courseRepo = new Mock<IGenericRepository<Course>>();
+        courseRepo.Setup(r => r.GetByIdAsync(999, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Course?)null);
+        uow.Setup(u => u.CourseRepository).Returns(courseRepo.Object);
+
+        var currentUserService = new Mock<ICurrentUserService>();
+        var service = new ClassService(uow.Object, currentUserService.Object);
+
+        var request = new CreateClassRequest(
+            "CLS-NEW", "New Class", 999,
+            DateTime.UtcNow.AddDays(1),
+            DateTime.UtcNow.AddDays(30),
+            "Room 101", 20, ClassStatus.Planned);
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            service.CreateClassCoreAsync(request, createdByAccountId: 1));
+
+        Assert.Contains("không tồn tại trong hệ thống hoặc đã bị xóa", ex.Message);
+    }
+
+    [Fact]
+    public async Task UpdateClassAsync_ThrowsWhenTargetCourseDoesNotExist()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        var existingClass = new Class
+        {
+            ClassId = 1,
+            ClassCode = "CLS-01",
+            ClassName = "Class 1",
+            CourseId = 1,
+            Status = ClassStatus.Planned,
+            IsDeleted = false
+        };
+
+        var classRepo = new Mock<IGenericRepository<Class>>();
+        classRepo.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(existingClass);
+        classRepo.Setup(r => r.GetQueryable()).Returns(new List<Class> { existingClass }.AsQueryable());
+        uow.Setup(u => u.ClassRepository).Returns(classRepo.Object);
+
+        var courseRepo = new Mock<IGenericRepository<Course>>();
+        courseRepo.Setup(r => r.GetByIdAsync(2, It.IsAny<CancellationToken>())).ReturnsAsync((Course?)null);
+        uow.Setup(u => u.CourseRepository).Returns(courseRepo.Object);
+
+        uow.Setup(u => u.ExecuteInStrategyAsync(It.IsAny<Func<CancellationToken, Task<TrainingClassResponse>>>(), It.IsAny<CancellationToken>()))
+            .Returns<Func<CancellationToken, Task<TrainingClassResponse>>, CancellationToken>((op, ct) => op(ct));
+
+        var currentUserService = new Mock<ICurrentUserService>();
+        var service = new ClassService(uow.Object, currentUserService.Object);
+
+        var request = new UpdateClassRequest(
+            1, "CLS-01", "Class 1", 2, DateTime.UtcNow.AddDays(1), DateTime.UtcNow.AddDays(30),
+            "Phòng Sim A320", 30, ClassStatus.Planned, null);
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            service.UpdateClassAsync(1, request, updatedByAccountId: 1));
+
+        Assert.Contains("khóa học này không tồn tại hoặc đã bị xóa", ex.Message);
+    }
+
+    [Fact]
+    public async Task UpdateClassAsync_ThrowsWhenChangingCourseForClassWithEnrollments()
+    {
+        var uow = new Mock<IUnitOfWork>();
+        var existingClass = new Class
+        {
+            ClassId = 1,
+            ClassCode = "CLS-01",
+            ClassName = "Class 1",
+            CourseId = 1,
+            Status = ClassStatus.Planned,
+            IsDeleted = false
+        };
+
+        var classRepo = new Mock<IGenericRepository<Class>>();
+        classRepo.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(existingClass);
+        classRepo.Setup(r => r.GetQueryable()).Returns(new List<Class> { existingClass }.AsQueryable());
+        uow.Setup(u => u.ClassRepository).Returns(classRepo.Object);
+
+        var courseRepo = new Mock<IGenericRepository<Course>>();
+        courseRepo.Setup(r => r.GetByIdAsync(2, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Course { CourseId = 2, CourseCode = "CRS-02", Status = CourseStatus.Active, VersionNo = 1 });
+        uow.Setup(u => u.CourseRepository).Returns(courseRepo.Object);
+
+        var enrollmentRepo = new Mock<IGenericRepository<CourseEnrollment>>();
+        enrollmentRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<CourseEnrollment>
+            {
+                new() { ClassId = 1, AccountId = 10, Status = EnrollmentStatus.Active, IsDeleted = false }
+            });
+        uow.Setup(u => u.CourseEnrollmentRepository).Returns(enrollmentRepo.Object);
+
+        uow.Setup(u => u.ExecuteInStrategyAsync(It.IsAny<Func<CancellationToken, Task<TrainingClassResponse>>>(), It.IsAny<CancellationToken>()))
+            .Returns<Func<CancellationToken, Task<TrainingClassResponse>>, CancellationToken>((op, ct) => op(ct));
+
+        var currentUserService = new Mock<ICurrentUserService>();
+        var service = new ClassService(uow.Object, currentUserService.Object);
+
+        var request = new UpdateClassRequest(
+            1, "CLS-01", "Class 1", 2, DateTime.UtcNow.AddDays(1), DateTime.UtcNow.AddDays(30),
+            "Phòng Sim A320", 30, ClassStatus.Planned, null);
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            service.UpdateClassAsync(1, request, updatedByAccountId: 1));
+
+        Assert.Contains("Không thể thay đổi khóa học của lớp học đã có học viên ghi danh", ex.Message);
+    }
 }
 
