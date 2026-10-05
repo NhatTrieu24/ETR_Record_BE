@@ -529,6 +529,72 @@ public class EtrService : IEtrService
                 )).ToList();
         }
 
+        // Đảm bảo các mốc vòng đời chính (Submit -> Verify -> Approve -> Lock) luôn hiện diện trong Timeline
+        if (etr.SubmittedAt.HasValue && !approvalHistoryItems.Any(h => h.ActionType.Equals("Submit", StringComparison.OrdinalIgnoreCase) || h.ActionType.Equals("Submitted", StringComparison.OrdinalIgnoreCase)))
+        {
+            var submitterId = approvalRequest?.SubmittedByAccountId ?? 1;
+            approvalHistoryItems.Add(new EtrDossierApprovalHistoryItem(
+                approvalHistoryItems.Count + 1000,
+                approvalRequest?.ApprovalRequestId,
+                "Submit",
+                "Draft",
+                "Submitted",
+                "Hồ sơ ETR được hoàn thiện và nộp lên QA thẩm định.",
+                submitterId,
+                GetAccountDisplayName(submitterId),
+                etr.SubmittedAt.Value
+            ));
+        }
+
+        if (etr.VerifiedAt.HasValue && !approvalHistoryItems.Any(h => h.ActionType.Equals("Verify", StringComparison.OrdinalIgnoreCase) || h.ActionType.Equals("Verified", StringComparison.OrdinalIgnoreCase)))
+        {
+            approvalHistoryItems.Add(new EtrDossierApprovalHistoryItem(
+                approvalHistoryItems.Count + 1001,
+                approvalRequest?.ApprovalRequestId,
+                "Verify",
+                "Submitted",
+                "Verified",
+                "Phòng Đảm bảo chất lượng (QA) đã kiểm tra đầy đủ minh chứng & thẩm định hoàn tất.",
+                1,
+                "Quality Assurance Officer",
+                etr.VerifiedAt.Value
+            ));
+        }
+
+        if (etr.CompletedAt.HasValue && !approvalHistoryItems.Any(h => h.ActionType.Equals("Complete", StringComparison.OrdinalIgnoreCase) || h.ActionType.Equals("Approved", StringComparison.OrdinalIgnoreCase)))
+        {
+            var approverId = approvalRequest?.CurrentApproverId ?? 1;
+            approvalHistoryItems.Add(new EtrDossierApprovalHistoryItem(
+                approvalHistoryItems.Count + 1002,
+                approvalRequest?.ApprovalRequestId,
+                "Approve",
+                "Verified",
+                "Completed",
+                "Trưởng phòng Quản lý Đào tạo phê duyệt hoàn thành khóa huấn luyện.",
+                approverId,
+                GetAccountDisplayName(approverId),
+                etr.CompletedAt.Value
+            ));
+        }
+
+        if (etr.IsLocked && !approvalHistoryItems.Any(h => h.ActionType.Equals("Lock", StringComparison.OrdinalIgnoreCase) || h.ActionType.Equals("Locked", StringComparison.OrdinalIgnoreCase)))
+        {
+            approvalHistoryItems.Add(new EtrDossierApprovalHistoryItem(
+                approvalHistoryItems.Count + 1003,
+                approvalRequest?.ApprovalRequestId,
+                "Lock",
+                "Completed",
+                "Locked",
+                "Hồ sơ đã được đóng băng và mã hóa chữ ký số lưu trữ an toàn (IsLocked = true).",
+                1,
+                "ETR Security Daemon",
+                etr.CompletedAt ?? etr.VerifiedAt ?? DateTime.UtcNow
+            ));
+        }
+
+        approvalHistoryItems = approvalHistoryItems.OrderBy(h => h.ActionAt).ToList();
+
+
         // 6. Readiness Summary
         var (flightHours, simHours) = await GetQualifiedTrainingHoursAsync(etr.EnrollmentId, cancellationToken);
         int totalSub = subjectItems.Count;

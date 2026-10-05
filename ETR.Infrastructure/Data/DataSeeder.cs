@@ -27,6 +27,7 @@ public static class DataSeeder
         await SeedSignoffAsync(context);
         await SeedEvidenceAsync(context);
         await SeedApprovalWorkflowAsync(context);
+        await SeedAmendmentRequestsAsync(context);
         await SeedMiscellaneousAsync(context);
     }
 
@@ -922,4 +923,29 @@ public static class DataSeeder
             await context.SaveChangesAsync();
         }
     }
+
+    private static async Task SeedAmendmentRequestsAsync(AppDbContext context)
+    {
+        if (!await context.AmendmentRequests.AnyAsync())
+        {
+            var sr = await context.SubjectResults.FirstOrDefaultAsync();
+            if (sr != null)
+            {
+                var instructor = await context.Accounts.FirstOrDefaultAsync(a => a.Username == InstructorUsername);
+                var instructorId = instructor?.AccountId ?? sr.EvaluatedByAccountId ?? 1;
+
+                context.AmendmentRequests.Add(new AmendmentRequest
+                {
+                    SubjectResultId = sr.SubjectResultId,
+                    RequestedByAccountId = instructorId,
+                    Reason = "Instructor requested unlock to update practical assessment score following re-evaluation.",
+                    OldValue = sr.Status,
+                    Status = AmendmentStatus.Pending,
+                    CreatedAt = DateTime.UtcNow.AddHours(-2)
+                });
+                await context.SaveChangesAsync();
+            }
+        }
+    }
 }
+

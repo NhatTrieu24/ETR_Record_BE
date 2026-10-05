@@ -11,7 +11,7 @@ namespace ETR.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin,Instructor,Academic")]
+[Authorize(Roles = "Admin,Instructor,Academic,TrainingManager,Audit")]
 public class SessionsController : ControllerBase
 {
     private readonly ISessionService _sessionService;
