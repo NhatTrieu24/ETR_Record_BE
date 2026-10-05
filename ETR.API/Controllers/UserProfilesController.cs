@@ -34,7 +34,7 @@ public class UserProfilesController : ControllerBase
     // scoping Instructor to "students in classes they teach" is tracked separately as H20 in
     // LO_TRINH_HOAN_THIEN_DU_AN.md and should replace this blanket grant once implemented.
     [HttpGet]
-    [Authorize(Roles = "Admin,Academic,QA,Audit,Instructor")]
+    [Authorize(Roles = "Admin,Academic,QA,Audit,Instructor,TrainingManager")]
     public async Task<ActionResult<IEnumerable<UserProfileResponse>>> GetAllUserProfiles(CancellationToken cancellationToken)
     {
         var profiles = await _userProfileService.GetAllProfilesAsync(cancellationToken);

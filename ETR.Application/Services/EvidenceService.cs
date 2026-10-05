@@ -61,8 +61,8 @@ public class EvidenceService : IEvidenceService
 
         var attachments = await GetAttachmentsByOwnerIdsAsync(evidences.Select(e => e.EvidenceFileId), cancellationToken);
 
-        // TrainingManager chỉ xem metadata (không nhận URL tệp)
-        bool isMetadataOnly = roleName == "TrainingManager";
+        // TrainingManager (ETR Approver) và các vai trò có thẩm quyền được xem URL tệp để kiểm định
+        bool isMetadataOnly = false;
 
         var profiles = (await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken)).ToList();
         var profileMap = profiles.GroupBy(p => p.AccountId).ToDictionary(g => g.Key, g => g.First());
@@ -128,11 +128,7 @@ public class EvidenceService : IEvidenceService
 
         EnrichResponse(resp, evidence, profileMap, evidenceTypeMap, srMap, subjectMap, etrMap, enrollmentMap, courseMap, classMap);
 
-        // TrainingManager chỉ xem metadata (không nhận URL tệp)
-        if (roleName == "TrainingManager")
-        {
-            resp.FileUrl = string.Empty;
-        }
+
 
         return resp;
     }
