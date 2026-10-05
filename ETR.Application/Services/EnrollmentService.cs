@@ -142,6 +142,42 @@ public class EnrollmentService : IEnrollmentService
                     throw new BusinessRuleViolationException($"Cannot enroll. Course (ID: {trainingClass.CourseId}) has no subjects configured. Please add subjects to the course first.");
                 }
 
+                // === BUSINESS RULE: Student Department must match Course Training Audience (if configured) ===
+                var allowedDeptIds = new List<int>();
+                if (_unitOfWork.CourseDepartmentRepository != null)
+                {
+                    var allCourseDepts = (await _unitOfWork.CourseDepartmentRepository.GetAllAsync(ct)) ?? Enumerable.Empty<CourseDepartment>();
+                    allowedDeptIds = allCourseDepts
+                        .Where(cd => cd.CourseId == trainingClass.CourseId && !cd.IsDeleted)
+                        .Select(cd => cd.DepartmentId)
+                        .ToList();
+                }
+
+                if (allowedDeptIds.Any())
+                {
+                    var studentAccount = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, ct);
+                    if (studentAccount == null)
+                    {
+                        throw new BusinessRuleViolationException($"Không tìm thấy tài khoản học viên (Account ID: {accountId}).");
+                    }
+
+                    if (!allowedDeptIds.Contains(studentAccount.DepartmentId))
+                    {
+                        var allDepts = _unitOfWork.DepartmentRepository != null
+                            ? ((await _unitOfWork.DepartmentRepository.GetAllAsync(ct)) ?? Enumerable.Empty<Department>()).ToDictionary(d => d.DepartmentId, d => d.DepartmentName)
+                            : new Dictionary<int, string>();
+
+                        var studentDeptName = allDepts.TryGetValue(studentAccount.DepartmentId, out var sdn) ? sdn : $"ID #{studentAccount.DepartmentId}";
+                        var allowedDeptNames = allowedDeptIds
+                            .Where(id => allDepts.ContainsKey(id))
+                            .Select(id => allDepts[id]);
+                        var allowedDeptNamesStr = string.Join(", ", allowedDeptNames);
+
+                        throw new BusinessRuleViolationException(
+                            $"Học viên '{userProfile.FullName}' (Mã: {userProfile.UserCode}) thuộc phòng ban '{studentDeptName}', không thuộc đối tượng đào tạo được phép ghi danh cho khóa học '{course?.CourseName ?? trainingClass.ClassName}' (Phòng ban hợp lệ: {allowedDeptNamesStr}).");
+                    }
+                }
+
                 var allEtrs = await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(ct);
                 var allEnrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct);
                 var allClasses = await _unitOfWork.ClassRepository.GetAllAsync(ct);
@@ -361,6 +397,35 @@ public class EnrollmentService : IEnrollmentService
                         AcademyTimeHelper.IsInPast(targetClass.StartDate))
                     {
                         throw new BusinessRuleViolationException($"Không thể chuyển học viên vào lớp học đã bắt đầu, đang diễn ra hoặc đã kết thúc (Trạng thái lớp: {targetClass.Status}, Ngày bắt đầu: {targetClass.StartDate:dd/MM/yyyy}).");
+                    }
+
+                    var targetCourseDepts = new List<int>();
+                    if (_unitOfWork.CourseDepartmentRepository != null)
+                    {
+                        var allDeptsList = (await _unitOfWork.CourseDepartmentRepository.GetAllAsync(ct)) ?? Enumerable.Empty<CourseDepartment>();
+                        targetCourseDepts = allDeptsList
+                            .Where(cd => cd.CourseId == targetClass.CourseId && !cd.IsDeleted)
+                            .Select(cd => cd.DepartmentId)
+                            .ToList();
+                    }
+
+                    if (targetCourseDepts.Any())
+                    {
+                        var studentAccount = await _unitOfWork.AccountRepository.GetByIdAsync(item.AccountId, ct);
+                        if (studentAccount != null && !targetCourseDepts.Contains(studentAccount.DepartmentId))
+                        {
+                            var allDepts = _unitOfWork.DepartmentRepository != null
+                                ? ((await _unitOfWork.DepartmentRepository.GetAllAsync(ct)) ?? Enumerable.Empty<Department>()).ToDictionary(d => d.DepartmentId, d => d.DepartmentName)
+                                : new Dictionary<int, string>();
+                            var targetCourse = await _unitOfWork.CourseRepository.GetByIdAsync(targetClass.CourseId, ct);
+                            var studentProfile = await _unitOfWork.UserProfileRepository.GetByIdAsync(item.AccountId, ct);
+
+                            var studentDeptName = allDepts.TryGetValue(studentAccount.DepartmentId, out var sdn) ? sdn : $"ID #{studentAccount.DepartmentId}";
+                            var allowedDeptNamesStr = string.Join(", ", targetCourseDepts.Where(deptId => allDepts.ContainsKey(deptId)).Select(deptId => allDepts[deptId]));
+
+                            throw new BusinessRuleViolationException(
+                                $"Không thể chuyển học viên '{studentProfile?.FullName ?? $"#{item.AccountId}"}' sang lớp '{targetClass.ClassName}' vì học viên thuộc phòng ban '{studentDeptName}', không thuộc đối tượng đào tạo của khóa học '{targetCourse?.CourseName}' (Phòng ban hợp lệ: {allowedDeptNamesStr}).");
+                        }
                     }
                 }
 

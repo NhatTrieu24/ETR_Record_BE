@@ -192,6 +192,417 @@ public class EtrService : IEtrService
             evidenceResponses);
     }
 
+    public async Task<EtrDossierResponse> GetEtrDossierAsync(int etrCourseRecordId, int currentAccountId, string roleName, CancellationToken cancellationToken = default)
+    {
+        var etr = await _unitOfWork.ETRCourseRecordRepository.GetWithSubjectResultsAsync(etrCourseRecordId, cancellationToken)
+            ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
+
+        var enrollment = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(etr.EnrollmentId, cancellationToken)
+            ?? throw new KeyNotFoundException($"Enrollment for ETR #{etrCourseRecordId} not found.");
+
+        // 1. Phân quyền truy cập chính dossier (Object-Level Authorization / Scope Check)
+        if (roleName == "Student")
+        {
+            if (enrollment.AccountId != currentAccountId)
+            {
+                throw new ForbiddenAccessException("Bạn chỉ được phép xem hồ sơ ETR của chính mình.");
+            }
+        }
+        else if (roleName == "Instructor")
+        {
+            var myEnrollmentIds = await GetInstructorEnrollmentIdsAsync(currentAccountId, cancellationToken);
+            if (!myEnrollmentIds.Contains(etr.EnrollmentId))
+            {
+                throw new ForbiddenAccessException("Bạn không được phân công giảng dạy học viên này.");
+            }
+        }
+
+        // 2. Load Core Info (Student, Course, Class)
+        var allProfiles = await _unitOfWork.UserProfileRepository.GetAllAsync(cancellationToken);
+        var learnerProfile = allProfiles.FirstOrDefault(p => p.AccountId == enrollment.AccountId);
+
+        var allAccounts = await _unitOfWork.AccountRepository.GetAllAsync(cancellationToken);
+        var accountMap = allAccounts.ToDictionary(a => a.AccountId, a => a.Username ?? $"Account #{a.AccountId}");
+        var profileMap = allProfiles.Where(p => !string.IsNullOrWhiteSpace(p.FullName)).ToDictionary(p => p.AccountId, p => p.FullName);
+
+        string GetAccountDisplayName(int? accId)
+        {
+            if (!accId.HasValue) return "Hệ thống";
+            if (profileMap.TryGetValue(accId.Value, out var pName) && !string.IsNullOrWhiteSpace(pName)) return pName;
+            if (accountMap.TryGetValue(accId.Value, out var aName) && !string.IsNullOrWhiteSpace(aName)) return aName;
+            return $"Account #{accId.Value}";
+        }
+
+        var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(enrollment.ClassId, cancellationToken);
+        var course = trainingClass != null ? await _unitOfWork.CourseRepository.GetByIdAsync(trainingClass.CourseId, cancellationToken) : null;
+
+        // Privacy filtering for Student Profile
+        bool canViewSensitiveLearnerDetails = roleName is "Student" or "Admin" or "Academic";
+        string? emailDisplay = canViewSensitiveLearnerDetails ? learnerProfile?.Email : null;
+        string? phoneDisplay = canViewSensitiveLearnerDetails ? learnerProfile?.Phone : null;
+
+        var studentInfo = new EtrDossierStudentInfo(
+            enrollment.AccountId,
+            learnerProfile?.UserCode ?? $"HV-{enrollment.AccountId}",
+            learnerProfile?.FullName ?? $"Học viên #{enrollment.AccountId}",
+            emailDisplay,
+            phoneDisplay
+        );
+
+        var courseInfo = new EtrDossierCourseInfo(
+            course?.CourseId ?? 0,
+            course?.CourseCode ?? "N/A",
+            course?.CourseName ?? "Chưa rõ",
+            etr.CourseVersionNo > 0 ? etr.CourseVersionNo : (course?.VersionNo ?? 1)
+        );
+
+        var classInfo = new EtrDossierClassInfo(
+            trainingClass?.ClassId ?? 0,
+            trainingClass?.ClassCode ?? "N/A",
+            trainingClass?.ClassName ?? "Chưa rõ",
+            trainingClass?.StartDate,
+            trainingClass?.EndDate,
+            trainingClass?.Status.ToString() ?? "Active"
+        );
+
+        // 3. Subjects & Components Drill-Down
+        var subjectResults = etr.SubjectResults ?? new List<SubjectResult>();
+        var subjectResultIds = subjectResults.Select(sr => sr.SubjectResultId).ToList();
+
+        var allSubjects = await _unitOfWork.SubjectRepository.GetAllAsync(cancellationToken);
+        var subjectMap = allSubjects.ToDictionary(s => s.SubjectId);
+
+        var allCourseSubjects = course != null 
+            ? (await _unitOfWork.CourseSubjectRepository.GetAllAsync(cancellationToken)).Where(cs => cs.CourseId == course.CourseId).ToDictionary(cs => cs.SubjectId)
+            : new Dictionary<int, CourseSubject>();
+
+        // Assessments & Checklist Results
+        var allAssessmentResults = await _unitOfWork.AssessmentResultRepository.GetAllAsync(cancellationToken);
+        var assessmentResults = allAssessmentResults.Where(ar => subjectResultIds.Contains(ar.SubjectResultId)).ToList();
+        var allAssessments = await _unitOfWork.AssessmentRepository.GetAllAsync(cancellationToken);
+        var assessmentMap = allAssessments.ToDictionary(a => a.AssessmentId);
+
+        var allPracticalResults = await _unitOfWork.PracticalChecklistResultRepository.GetAllAsync(cancellationToken);
+        var practicalResults = allPracticalResults.Where(pr => subjectResultIds.Contains(pr.SubjectResultId)).ToList();
+        var allPracticalChecklists = await _unitOfWork.PracticalChecklistRepository.GetAllAsync(cancellationToken);
+        var practicalChecklistMap = allPracticalChecklists.ToDictionary(pc => pc.PracticalChecklistId);
+
+        // Signoffs
+        var allSignoffs = await _unitOfWork.SubjectSignoffRepository.GetAllAsync(cancellationToken);
+        var signoffs = allSignoffs.Where(s => subjectResultIds.Contains(s.SubjectResultId) && !s.IsDeleted).ToList();
+
+        // Evidences
+        var allEvidences = await _unitOfWork.EvidenceFileRepository.GetAllAsync(cancellationToken);
+        var evidences = allEvidences.Where(ev => subjectResultIds.Contains(ev.SubjectResultId) && !ev.IsDeleted).ToList();
+        var allAttachments = await _unitOfWork.AttachmentRepository.GetAllAsync(cancellationToken);
+        var evidenceAttachments = allAttachments
+            .Where(a => a.OwnerType == nameof(EvidenceFile) && evidences.Select(ev => ev.EvidenceFileId).Contains(a.OwnerId) && !a.IsDeleted)
+            .GroupBy(a => a.OwnerId)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        // Sessions & Attendance
+        var allSessions = trainingClass != null
+            ? (await _unitOfWork.SessionRepository.GetAllAsync(cancellationToken)).Where(s => s.ClassId == trainingClass.ClassId && !s.IsDeleted).ToList()
+            : new List<Session>();
+
+        var allClassSubjects = trainingClass != null
+            ? (await _unitOfWork.ClassSubjectRepository.GetAllAsync(cancellationToken)).Where(cs => cs.ClassId == trainingClass.ClassId).ToList()
+            : new List<ClassSubject>();
+
+        var allAttendanceRecords = await _unitOfWork.AttendanceRecordRepository.GetAllAsync(cancellationToken);
+        var attendanceRecords = allAttendanceRecords.Where(ar => ar.EnrollmentId == etr.EnrollmentId && !ar.IsDeleted).ToList();
+        var attendanceBySession = attendanceRecords.GroupBy(ar => ar.SessionId).ToDictionary(g => g.Key, g => g.First());
+
+        var subjectItems = new List<EtrDossierSubjectItem>();
+        foreach (var sr in subjectResults.OrderBy(sr => sr.SequenceNoSnapshot ?? sr.SubjectResultId))
+        {
+            var subj = subjectMap.GetValueOrDefault(sr.SubjectId);
+            var cs = allCourseSubjects.GetValueOrDefault(sr.SubjectId);
+            var signoff = signoffs.FirstOrDefault(s => s.SubjectResultId == sr.SubjectResultId);
+
+            string subCode = sr.SubjectCodeSnapshot ?? subj?.SubjectCode ?? $"SUB-{sr.SubjectId}";
+            string subName = sr.SubjectNameSnapshot ?? subj?.SubjectName ?? $"Môn học #{sr.SubjectId}";
+            string subType = sr.SubjectTypeSnapshot ?? subj?.SubjectType ?? "Theory";
+            int reqHours = sr.RequiredHoursSnapshot ?? cs?.RequiredHours ?? subj?.DefaultHours ?? 0;
+            decimal passScore = sr.PassingScoreSnapshot ?? cs?.PassingScore ?? 70m;
+            bool isMandatory = sr.IsMandatorySnapshot ?? cs?.IsMandatory ?? true;
+
+            // Assessments for this subject
+            var subAssessments = assessmentResults
+                .Where(ar => ar.SubjectResultId == sr.SubjectResultId)
+                .OrderBy(ar => ar.AttemptNo)
+                .Select(ar => {
+                    var def = assessmentMap.GetValueOrDefault(ar.AssessmentId);
+                    return new EtrDossierAssessmentItem(
+                        ar.AssessmentResultId,
+                        ar.AssessmentId,
+                        def?.ComponentName ?? $"Assessment #{ar.AssessmentId}",
+                        def?.AssessmentType.ToString() ?? "Theory",
+                        ar.WeightSnapshot ?? def?.Weight ?? 0m,
+                        ar.PassingScoreSnapshot ?? def?.PassingScore ?? passScore,
+                        ar.Score,
+                        ar.ResultStatus,
+                        ar.AttemptNo,
+                        ar.TakenAt ?? ar.RecordedAt,
+                        ar.Remark,
+                        GetAccountDisplayName(ar.GradedByAccountId)
+                    );
+                }).ToList();
+
+            // Practical Checklists
+            var subChecklists = practicalResults
+                .Where(pr => pr.SubjectResultId == sr.SubjectResultId)
+                .Select(pr => {
+                    var def = practicalChecklistMap.GetValueOrDefault(pr.PracticalChecklistId);
+                    return new EtrDossierChecklistItem(
+                        pr.PracticalChecklistResultId,
+                        pr.PracticalChecklistId,
+                        def?.ItemName ?? $"Checklist #{pr.PracticalChecklistId}",
+                        pr.ResultStatus,
+                        GetAccountDisplayName(pr.VerifiedByAccountId),
+                        pr.CompletedAt,
+                        pr.VerificationComment
+                    );
+                }).ToList();
+
+            // Sessions for this subject in the class
+            var subSessions = allSessions
+                .Where(s => s.SubjectId == sr.SubjectId)
+                .OrderBy(s => s.SessionDate ?? DateTime.MinValue)
+                .Select(s => {
+                    var ar = attendanceBySession.GetValueOrDefault(s.SessionId);
+                    var assignedCs = allClassSubjects.FirstOrDefault(csub => csub.SubjectId == s.SubjectId);
+                    int? assignedInstructorId = assignedCs?.InstructorAccountId;
+                    int? signedInstructorId = ar?.InstructorSignedByAccountId ?? s.ConfirmedByAccountId;
+                    DateTime? signedAt = ar?.InstructorSignedAt ?? s.ConfirmedAt;
+
+                    return new EtrDossierSessionItem(
+                        s.SessionId,
+                        s.SessionTitle,
+                        s.SessionDate,
+                        s.TrainingType.ToString(),
+                        s.LessonCode,
+                        s.Location,
+                        ar?.Status.ToString() ?? "NotRecorded",
+                        ar?.FlightHours,
+                        ar?.SimulatorHours,
+                        ar?.DualHours,
+                        ar?.SoloHours,
+                        ar?.PicHours,
+                        ar?.CrossCountryHours,
+                        ar?.NightHours,
+                        ar?.InstrumentHours,
+                        ar?.DepartureIcao,
+                        ar?.ArrivalIcao,
+                        ar?.Route,
+                        ar?.AircraftRegistration,
+                        ar?.SimulatorDevice,
+                        assignedInstructorId,
+                        GetAccountDisplayName(assignedInstructorId),
+                        signedInstructorId,
+                        GetAccountDisplayName(signedInstructorId),
+                        signedAt,
+                        "Chưa có dữ liệu hệ thống ghi nhận người thực dạy riêng biệt",
+                        "Chưa có bản chụp lịch sử hiệu lực chứng chỉ tại ngày dạy (Historical Snapshot); không suy đoán năng lực từ chữ ký.",
+                        ar?.InstructorComments,
+                        ar?.StudentComments
+                    );
+                }).ToList();
+
+            // Evidence files for this subject
+            var subEvidences = evidences
+                .Where(ev => ev.SubjectResultId == sr.SubjectResultId)
+                .Select(ev => {
+                    var att = evidenceAttachments.GetValueOrDefault(ev.EvidenceFileId);
+
+                    // Lọc URL attachment theo role và quyền sở hữu (TrainingManager chỉ xem metadata)
+                    bool canViewEvidenceContent = roleName switch
+                    {
+                        "Admin" or "Academic" or "QA" or "Audit" or "Instructor" => true,
+                        "Student" => enrollment.AccountId == currentAccountId,
+                        "TrainingManager" => false,
+                        _ => false
+                    };
+
+                    string evidenceUrl = canViewEvidenceContent ? (att?.Url ?? string.Empty) : string.Empty;
+
+                    return new EtrDossierEvidenceItem(
+                        ev.EvidenceFileId,
+                        att?.FileName ?? $"Evidence-{ev.EvidenceFileId}",
+                        evidenceUrl,
+                        att?.MimeType ?? "application/octet-stream",
+                        ev.VerificationStatus,
+                        ev.VerificationComment,
+                        GetAccountDisplayName(ev.VerifiedByAccountId),
+                        ev.VerifiedAt,
+                        GetAccountDisplayName(ev.UploadedByAccountId),
+                        ev.UploadedAt
+                    );
+                }).ToList();
+
+            subjectItems.Add(new EtrDossierSubjectItem(
+                sr.SubjectResultId,
+                sr.SubjectId,
+                subCode,
+                subName,
+                subType,
+                reqHours,
+                passScore,
+                isMandatory,
+                sr.Status,
+                sr.Score,
+                sr.AttendanceRate,
+                signoff != null,
+                signoff?.SignoffAt,
+                GetAccountDisplayName(signoff?.SignoffByAccountId),
+                signoff?.Role,
+                signoff?.Comment,
+                sr.CarriedOverFromSubjectResultId.HasValue,
+                subAssessments,
+                subChecklists,
+                subSessions,
+                subEvidences
+            ));
+        }
+
+        // 4. Credentials & Medical Summary (Strict Role Filtering)
+        EtrDossierCredentialSummary? credentialsSummary = null;
+        if (roleName != "Instructor" && learnerProfile != null)
+        {
+            // Masking LicenseNumber for TrainingManager, QA, Audit
+            string? licenseNumberDisplay = learnerProfile.LicenseNumber;
+            if (roleName is "QA" or "Audit" or "TrainingManager" && !string.IsNullOrEmpty(licenseNumberDisplay))
+            {
+                licenseNumberDisplay = licenseNumberDisplay.Length > 4 
+                    ? $"***{licenseNumberDisplay[^4..]}" 
+                    : "***";
+            }
+
+            // Credential Attachments (Only for Student self, Admin, Academic, QA, Audit)
+            var credentialAttachments = new List<CredentialAttachmentDto>();
+            bool canViewCredentialFiles = roleName is "Admin" or "Academic" or "QA" or "Audit" || (roleName == "Student" && enrollment.AccountId == currentAccountId);
+            if (canViewCredentialFiles)
+            {
+                var userDocAttachments = allAttachments
+                    .Where(a => a.OwnerType == nameof(UserProfile) && a.OwnerId == enrollment.AccountId && !a.IsDeleted)
+                    .OrderByDescending(a => a.UploadedAt)
+                    .Select(a => new CredentialAttachmentDto(
+                        a.AttachmentId, a.OwnerId, a.DocType ?? "General", a.FileName, a.Url, a.MimeType, a.FileSize, a.UploadedAt, a.UploadedByAccountId
+                    )).ToList();
+                credentialAttachments = userDocAttachments;
+            }
+
+            credentialsSummary = new EtrDossierCredentialSummary(
+                learnerProfile.IsCredentialsVerified,
+                learnerProfile.LicenseType,
+                licenseNumberDisplay,
+                learnerProfile.LicenseExpiryDate,
+                learnerProfile.MedicalClass,
+                learnerProfile.MedicalExpiryDate,
+                learnerProfile.IcaoElpLevel,
+                learnerProfile.IcaoElpExpiryDate,
+                learnerProfile.TypeRatings,
+                credentialAttachments
+            );
+        }
+
+        // 5. Approval History (Excluding internal technical audit log)
+        var allApprovalRequests = await _unitOfWork.ApprovalRequestRepository.GetAllAsync(cancellationToken);
+        var approvalRequest = allApprovalRequests.FirstOrDefault(ar => ar.ETRCourseRecordId == etrCourseRecordId);
+        var approvalHistoryItems = new List<EtrDossierApprovalHistoryItem>();
+        if (approvalRequest != null)
+        {
+            var allHistories = await _unitOfWork.ApprovalHistoryRepository.GetAllAsync(cancellationToken);
+            approvalHistoryItems = allHistories
+                .Where(ah => ah.ApprovalRequestId == approvalRequest.ApprovalRequestId)
+                .OrderBy(ah => ah.ActionAt)
+                .Select(ah => new EtrDossierApprovalHistoryItem(
+                    ah.ApprovalHistoryId,
+                    ah.ApprovalRequestId,
+                    ah.ActionType,
+                    ah.PreviousStatus,
+                    ah.NewStatus,
+                    ah.Comments,
+                    ah.ActionByAccountId,
+                    GetAccountDisplayName(ah.ActionByAccountId),
+                    ah.ActionAt
+                )).ToList();
+        }
+
+        // 6. Readiness Summary
+        var (flightHours, simHours) = await GetQualifiedTrainingHoursAsync(etr.EnrollmentId, cancellationToken);
+        int totalSub = subjectItems.Count;
+        int passedSub = subjectItems.Count(s => s.Status == SubjectResultStatus.Passed || s.Status == SubjectResultStatus.Exempted);
+        decimal avgAtt = subjectItems.Any(s => s.AttendanceRate.HasValue) 
+            ? subjectItems.Where(s => s.AttendanceRate.HasValue).Average(s => s.AttendanceRate!.Value) 
+            : 0m;
+
+        var pendingConditions = new List<string>();
+        var mandatoryPending = subjectItems.Where(s => s.IsMandatory && s.Status != SubjectResultStatus.Passed && s.Status != SubjectResultStatus.Exempted).ToList();
+        if (mandatoryPending.Any())
+        {
+            pendingConditions.Add($"Còn {mandatoryPending.Count} môn bắt buộc chưa đạt ({string.Join(", ", mandatoryPending.Select(m => m.SubjectCode))})");
+        }
+
+        string overallStatus = (pendingConditions.Count == 0 && (etr.Status == EtrStatus.Verified || etr.Status == EtrStatus.Completed)) ? "Met" : "NotMet";
+
+        var readiness = new EtrDossierReadinessSummary(
+            totalSub,
+            passedSub,
+            Math.Round(avgAtt, 1),
+            Math.Round(flightHours, 1),
+            Math.Round(simHours, 1),
+            overallStatus,
+            pendingConditions
+        );
+
+        // 7. Allowed Actions for this caller
+        var allowedActions = new List<string>();
+        if (roleName is "Instructor" or "Academic" or "Admin" && (etr.Status == EtrStatus.Draft || etr.Status == EtrStatus.ReturnedForCorrection) && !etr.IsLocked)
+        {
+            allowedActions.Add("Submit");
+        }
+        if (roleName is "QA" or "Admin" && etr.Status == EtrStatus.Submitted)
+        {
+            allowedActions.Add("Verify");
+            allowedActions.Add("Return");
+        }
+        if (roleName is "TrainingManager" or "Admin" && etr.Status == EtrStatus.Verified)
+        {
+            allowedActions.Add("Complete");
+            allowedActions.Add("Return");
+        }
+        if (roleName is "Admin" && etr.Status == EtrStatus.Completed)
+        {
+            allowedActions.Add("Reopen");
+        }
+        if (roleName is "Admin" or "Audit" or "Academic" or "TrainingManager")
+        {
+            allowedActions.Add("ExportPdf");
+        }
+
+        return new EtrDossierResponse(
+            etr.ETRCourseRecordId,
+            etr.EnrollmentId,
+            etr.Status,
+            etr.IsLocked,
+            courseInfo.VersionNo,
+            etr.SubmittedAt,
+            etr.VerifiedAt,
+            etr.CompletedAt,
+            etr.IssuedDate,
+            etr.ExpiryDate,
+            studentInfo,
+            courseInfo,
+            classInfo,
+            readiness,
+            subjectItems,
+            credentialsSummary,
+            approvalHistoryItems,
+            allowedActions
+        );
+    }
+
     public async Task DeleteEtrAsync(int id, int deletedByAccountId, CancellationToken cancellationToken = default)
     {
         var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(id, cancellationToken);
@@ -234,6 +645,16 @@ public class EtrService : IEtrService
             ?? throw new KeyNotFoundException($"ETRCourseRecord not found.");
 
         if (etr.IsLocked) throw new BusinessRuleViolationException("ETR is locked.");
+
+        // Check Instructor Scope (chỉ cho phép giảng viên nộp ETR cho học viên thuộc các lớp mình phân công)
+        if (_currentUserService.RoleName == "Instructor")
+        {
+            var myEnrollmentIds = await GetInstructorEnrollmentIdsAsync(accountId, cancellationToken);
+            if (!myEnrollmentIds.Contains(etr.EnrollmentId))
+            {
+                throw new ForbiddenAccessException("Bạn không được phân công giảng dạy học viên này.");
+            }
+        }
 
         var enrollment = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(etr.EnrollmentId, cancellationToken)
             ?? throw new BusinessRuleViolationException("Enrollment not found.");

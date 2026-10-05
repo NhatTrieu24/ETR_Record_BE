@@ -1856,6 +1856,12 @@ public class ImportService : IImportService
         var allEnrollments = (await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(ct)).ToList();
         var allEtrs = (await _unitOfWork.ETRCourseRecordRepository.GetAllAsync(ct)).ToList();
         var allCourseSubjects = (await _unitOfWork.CourseSubjectRepository.GetAllAsync(ct)).ToList();
+        var allCourseDepartments = _unitOfWork.CourseDepartmentRepository != null
+            ? (await _unitOfWork.CourseDepartmentRepository.GetAllAsync(ct)).Where(cd => !cd.IsDeleted).ToList()
+            : new List<CourseDepartment>();
+        var allDepartments = _unitOfWork.DepartmentRepository != null
+            ? (await _unitOfWork.DepartmentRepository.GetAllAsync(ct)).ToDictionary(d => d.DepartmentId, d => d.DepartmentName)
+            : new Dictionary<int, string>();
 
         var seenPairs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in rows)
@@ -1907,6 +1913,22 @@ public class ImportService : IImportService
 
                 if (resolvedCourseId.HasValue)
                 {
+                    var allowedDeptIds = allCourseDepartments
+                        .Where(cd => cd.CourseId == resolvedCourseId.Value)
+                        .Select(cd => cd.DepartmentId)
+                        .ToHashSet();
+
+                    if (allowedDeptIds.Count > 0)
+                    {
+                        if (!allowedDeptIds.Contains(account.DepartmentId))
+                        {
+                            var allowedNames = string.Join(", ", allowedDeptIds.Select(id => allDepartments.TryGetValue(id, out var dn) ? dn : id.ToString()));
+                            var studentDeptName = allDepartments.TryGetValue(account.DepartmentId, out var sdn) ? sdn : "Chưa phân loại";
+                            errors.Add(new ImportRowError(row.RowNumber, "Students.Username",
+                                $"Học viên '{row.Username}' thuộc phòng ban '{studentDeptName}', không thuộc đối tượng đào tạo được phép của khóa học (Yêu cầu: {allowedNames})."));
+                        }
+                    }
+
                     var studentEnrollments = allEnrollments.Where(e => e.AccountId == account.AccountId).ToList();
                     var classIdsForCourse = existingClasses.Values
                         .Where(c => c.CourseId == resolvedCourseId.Value)

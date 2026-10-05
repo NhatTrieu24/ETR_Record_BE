@@ -23,7 +23,9 @@ public record UserProfileResponse(
     string? TypeRatings = null,
     bool IsCredentialsVerified = false,
     int? CredentialsVerifiedByAccountId = null,
-    DateTime? CredentialsVerifiedAt = null);
+    DateTime? CredentialsVerifiedAt = null,
+    int? DepartmentId = null,
+    string? DepartmentName = null);
 
 // Grounded is deliberately excluded here (see LearnerStatus enum docs — it is set/cleared only by
 // CertificateValidityCalculator consumers, never by a plain profile edit); the service rejects it.

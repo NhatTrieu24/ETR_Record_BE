@@ -13,5 +13,7 @@ public record CourseResponse(
     string? CourseType = null,
     List<CourseSubjectResponse>? Subjects = null,
     int VersionNo = 1,
-    int? PreviousVersionId = null
+    int? PreviousVersionId = null,
+    List<int>? DepartmentIds = null,
+    List<string>? DepartmentNames = null
 );

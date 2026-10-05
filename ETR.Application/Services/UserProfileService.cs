@@ -39,7 +39,19 @@ public class UserProfileService : IUserProfileService
             profiles = profiles.Where(p => studentIds.Contains(p.AccountId));
         }
 
-        return profiles.Select(MapToResponse);
+        var accountMap = _unitOfWork.AccountRepository != null
+            ? (await _unitOfWork.AccountRepository.GetAllIncludingDeletedAsync(cancellationToken)).ToDictionary(a => a.AccountId, a => a)
+            : new Dictionary<int, Account>();
+        var deptMap = _unitOfWork.DepartmentRepository != null
+            ? (await _unitOfWork.DepartmentRepository.GetAllAsync(cancellationToken)).ToDictionary(d => d.DepartmentId, d => d.DepartmentName)
+            : new Dictionary<int, string>();
+
+        return profiles.Select(p =>
+        {
+            var acc = accountMap.GetValueOrDefault(p.AccountId);
+            string? deptName = acc != null && deptMap.TryGetValue(acc.DepartmentId, out var dn) ? dn : null;
+            return MapToResponse(p, acc, deptName);
+        });
     }
 
     public async Task<IEnumerable<UserProfileResponse>> GetLearnerProfilesAsync(CancellationToken cancellationToken = default)
@@ -48,8 +60,16 @@ public class UserProfileService : IUserProfileService
         var studentRole = roles.FirstOrDefault(r => r.RoleName == "Student");
         if (studentRole == null) return Enumerable.Empty<UserProfileResponse>();
 
-        var accounts = await _unitOfWork.AccountRepository.GetAllIncludingDeletedAsync(cancellationToken);
-        var studentAccountIds = accounts.Where(a => a.RoleId == studentRole.RoleId).Select(a => a.AccountId).ToHashSet();
+        var accounts = _unitOfWork.AccountRepository != null
+            ? (await _unitOfWork.AccountRepository.GetAllIncludingDeletedAsync(cancellationToken)).ToList()
+            : new List<Account>();
+        var studentAccounts = accounts.Where(a => a.RoleId == studentRole.RoleId).ToList();
+        var studentAccountIds = studentAccounts.Select(a => a.AccountId).ToHashSet();
+        var accountMap = studentAccounts.ToDictionary(a => a.AccountId, a => a);
+
+        var deptMap = _unitOfWork.DepartmentRepository != null
+            ? (await _unitOfWork.DepartmentRepository.GetAllAsync(cancellationToken)).ToDictionary(d => d.DepartmentId, d => d.DepartmentName)
+            : new Dictionary<int, string>();
 
         var profiles = await _unitOfWork.UserProfileRepository.GetAllIncludingDeletedAsync(cancellationToken);
         var learnerProfiles = profiles.Where(p => studentAccountIds.Contains(p.AccountId));
@@ -60,7 +80,12 @@ public class UserProfileService : IUserProfileService
             learnerProfiles = learnerProfiles.Where(p => myStudentIds.Contains(p.AccountId));
         }
 
-        return learnerProfiles.Select(MapToResponse);
+        return learnerProfiles.Select(p =>
+        {
+            var acc = accountMap.GetValueOrDefault(p.AccountId);
+            string? deptName = acc != null && deptMap.TryGetValue(acc.DepartmentId, out var dn) ? dn : null;
+            return MapToResponse(p, acc, deptName);
+        });
     }
 
     public async Task<UserProfileResponse> GetProfileByAccountIdAsync(int accountId, CancellationToken cancellationToken = default)
@@ -82,7 +107,20 @@ public class UserProfileService : IUserProfileService
             }
         }
             
-        return MapToResponse(profile);
+        Account? account = null;
+        if (_unitOfWork.AccountRepository != null)
+        {
+            account = await _unitOfWork.AccountRepository.GetByIdAsync(accountId, cancellationToken);
+        }
+
+        string? deptName = null;
+        if (account != null && _unitOfWork.DepartmentRepository != null)
+        {
+            var dept = await _unitOfWork.DepartmentRepository.GetByIdAsync(account.DepartmentId, cancellationToken);
+            deptName = dept?.DepartmentName;
+        }
+
+        return MapToResponse(profile, account, deptName);
     }
 
     public async Task<UserProfileResponse> CreateProfileAsync(CreateUserProfileRequest request, int accountId, int createdByAccountId, CancellationToken cancellationToken = default)
@@ -536,10 +574,13 @@ public class UserProfileService : IUserProfileService
         return MapToResponse(profile);
     }
 
-    private UserProfileResponse MapToResponse(UserProfile p)
+    private UserProfileResponse MapToResponse(UserProfile p, Account? account = null, string? departmentName = null)
     {
         bool isInstructor = _currentUserService.RoleName == "Instructor";
         bool isOwnProfile = _currentUserService.AccountId.HasValue && _currentUserService.AccountId.Value == p.AccountId;
+
+        int? deptId = account?.DepartmentId ?? p.Account?.DepartmentId;
+        string? deptName = departmentName;
 
         // If Instructor viewing another student's profile, mask sensitive pilot credentials
         if (isInstructor && !isOwnProfile)
@@ -564,7 +605,9 @@ public class UserProfileService : IUserProfileService
                 TypeRatings: null,
                 IsCredentialsVerified: p.IsCredentialsVerified,
                 CredentialsVerifiedByAccountId: null,
-                CredentialsVerifiedAt: null);
+                CredentialsVerifiedAt: null,
+                DepartmentId: deptId,
+                DepartmentName: deptName);
         }
 
         return new UserProfileResponse(
@@ -587,6 +630,8 @@ public class UserProfileService : IUserProfileService
             p.TypeRatings,
             p.IsCredentialsVerified,
             p.CredentialsVerifiedByAccountId,
-            p.CredentialsVerifiedAt);
+            p.CredentialsVerifiedAt,
+            DepartmentId: deptId,
+            DepartmentName: deptName);
     }
 }

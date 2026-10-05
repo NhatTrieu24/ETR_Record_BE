@@ -49,21 +49,55 @@ public class EvidenceService : IEvidenceService
         _assessmentResultService = assessmentResultService;
     }
 
-    public async Task<IEnumerable<EvidenceResponse>> GetAllEvidencesAsync(CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<EvidenceResponse>> GetAllEvidencesAsync(int? currentAccountId = null, string? roleName = null, CancellationToken cancellationToken = default)
     {
         var evidences = (await _unitOfWork.EvidenceFileRepository.GetAllAsync(cancellationToken)).ToList();
+
+        // Student chỉ xem được minh chứng của chính mình
+        if (roleName == "Student" && currentAccountId.HasValue)
+        {
+            evidences = evidences.Where(e => e.AccountId == currentAccountId.Value).ToList();
+        }
+
         var attachments = await GetAttachmentsByOwnerIdsAsync(evidences.Select(e => e.EvidenceFileId), cancellationToken);
-        return evidences.Select(e => MapToResponse(e, attachments.GetValueOrDefault(e.EvidenceFileId))).ToList();
+
+        // TrainingManager chỉ xem metadata (không nhận URL tệp)
+        bool isMetadataOnly = roleName == "TrainingManager";
+
+        return evidences.Select(e =>
+        {
+            var att = attachments.GetValueOrDefault(e.EvidenceFileId);
+            var resp = MapToResponse(e, att);
+            if (isMetadataOnly)
+            {
+                resp.FileUrl = string.Empty;
+            }
+            return resp;
+        }).ToList();
     }
 
-    public async Task<EvidenceResponse> GetEvidenceByIdAsync(int id, CancellationToken cancellationToken = default)
+    public async Task<EvidenceResponse> GetEvidenceByIdAsync(int id, int? currentAccountId = null, string? roleName = null, CancellationToken cancellationToken = default)
     {
         var evidence = await _unitOfWork.EvidenceFileRepository.GetByIdAsync(id, cancellationToken);
         if (evidence == null)
             throw new KeyNotFoundException($"Evidence with ID {id} not found.");
 
+        // Student chỉ được xem minh chứng của chính mình
+        if (roleName == "Student" && currentAccountId.HasValue && evidence.AccountId != currentAccountId.Value)
+        {
+            throw new ForbiddenAccessException("Bạn chỉ được phép xem minh chứng của chính mình.");
+        }
+
         var attachment = await GetAttachmentAsync(id, cancellationToken);
-        return MapToResponse(evidence, attachment);
+        var resp = MapToResponse(evidence, attachment);
+
+        // TrainingManager chỉ xem metadata (không nhận URL tệp)
+        if (roleName == "TrainingManager")
+        {
+            resp.FileUrl = string.Empty;
+        }
+
+        return resp;
     }
 
     public async Task<EvidenceResponse> UploadEvidenceAsync(UploadEvidenceRequest request, int uploadedByAccountId, string? uploadedByRoleName, CancellationToken cancellationToken = default)

@@ -13,5 +13,6 @@ public record UpdateCourseRequest(
     int? ValidityMonths = null,
     [MaxLength(50)] string? CourseType = null,
     [Required, MinLength(1, ErrorMessage = "A course must have at least one subject.")] 
-    List<AddCourseSubjectRequest> Subjects = null!
+    List<AddCourseSubjectRequest> Subjects = null!,
+    List<int>? DepartmentIds = null
 );

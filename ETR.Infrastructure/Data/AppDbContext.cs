@@ -19,6 +19,7 @@ public partial class AppDbContext : DbContext
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Department> Departments => Set<Department>();
     public DbSet<Course> Courses => Set<Course>();
+    public DbSet<CourseDepartment> CourseDepartments => Set<CourseDepartment>();
     public DbSet<EvidenceType> EvidenceTypes => Set<EvidenceType>();
 
     public DbSet<Account> Accounts => Set<Account>();
@@ -93,6 +94,7 @@ public partial class AppDbContext : DbContext
 
         modelBuilder.Entity<Subject>().HasKey(e => e.SubjectId);
         modelBuilder.Entity<CourseSubject>().HasKey(e => new { e.CourseId, e.SubjectId });
+        modelBuilder.Entity<CourseDepartment>().HasKey(e => new { e.CourseId, e.DepartmentId });
         modelBuilder.Entity<Class>().HasKey(e => e.ClassId);
         modelBuilder.Entity<Class>().Property(c => c.CourseVersionNo).HasDefaultValue(1);
         modelBuilder.Entity<ClassSubject>().HasKey(e => e.ClassSubjectId);
@@ -124,7 +126,9 @@ public partial class AppDbContext : DbContext
         // global (ConfigureSoftDeleteFilters), so a raw unique index would still block reusing a
         // key after the row is soft-deleted. Filtering keeps uniqueness scoped to active rows only.
         modelBuilder.Entity<Role>().HasIndex(r => r.RoleName).IsUnique().HasFilter("[IsDeleted] = 0");
+        modelBuilder.Entity<Department>().Property(d => d.DepartmentCode).HasMaxLength(20);
         modelBuilder.Entity<Department>().HasIndex(d => d.DepartmentName).IsUnique().HasFilter("[IsDeleted] = 0");
+        modelBuilder.Entity<Department>().HasIndex(d => d.DepartmentCode).IsUnique().HasFilter("[DepartmentCode] IS NOT NULL AND [DepartmentCode] <> '' AND [IsDeleted] = 0");
         modelBuilder.Entity<EvidenceType>().HasIndex(et => et.TypeName).IsUnique().HasFilter("[IsDeleted] = 0");
         modelBuilder.Entity<Course>().HasIndex(c => new { c.CourseCode, c.VersionNo }).IsUnique().HasFilter("[IsDeleted] = 0");
         modelBuilder.Entity<Subject>().HasIndex(s => s.SubjectCode).IsUnique().HasFilter("[IsDeleted] = 0");
@@ -222,6 +226,8 @@ public partial class AppDbContext : DbContext
         // Course & Class Setup
         modelBuilder.Entity<CourseSubject>().HasOne<Course>().WithMany().HasForeignKey(cs => cs.CourseId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<CourseSubject>().HasOne<Subject>().WithMany().HasForeignKey(cs => cs.SubjectId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<CourseDepartment>().HasOne(cd => cd.Course).WithMany().HasForeignKey(cd => cd.CourseId).OnDelete(cascadeDeleteConfig);
+        modelBuilder.Entity<CourseDepartment>().HasOne(cd => cd.Department).WithMany().HasForeignKey(cd => cd.DepartmentId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<Class>().HasOne<Course>().WithMany().HasForeignKey(tc => tc.CourseId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<ClassSubject>().HasOne<Class>().WithMany().HasForeignKey(cs => cs.ClassId).OnDelete(cascadeDeleteConfig);
         modelBuilder.Entity<ClassSubject>().HasOne<Subject>().WithMany().HasForeignKey(cs => cs.SubjectId).OnDelete(cascadeDeleteConfig);

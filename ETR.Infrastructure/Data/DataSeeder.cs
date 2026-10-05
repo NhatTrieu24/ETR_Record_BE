@@ -47,17 +47,27 @@ public static class DataSeeder
 
         var defaultDepartments = new[]
         {
-            new Department { DepartmentName = "Administration" },
-            new Department { DepartmentName = "Training" },
-            new Department { DepartmentName = "Flight Crew" },
-            new Department { DepartmentName = "Cabin Crew" },
-            new Department { DepartmentName = "Engineering & Maintenance" },
-            new Department { DepartmentName = "Ground Operations" }
+            new Department { DepartmentName = "Administration", DepartmentCode = "ADM", Description = "Ban giám hiệu & Quản trị hệ thống", IsTrainingAudience = false },
+            new Department { DepartmentName = "Training", DepartmentCode = "TRN", Description = "Phòng Quản lý Đào tạo & Khảo thí", IsTrainingAudience = false },
+            new Department { DepartmentName = "Flight Crew", DepartmentCode = "FC", Description = "Khoa / Đoàn Phi công (Flight Operations)", IsTrainingAudience = true },
+            new Department { DepartmentName = "Cabin Crew", DepartmentCode = "CC", Description = "Khoa / Đoàn Tiếp viên hàng không (In-Flight Services)", IsTrainingAudience = true },
+            new Department { DepartmentName = "Engineering & Maintenance", DepartmentCode = "ENG", Description = "Khoa Kỹ thuật & Bảo dưỡng tàu bay", IsTrainingAudience = true },
+            new Department { DepartmentName = "Ground Operations", DepartmentCode = "GND", Description = "Khoa Khai thác mặt đất & Dịch vụ sân đỗ", IsTrainingAudience = true }
         };
         foreach (var dept in defaultDepartments)
         {
-            if (!await context.Departments.IgnoreQueryFilters().AnyAsync(d => d.DepartmentName == dept.DepartmentName))
+            var existing = await context.Departments.IgnoreQueryFilters().FirstOrDefaultAsync(d => d.DepartmentName == dept.DepartmentName);
+            if (existing == null)
+            {
                 context.Departments.Add(dept);
+            }
+            else
+            {
+                if (string.IsNullOrEmpty(existing.DepartmentCode)) existing.DepartmentCode = dept.DepartmentCode;
+                existing.IsTrainingAudience = dept.IsTrainingAudience;
+                if (string.IsNullOrEmpty(existing.Description)) existing.Description = dept.Description;
+                context.Departments.Update(existing);
+            }
         }
         await context.SaveChangesAsync();
 

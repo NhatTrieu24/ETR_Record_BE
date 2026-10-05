@@ -24,13 +24,15 @@ public class EvidencesController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy danh sách tất cả các tệp bằng chứng (evidence) đã tải lên.
+    /// Lấy danh sách các tệp bằng chứng (evidence) đã tải lên (Student chỉ xem được của mình, TrainingManager chỉ xem metadata).
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = "Instructor,QA,Admin,Academic,Audit")]
+    [Authorize(Roles = "Instructor,QA,Admin,Academic,Audit,Student,TrainingManager")]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
-        var files = await _evidenceService.GetAllEvidencesAsync(cancellationToken);
+        var accountId = _currentUserService.AccountId;
+        var roleName = _currentUserService.RoleName;
+        var files = await _evidenceService.GetAllEvidencesAsync(accountId, roleName, cancellationToken);
         return Ok(files);
     }
 
@@ -38,25 +40,28 @@ public class EvidencesController : ControllerBase
     /// Lấy thông tin một tệp bằng chứng cụ thể theo ID.
     /// </summary>
     [HttpGet("{id}")]
-    [Authorize(Roles = "Instructor,QA,Admin,Academic,Audit")]
+    [Authorize(Roles = "Instructor,QA,Admin,Academic,Audit,Student,TrainingManager")]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
     {
-        var file = await _evidenceService.GetEvidenceByIdAsync(id, cancellationToken);
+        var accountId = _currentUserService.AccountId;
+        var roleName = _currentUserService.RoleName;
+        var file = await _evidenceService.GetEvidenceByIdAsync(id, accountId, roleName, cancellationToken);
         return Ok(file);
     }
 
     /// <summary>
-    /// Chuyển hướng (302) đến URL Cloudinary của tệp bằng chứng — file được lưu trữ ngoài server,
-    /// backend chỉ giữ URL tham chiếu (xem EvidenceService/Attachment).
+    /// Chuyển hướng (302) đến URL Cloudinary của tệp bằng chứng (Chỉ dành cho roles có quyền xem file; Student chỉ tải được của chính mình).
     /// </summary>
     [HttpGet("{id}/download")]
-    [Authorize(Roles = "Instructor,QA,Admin,Academic,Audit")]
+    [Authorize(Roles = "Instructor,QA,Admin,Academic,Audit,Student")]
     public async Task<IActionResult> Download(int id, CancellationToken cancellationToken)
     {
-        var file = await _evidenceService.GetEvidenceByIdAsync(id, cancellationToken);
+        var accountId = _currentUserService.AccountId;
+        var roleName = _currentUserService.RoleName;
+        var file = await _evidenceService.GetEvidenceByIdAsync(id, accountId, roleName, cancellationToken);
 
         if (string.IsNullOrEmpty(file.FileUrl))
-            return NotFound("Evidence file has no URL on record.");
+            return NotFound("Evidence file has no URL on record or access is restricted.");
 
         return Redirect(file.FileUrl);
     }

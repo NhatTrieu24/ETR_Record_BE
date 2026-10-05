@@ -21,8 +21,10 @@ public class DepartmentService : IDepartmentService
         return departments.Select(d => new DepartmentResponse
         {
             DepartmentId = d.DepartmentId,
+            DepartmentCode = d.DepartmentCode,
             DepartmentName = d.DepartmentName,
-            Description = d.Description
+            Description = d.Description,
+            IsTrainingAudience = d.IsTrainingAudience
         });
     }
 
@@ -34,8 +36,10 @@ public class DepartmentService : IDepartmentService
         return new DepartmentResponse
         {
             DepartmentId = d.DepartmentId,
+            DepartmentCode = d.DepartmentCode,
             DepartmentName = d.DepartmentName,
-            Description = d.Description
+            Description = d.Description,
+            IsTrainingAudience = d.IsTrainingAudience
         };
     }
 
@@ -49,8 +53,10 @@ public class DepartmentService : IDepartmentService
 
         var department = new Department
         {
+            DepartmentCode = request.DepartmentCode ?? string.Empty,
             DepartmentName = request.DepartmentName,
             Description = request.Description,
+            IsTrainingAudience = request.IsTrainingAudience,
             CreatedAt = DateTime.UtcNow,
             CreatedByAccountId = createdByAccountId
         };
@@ -61,8 +67,10 @@ public class DepartmentService : IDepartmentService
         return new DepartmentResponse
         {
             DepartmentId = department.DepartmentId,
+            DepartmentCode = department.DepartmentCode,
             DepartmentName = department.DepartmentName,
-            Description = department.Description
+            Description = department.Description,
+            IsTrainingAudience = department.IsTrainingAudience
         };
     }
 
@@ -77,8 +85,13 @@ public class DepartmentService : IDepartmentService
             throw new BusinessRuleViolationException($"A department named '{request.DepartmentName}' already exists.");
         }
 
+        if (request.DepartmentCode != null)
+        {
+            department.DepartmentCode = request.DepartmentCode;
+        }
         department.DepartmentName = request.DepartmentName;
         department.Description = request.Description;
+        department.IsTrainingAudience = request.IsTrainingAudience;
         department.UpdatedAt = DateTime.UtcNow;
         department.UpdatedByAccountId = updatedByAccountId;
 
@@ -88,8 +101,10 @@ public class DepartmentService : IDepartmentService
         return new DepartmentResponse
         {
             DepartmentId = department.DepartmentId,
+            DepartmentCode = department.DepartmentCode,
             DepartmentName = department.DepartmentName,
-            Description = department.Description
+            Description = department.Description,
+            IsTrainingAudience = department.IsTrainingAudience
         };
     }
 

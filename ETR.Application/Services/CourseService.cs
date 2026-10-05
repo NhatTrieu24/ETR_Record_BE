@@ -53,8 +53,25 @@ public class CourseService : ICourseService
     public async Task<IEnumerable<CourseResponse>> GetAllCoursesAsync(CancellationToken cancellationToken = default)
     {
         var courses = await _unitOfWork.CourseRepository.GetAllAsync(cancellationToken);
-        return courses.Where(c => !c.IsDeleted).Select(c => new CourseResponse(
-            c.CourseId, c.CourseCode, c.CourseName, c.Description, c.DurationHours, c.Status, c.ValidityMonths, c.CourseType, VersionNo: c.VersionNo, PreviousVersionId: c.PreviousVersionId));
+        var courseDepartments = _unitOfWork.CourseDepartmentRepository != null
+            ? (await _unitOfWork.CourseDepartmentRepository.GetAllAsync(cancellationToken)).Where(cd => !cd.IsDeleted).ToList()
+            : new List<CourseDepartment>();
+        var departments = _unitOfWork.DepartmentRepository != null
+            ? (await _unitOfWork.DepartmentRepository.GetAllAsync(cancellationToken)).ToDictionary(d => d.DepartmentId, d => d.DepartmentName)
+            : new Dictionary<int, string>();
+
+        return courses.Where(c => !c.IsDeleted).Select(c =>
+        {
+            var cdList = courseDepartments.Where(cd => cd.CourseId == c.CourseId).ToList();
+            var deptIds = cdList.Select(cd => cd.DepartmentId).ToList();
+            var deptNames = deptIds.Where(id => departments.ContainsKey(id)).Select(id => departments[id]).ToList();
+
+            return new CourseResponse(
+                c.CourseId, c.CourseCode, c.CourseName, c.Description, c.DurationHours, c.Status, c.ValidityMonths, c.CourseType,
+                VersionNo: c.VersionNo, PreviousVersionId: c.PreviousVersionId,
+                DepartmentIds: deptIds.Count > 0 ? deptIds : null,
+                DepartmentNames: deptNames.Count > 0 ? deptNames : null);
+        });
     }
 
     public async Task<CourseResponse> GetCourseByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -71,7 +88,20 @@ public class CourseService : ICourseService
                 cs.CourseId, cs.SubjectId, cs.SequenceNo, cs.RequiredHours, cs.RequiredSessions, cs.IsMandatory, cs.PassingScore, cs.SubjectVersion
             )).ToList();
 
-        return new CourseResponse(c.CourseId, c.CourseCode, c.CourseName, c.Description, c.DurationHours, c.Status, c.ValidityMonths, c.CourseType, subjects, c.VersionNo, c.PreviousVersionId);
+        var cdList = _unitOfWork.CourseDepartmentRepository != null
+            ? (await _unitOfWork.CourseDepartmentRepository.GetAllAsync(cancellationToken)).Where(cd => cd.CourseId == id && !cd.IsDeleted).ToList()
+            : new List<CourseDepartment>();
+        var departments = _unitOfWork.DepartmentRepository != null
+            ? (await _unitOfWork.DepartmentRepository.GetAllAsync(cancellationToken)).ToDictionary(d => d.DepartmentId, d => d.DepartmentName)
+            : new Dictionary<int, string>();
+        var deptIds = cdList.Select(cd => cd.DepartmentId).ToList();
+        var deptNames = deptIds.Where(deptId => departments.ContainsKey(deptId)).Select(deptId => departments[deptId]).ToList();
+
+        return new CourseResponse(
+            c.CourseId, c.CourseCode, c.CourseName, c.Description, c.DurationHours, c.Status, c.ValidityMonths, c.CourseType,
+            subjects, c.VersionNo, c.PreviousVersionId,
+            DepartmentIds: deptIds.Count > 0 ? deptIds : null,
+            DepartmentNames: deptNames.Count > 0 ? deptNames : null);
     }
 
     public async Task<CourseResponse> CreateCourseAsync(CreateCourseRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
@@ -156,10 +186,43 @@ public class CourseService : ICourseService
                     ));
                 }
 
+                var deptIdsList = new List<int>();
+                var deptNamesList = new List<string>();
+                if (request.DepartmentIds != null && request.DepartmentIds.Any() && _unitOfWork.DepartmentRepository != null && _unitOfWork.CourseDepartmentRepository != null)
+                {
+                    var validatedDepts = await ValidateAndGetTrainingAudienceDepartmentsAsync(request.DepartmentIds, ct);
+
+                    foreach (var dept in validatedDepts)
+                    {
+                        var courseDept = new CourseDepartment
+                        {
+                            CourseId = course.CourseId,
+                            DepartmentId = dept.DepartmentId,
+                            CreatedAt = DateTime.UtcNow,
+                            CreatedByAccountId = createdByAccountId
+                        };
+                        await _unitOfWork.CourseDepartmentRepository.AddAsync(courseDept, ct);
+                        deptIdsList.Add(dept.DepartmentId);
+                        deptNamesList.Add(dept.DepartmentName);
+                    }
+                }
+
                 await _unitOfWork.SaveAsync(ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
 
-                return new CourseResponse(course.CourseId, course.CourseCode, course.CourseName, course.Description, course.DurationHours, course.Status, course.ValidityMonths, course.CourseType, responseSubjects, course.VersionNo);
+                return new CourseResponse(
+                    course.CourseId,
+                    course.CourseCode,
+                    course.CourseName,
+                    course.Description,
+                    course.DurationHours,
+                    course.Status,
+                    course.ValidityMonths,
+                    course.CourseType,
+                    responseSubjects,
+                    course.VersionNo,
+                    DepartmentIds: deptIdsList.Count > 0 ? deptIdsList : null,
+                    DepartmentNames: deptNamesList.Count > 0 ? deptNamesList : null);
             }
             catch
             {
@@ -606,10 +669,91 @@ public class CourseService : ICourseService
                     }
                 }
 
+                // SYNC COURSE DEPARTMENTS
+                var deptIdsList = new List<int>();
+                var deptNamesList = new List<string>();
+                if (request.DepartmentIds != null && _unitOfWork.CourseDepartmentRepository != null && _unitOfWork.DepartmentRepository != null)
+                {
+                    var validatedDepts = await ValidateAndGetTrainingAudienceDepartmentsAsync(request.DepartmentIds, ct);
+                    var targetDeptDict = validatedDepts.ToDictionary(d => d.DepartmentId, d => d.DepartmentName);
+                    var targetDeptIds = targetDeptDict.Keys.ToHashSet();
+
+                    var existingCourseDepts = (await _unitOfWork.CourseDepartmentRepository.GetAllAsync(ct))
+                        .Where(cd => cd.CourseId == id).ToList();
+
+                    foreach (var cd in existingCourseDepts)
+                    {
+                        if (!targetDeptIds.Contains(cd.DepartmentId))
+                        {
+                            cd.IsDeleted = true;
+                            cd.DeletedAt = DateTime.UtcNow;
+                            cd.UpdatedAt = DateTime.UtcNow;
+                            cd.UpdatedByAccountId = updatedByAccountId;
+                            _unitOfWork.CourseDepartmentRepository.Update(cd);
+                        }
+                    }
+
+                    foreach (var deptId in targetDeptIds)
+                    {
+                        var existing = existingCourseDepts.FirstOrDefault(cd => cd.DepartmentId == deptId);
+                        if (existing != null)
+                        {
+                            if (existing.IsDeleted)
+                            {
+                                existing.IsDeleted = false;
+                                existing.DeletedAt = null;
+                                existing.UpdatedAt = DateTime.UtcNow;
+                                existing.UpdatedByAccountId = updatedByAccountId;
+                                _unitOfWork.CourseDepartmentRepository.Update(existing);
+                            }
+                        }
+                        else
+                        {
+                            var newCd = new CourseDepartment
+                            {
+                                CourseId = id,
+                                DepartmentId = deptId,
+                                CreatedAt = DateTime.UtcNow,
+                                CreatedByAccountId = updatedByAccountId
+                            };
+                            await _unitOfWork.CourseDepartmentRepository.AddAsync(newCd, ct);
+                        }
+                        deptIdsList.Add(deptId);
+                        deptNamesList.Add(targetDeptDict[deptId]);
+                    }
+                }
+                else if (_unitOfWork.CourseDepartmentRepository != null && _unitOfWork.DepartmentRepository != null)
+                {
+                    var existingCourseDepts = (await _unitOfWork.CourseDepartmentRepository.GetAllAsync(ct))
+                        .Where(cd => cd.CourseId == id && !cd.IsDeleted).ToList();
+                    var allDepartments = (await _unitOfWork.DepartmentRepository.GetAllAsync(ct))
+                        .ToDictionary(d => d.DepartmentId, d => d.DepartmentName);
+                    foreach (var cd in existingCourseDepts)
+                    {
+                        deptIdsList.Add(cd.DepartmentId);
+                        if (allDepartments.TryGetValue(cd.DepartmentId, out var dn))
+                        {
+                            deptNamesList.Add(dn);
+                        }
+                    }
+                }
+
                 await _unitOfWork.SaveAsync(ct);
                 await _unitOfWork.CommitTransactionAsync(ct);
 
-                return new CourseResponse(course.CourseId, course.CourseCode, course.CourseName, course.Description, course.DurationHours, course.Status, course.ValidityMonths, course.CourseType, finalSubjects.OrderBy(s => s.SequenceNo).ToList(), course.VersionNo);
+                return new CourseResponse(
+                    course.CourseId,
+                    course.CourseCode,
+                    course.CourseName,
+                    course.Description,
+                    course.DurationHours,
+                    course.Status,
+                    course.ValidityMonths,
+                    course.CourseType,
+                    finalSubjects.OrderBy(s => s.SequenceNo).ToList(),
+                    course.VersionNo,
+                    DepartmentIds: deptIdsList.Count > 0 ? deptIdsList : null,
+                    DepartmentNames: deptNamesList.Count > 0 ? deptNamesList : null);
             }
             catch
             {
@@ -752,6 +896,36 @@ public class CourseService : ICourseService
                     await _unitOfWork.CompletionRequirementRepository.AddAsync(newReq, ct);
                 }
 
+                // 5. Clone CourseDepartment
+                var clonedDeptIds = new List<int>();
+                var clonedDeptNames = new List<string>();
+                if (_unitOfWork.CourseDepartmentRepository != null && _unitOfWork.DepartmentRepository != null)
+                {
+                    var originalCourseDepts = (await _unitOfWork.CourseDepartmentRepository.GetAllAsync(ct))
+                        .Where(cd => cd.CourseId == courseId && !cd.IsDeleted)
+                        .ToList();
+
+                    var allDepts = (await _unitOfWork.DepartmentRepository.GetAllAsync(ct))
+                        .ToDictionary(d => d.DepartmentId, d => d.DepartmentName);
+
+                    foreach (var cd in originalCourseDepts)
+                    {
+                        var newCd = new CourseDepartment
+                        {
+                            CourseId = newCourse.CourseId,
+                            DepartmentId = cd.DepartmentId,
+                            CreatedAt = DateTime.UtcNow,
+                            CreatedByAccountId = createdByAccountId
+                        };
+                        await _unitOfWork.CourseDepartmentRepository.AddAsync(newCd, ct);
+                        clonedDeptIds.Add(cd.DepartmentId);
+                        if (allDepts.TryGetValue(cd.DepartmentId, out var dn))
+                        {
+                            clonedDeptNames.Add(dn);
+                        }
+                    }
+                }
+
                 await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
                 {
                     AccountId = createdByAccountId,
@@ -776,7 +950,9 @@ public class CourseService : ICourseService
                     newCourse.CourseType,
                     clonedSubjects,
                     newCourse.VersionNo,
-                    newCourse.PreviousVersionId
+                    newCourse.PreviousVersionId,
+                    DepartmentIds: clonedDeptIds.Count > 0 ? clonedDeptIds : null,
+                    DepartmentNames: clonedDeptNames.Count > 0 ? clonedDeptNames : null
                 );
             }
             catch
@@ -1056,5 +1232,35 @@ public class CourseService : ICourseService
         }, cancellationToken);
 
         await _unitOfWork.SaveAsync(cancellationToken);
+    }
+
+    private async Task<List<Department>> ValidateAndGetTrainingAudienceDepartmentsAsync(List<int> departmentIds, CancellationToken ct)
+    {
+        if (departmentIds == null || !departmentIds.Any() || _unitOfWork.DepartmentRepository == null)
+        {
+            return new List<Department>();
+        }
+
+        var distinctIds = departmentIds.Distinct().ToList();
+        var allDepts = (await _unitOfWork.DepartmentRepository.GetAllAsync(ct))?.ToList() ?? new List<Department>();
+        var deptDict = allDepts.ToDictionary(d => d.DepartmentId, d => d);
+
+        var validDepartments = new List<Department>();
+        foreach (var id in distinctIds)
+        {
+            if (!deptDict.TryGetValue(id, out var dept) || dept.IsDeleted)
+            {
+                throw new BusinessRuleViolationException($"Phòng ban (ID: #{id}) không tồn tại trong hệ thống.");
+            }
+
+            if (!dept.IsTrainingAudience)
+            {
+                throw new BusinessRuleViolationException($"Phòng ban '{dept.DepartmentName}' (Mã: {dept.DepartmentCode}) là phòng ban nội bộ/vận hành, không thể cấu hình làm đối tượng đào tạo cho khóa học.");
+            }
+
+            validDepartments.Add(dept);
+        }
+
+        return validDepartments;
     }
 }

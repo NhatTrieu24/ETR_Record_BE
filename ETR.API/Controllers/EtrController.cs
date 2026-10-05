@@ -83,6 +83,23 @@ public class EtrController : ControllerBase
     }
 
     /// <summary>
+    /// [Module/Flow]: Xử lý ETR / Dossier Chi Tiết
+    /// [Core Responsibility]: Lấy hồ sơ ETR Dossier chi tiết đa tầng (tổng quan, môn học, buổi học, nhật ký bay/SIM, minh chứng, năng định, lịch sử phê duyệt) có áp dụng phân quyền và kiểm soát dữ liệu theo Role.
+    /// [Target Audience]: Student, Instructor, Academic, QA, Audit, TrainingManager, Admin
+    /// </summary>
+    [HttpGet("{id}/dossier")]
+    [Authorize(Roles = "Student,Instructor,Academic,QA,Audit,TrainingManager,Admin")]
+    public async Task<ActionResult<EtrDossierResponse>> GetEtrDossier(int id, CancellationToken cancellationToken)
+    {
+        var accountId = _currentUserService.AccountId 
+            ?? throw new UnauthorizedAccessException("User is not authenticated.");
+        var roleName = _currentUserService.RoleName ?? string.Empty;
+
+        var dossier = await _etrService.GetEtrDossierAsync(id, accountId, roleName, cancellationToken);
+        return Ok(dossier);
+    }
+
+    /// <summary>
     /// [Module/Flow]: Xử lý ETR
     /// [Core Responsibility]: Xem % đáp ứng các điều kiện hoàn thành trước khi Submit, không cần
     /// đợi Submit thất bại mới biết đang thiếu gì.

@@ -1,0 +1,339 @@
+
+=== SLIDE 1 ===
+[Google Shape;15;p4]: SU26SE104  •   CAPSTONE PROJECT
+[Google Shape;16;p4]: ELECTRONIC TRAINING RECORD (ETR) SYSTEM IN AVIATION
+[Google Shape;17;p4]: Capstone Project Presentation – Information System
+[Google Shape;19;p4]: Group: SU26SE104
+Team members
+Nguyen Huu Nhat Trieu (SE170486) — Team Leader · Back-end
+Vo Trong Nhan (SE171411) — Front-end
+Doan Trong Khoi (SE141053) — Back-end 
+Tran Trong Nhan (SE171973) — Front-end 
+Supervisor: Ngo Dang Ha An
+
+=== SLIDE 2 ===
+[Google Shape;26;p5]: 02
+[Google Shape;27;p5]: Agenda
+[Google Shape;28;p5]: The presentation follows the order the panel evaluates
+[Google Shape;30;p5]: Electronic Training Record (ETR)  •  SU26SE104_GSU48
+[Google Shape;31;p5]: 01   Project Context & Background
+[Google Shape;32;p5]: 02   Current Problems & Pain Points
+[Google Shape;33;p5]: 03   Solution & Features
+[Google Shape;34;p5]: 04   Functional Requirements (Actor & Use Case)
+[Google Shape;35;p5]: 05   In-Scope / Out-of-Scope
+[Google Shape;36;p5]: 06   System Architecture & Database
+[Google Shape;37;p5]: 07   Demonstration & Conclusion
+
+=== SLIDE 3 ===
+[Google Shape;42;p6]: 03
+[Google Shape;43;p6]: Context / Background
+[Google Shape;45;p6]: Electronic Training Record (ETR)  •  SU26SE104_GSU48
+[Google Shape;46;p6]: Industry Regulations: Civil aviation demands absolute safety, traceability, and uncompromising compliance with international and national standards (CAAV Part 10, ICAO Annex 1, FAA, EASA).
+
+Multi-Stage Training Lifecycle: Aviation trainees (Pilots, Cabin Crew, Maintenance Technicians) undergo a continuous 3-phase journey:
+[Google Shape;47;p6]: Ground School:
+Theoretical foundations.
+[Google Shape;48;p6]: Flight Operations:
+Actual aircraft training and line checks.
+[Google Shape;49;p6]: Mandatory Record Retention: Authorities mandate that all attendance, flight hours, examination sheets, instructor endorsements, and certifications must be securely preserved for 5 to 10 years for unannounced safety audits.
+[Google Shape;50;p6]: Simulator (SIM / FTD):
+Cockpit procedures and emergency handling.
+[Google Shape;51;p6]: Problem Statement: Traditional aviation training record management relies heavily on paper logbooks and fragmented spreadsheets, creating massive data tampering risks and audit vulnerabilities.
+
+=== SLIDE 4 ===
+[Google Shape;56;p7]: 04
+[Google Shape;57;p7]: Problem — Key Issues & Impact
+[Google Shape;58;p7]: Each issue traced to the impact it creates for the academy
+[Google Shape;60;p7]: Electronic Training Record (ETR)  •  SU26SE104_GSU48
+[Google Shape;61;p7] TABLE (7 rows x 3 cols):
+   | Problem / Risk | Description | Potential impact
+   | Records lost or damaged | Paper records can be misplaced, damaged by fire or water, or deteriorate over time. | Training history cannot be proven; retention rules are breached; operations are affected.
+   | No version control | Multiple versions of the same document exist in different places. | Outdated data is used; confusion during assessment checks.
+   | Hard to search and retrieve | Finding an old record means manually reviewing several sources and folders. | Delays in reporting, verification and inspection support.
+   | Compliance & audit risk | No recorded edit or approval history; records are scattered across departments and formats. | Record validity cannot be proven during audit; dossiers take a long time to compile.
+   | Inconsistent data | The same information is re-entered on several forms and files. | Data discrepancies and inaccurate statistics.
+   | Low data security | Paper records can be viewed or copied without authorisation. | Personal data leakage and breaches of data-security rules.
+[Google Shape;62;p7]: Why it matters: these are not only inefficiencies — in a regulated aviation environment they become compliance and safety risks. The ETR system was built to remove them.
+
+=== SLIDE 5 ===
+[Google Shape;67;p8]: 05
+[Google Shape;68;p8]: Solution & Core Features
+[Google Shape;69;p8]: Addressing aviation training pain points through a centralized, tamper-evident digital platform
+[Google Shape;71;p8]: Electronic Training Record (ETR)  •  SU26SE104_GSU48
+[Google Shape;72;p8] TABLE (5 rows x 3 cols):
+   | Problem / Pain Point | ETR System Solution | Value & Benefit
+   | Paper & Fragmented Data | Centralized Curriculum & Class Management | Single source of truth; instant record retrieval across all departments.
+   | Attendance & Score Falsification | 80% Attendance Gate & Immutable Audit Trail | Automatic exam locking if attendance < 80%; logs 100% of score edits.
+   | Tampered / Fake Evidence Files | Cloud Storage with SHA-256 Integrity Hashing | Cryptographic proof guaranteeing document authenticity and non-repudiation.
+   | Delayed Multi-level Sign-offs | 3-Tier Digital Sign-off & Record Locking | Cuts sign-off cycle from weeks to minutes; locks records permanently after approval.
+[Google Shape;73;p8]: Key Value Proposition: The ETR system transforms aviation training from vulnerable paper/Excel tracking into a compliant, transparent, and auditable digital ecosystem adhering to CAAV & ICAO standards.
+
+=== SLIDE 6 ===
+[Google Shape;78;p9]: 06
+[Google Shape;79;p9]: Functional Requirements — System Stakeholders & Roles
+[Google Shape;80;p9]: Separation of duties (SoD) mapped across 7 specialized user roles
+[Google Shape;82;p9]: Electronic Training Record (ETR)  •  SU26SE104_GSU48
+[Google Shape;83;p9] TABLE (8 rows x 3 cols):
+   | Actor | Main responsibilities | Key System Permissions
+   | Administrator | System governance, account provisioning, department setup | Full administration, user management, global audit log view.
+   | Academic Staff (Training Coordinator) | Syllabus management, cohort scheduling, batch Excel import | CRUD courses/classes, assign instructors, import student rosters.
+   | Instructor | Record attendance, assessment scores and practical checklists; upload evidence; sign off subjects. | Mark attendance, grade exams, upload evidence (SHA-256), sign off.
+   | QA Staff | Verify or reject evidence; review submitted ETRs; return records for correction. | Approve / reject evidence and validate an ETR, return defective records with notes. Cannot verify evidence they uploaded themselves.
+   | Training Manager | Final review and approval of verified ETRs; amendment and unlock decisions. | Approve and freeze an ETR; issue certificates; authorise score amendments.
+   | Auditor (CAA) | Independent compliance review of locked records, approval history and audit logs. | Read-only: search, inspect and export training packages. No write operations.
+   | Student (Learner) | View own ETR status, attendance, results, certificates and training history. | Read-only on official records; can maintain the personal profile and password.
+[Google Shape;84;p9]: Separation of duties: data entry, quality verification, final approval, system administration and independent audit are handled by different roles — enforced in code, not by convention.
+
+=== SLIDE 7 ===
+[Google Shape;89;p10]: 07
+[Google Shape;90;p10]: Functional Requirements — Use Cases & Core Workflow
+[Google Shape;91;p10]: End-to-end operational flow from syllabus setup to final certification
+[Google Shape;93;p10]: Electronic Training Record (ETR)  •  SU26SE104_GSU48
+[Google Shape;94;p10]: Training Operations
+UC-04 Session Attendance Marking (80% Gate Check)
+UC-05 Theory Score & Practical Skill Checklist Grading
+UC-06 Evidence Upload with SHA-256 Cryptographic Hashing
+[Google Shape;95;p10]: Academic Setup
+UC-01 Account & Profile Management
+UC-02 Syllabus & Course Configuration
+UC-03 Class Cohort Scheduling & Excel Batch Import
+[Google Shape;96;p10]: Quality & Approval
+UC-07 Subject Completion Sign-off (Record Locking)
+UC-08 QA Evidence Verification & Return Handling
+UC-09 Training Manager Final Approval & Certificate Granting
+[Google Shape;97;p10]: Auditing & Tracking
+UC-10 Post-Approval Controlled Amendment Workflow
+UC-11 Trainee Progress & Digital Transcript Tracking
+UC-12 Compliance Audit Trail & SHA-256 Integrity Verification
+
+=== SLIDE 8 ===
+[Google Shape;102;p11]: 08
+[Google Shape;103;p11]: Main Functions
+[Google Shape;104;p11]: Feature groups mapped to the use cases defined in the SRS
+[Google Shape;106;p11]: Electronic Training Record (ETR)  •  SU26SE104_GSU48
+[Google Shape;107;p11] TABLE (9 rows x 4 cols):
+   | Feature group | Core functions | Use cases | Primary actor
+   | System administration | Account, role and department management; audit log; system statistics | UC-48 → UC-55 | Administrator
+   | Learner & curriculum | Learner records, courses, subjects, classes, enrolment, retake carry-over | UC-02 → UC-09 | Academic Staff
+   | ETR lifecycle | Auto-generate ETR on enrolment, 4 compliance gates, submit to QA | UC-07, UC-13, UC-14 | Academic Staff
+   | Attendance & assessment | Mark attendance, finalise session, record scores, practical checklist, sign-off | UC-17 → UC-21 | Instructor
+   | Evidence & QA verification | Upload / verify / reject evidence, maker-checker rule, review queue, return for correction | UC-22, UC-29 → UC-33 | Instructor · QA Staff
+   | Approval & locking | Final approval, Deep Freeze, certificate issue, amendment / unlock | UC-38 → UC-47 | Training Manager
+   | Audit, search & export | Locked-ETR archive, advanced search, approval chain, ZIP/PDF packages | UC-62 → UC-68 | Auditor
+   | Dashboards & self-service | Role dashboards, learner progress, certificates, notifications | UC-01, UC-15, UC-56 → UC-61 | All roles
+
+=== SLIDE 9 ===
+[Google Shape;112;p12]: 09
+[Google Shape;113;p12]: Project Scope — In-Scope vs. Out-of-Scope
+[Google Shape;114;p12]: Defining project boundaries to maintain high compliance depth within time constraints
+[Google Shape;116;p12]: Electronic Training Record (ETR)  •  SU26SE104_GSU48
+[Google Shape;117;p12]: 68 / 68
+Use cases registered → delivered (UC-01…UC-68)
+[Google Shape;118;p12]: 35
+Major features implemented (F-01…F-35)
+[Google Shape;119;p12]: 7
+User roles with role-based access control
+[Google Shape;120;p12]: 235
+Test cases executed, 100% passing
+[Google Shape;121;p12]: In scope — delivered
+Aviation Training Lifecycle: 100% digitized workflow: Syllabus → Scheduling → Attendance (80% gate)→ Grading → Sign-off → QA → Manager Approval & Certification.
+
+Data Integrity & Security: Automated SHA-256 evidence hashing, multi-tier record locking, JWT authentication & BCrypt security.
+
+Aviation Audit Trail: Append-only logging of 100% sensitive data mutations with GMT+7 timestamps for CAAV inspection.
+
+Batch Excel Processing: Validated template download & batch import for accounts, courses, classes, and student rosters.
+
+Dedicated Web Portals: 7 specialized, responsive web portals for all actors (optimized for Desktop & Tablet).
+[Google Shape;122;p12]: Out of scope (stated exclusions)
+Financial & Tuition Billing: Financial billing is managed by external enterprise ERP/Accounting systems; decoupled from academic records.
+
+Real-time Flight Telemetry: ETR records certified post-flight debriefings; live blackbox sensor streams belong to onboard avionics.
+
+Native Mobile App Stores: Prioritized secure, zero-install responsive Web/PWA over app store distribution overhead.
+[Google Shape;123;p12]: Strategic Focus: By strictly scoping out billing and flight telemetry, the system achieves enterprise-grade depth in training verification, regulatory compliance, and tamper-proof auditing.
+
+=== SLIDE 10 ===
+[Google Shape;128;p13]: 10
+[Google Shape;129;p13]: System Design / Architecture
+[Google Shape;131;p13]: Electronic Training Record (ETR)  •  SU26SE104_GSU48
+
+=== SLIDE 11 ===
+[Google Shape;137;p14]: 11
+[Google Shape;138;p14]: Technology Stack
+[Google Shape;139;p14]: Not just a list — the reason each technology was chosen
+[Google Shape;141;p14]: Electronic Training Record (ETR)  •  SU26SE104_GSU48
+[Google Shape;142;p14] TABLE (10 rows x 3 cols):
+   | Layer / purpose | Technology | Why we chose it
+   | Frontend | React 19 + Vite 8, React Router 7, SCSS | Component-based SPA with fast builds; ApexCharts for dashboards and SheetJS for Excel export.
+   | Backend | ASP.NET Core Web API | Strong REST tooling, EF Core, dependency injection and a clean layered structure.
+   | Architecture | Clean Architecture — API / Application / Domain / Infrastructure | Keeps business rules independent and testable; framework changes stay in the outer layer.
+   | Database | SQL Server (Azure SQL) | Relational and transactional; constraints and reporting suit compliance records.
+   | Authentication | JWT + BCrypt password hashing | Stateless authentication with role-based (zero-trust) checks on every request.
+   | File storage | Cloudinary | Evidence files are stored off-site with integrity hashing; the database keeps only metadata.
+   | Documents & mail | QuestPDF, ClosedXML, MailKit (SMTP) | PDF certificates and Excel reports generated server-side; automatic email notifications.
+   | Testing | xUnit + Moq (backend), Vitest (frontend), Postman/Swagger (API) | Automated verification of business rules plus API contract and UI testing.
+   | Deployment | Azure App Service + Azure SQL + Vercel | Cloud hosting with continuous delivery and separate frontend/backend releases.
+
+=== SLIDE 12 ===
+[Google Shape;147;p15]: 12
+[Google Shape;148;p15]: Flow 1 - User & Access Management
+[Google Shape;150;p15]: Role: Administrator
+[Google Shape;152;p15]: Account Creation: 
+Admin provisions user accounts with strict validation rules (email format, no special chars, phone starting with 0).
+[Google Shape;153;p15]: Role-Based Access Control (RBAC): 
+Enforces zero-trust role assignment across 7 distinct actors, preventing privilege escalation.
+[Google Shape;154;p15]: Manage and Update User: Organizes accounts into administrative/flight departments; manages account activation and status changes.
+[Google Shape;155;p15]: Activity Oversight (Audit Log): Every user creation, role update, and status change is automatically logged with GMT+7 timestamps for inspection.
+[Google Shape;159;p15]: Electronic Training Record (ETR)  •  SU26SE104_GSU48
+
+=== SLIDE 13 ===
+[Google Shape;164;p16]: 13
+[Google Shape;165;p16]: Flow 2 - Learner, Course & Enrollment
+[Google Shape;167;p16]: Role: Academic Staff
+[Google Shape;169;p16]: Enrollment: 
+Academic staff initiates learner enrollment into a specific class.
+[Google Shape;170;p16]: Auto-Generation:
+System automatically provisions the ETR Course Record in 'Draft' state.
+[Google Shape;171;p16]: Ensuring Completeness:
+Guarantees no missing records by automating the foundational data setup.
+[Google Shape;172;p16]: Curriculum & Schedule Mapping: 
+Auto-binds course subjects, passing score snapshots, and attendance rosters.
+[Google Shape;176;p16]: Electronic Training Record (ETR)  •  SU26SE104_GSU48
+
+=== SLIDE 14 ===
+[Google Shape;181;p17]: 14
+[Google Shape;182;p17]: Flow 3 - Attendance & Assessment
+[Google Shape;184;p17]: Role: Instructor
+[Google Shape;187;p17]: Data Isolation:
+Instructors can only access and modify data for classes they are explicitly assigned to teach.
+[Google Shape;188;p17]: Attendance Tracking:
+Real-time session confirmation and presence marking.
+[Google Shape;189;p17]: Automated Grading:
+System automatically calculates attendance rates and evaluates Pass/Fail status against configured thresholds.
+[Google Shape;190;p17]: Input Validation:
+Backend constraints reject invalid score inputs immediately.
+[Google Shape;194;p17]: Electronic Training Record (ETR)  •  SU26SE104_GSU48
+
+=== SLIDE 15 ===
+[Google Shape;199;p18]: 15
+[Google Shape;200;p18]: Flow 4 - Evidence & QA Verification
+[Google Shape;202;p18]: Role: QA Staff
+[Google Shape;203;p18]: Maker-Checker Compliance
+[Google Shape;205;p18]: Document Upload:
+Instructors upload physical evidence (scans/PDFs) linked to specific training events.
+[Google Shape;206;p18]: Independent Verification:
+QA staff review pending evidence in a dedicated queue.
+[Google Shape;207;p18]: Strict Enforcement:
+System strictly prohibits users from verifying documents they uploaded themselves.
+[Google Shape;208;p18]: Audit Readiness:
+Ensures all training data is backed by verified physical or digital proofs.
+[Google Shape;212;p18]: Electronic Training Record (ETR)  •  SU26SE104_GSU48
+
+=== SLIDE 16 ===
+[Google Shape;217;p19]: 16
+[Google Shape;218;p19]: Flow 5 - ETR Approval & Freeze
+[Google Shape;220;p19]: Role: Training Manager
+[Google Shape;221;p19]: The Deep Freeze Mechanism
+[Google Shape;222;p19]: Final Authority:
+Training Manager reviews fully verified ETRs for final sign-off.
+[Google Shape;223;p19]: Pre-Validation Engine:
+System checks all prerequisites (attendance, passing scores, verified evidence) before allowing approval.
+[Google Shape;224;p19]: Immutability Lock:
+Upon approval, the ETR enters the 'Completed' state.
+[Google Shape;225;p19]: Data Integrity:
+The 'Deep Freeze' prevents any further modifications by any user, ensuring regulatory compliance.
+[Google Shape;229;p19]: Electronic Training Record (ETR)  •  SU26SE104_GSU48
+
+=== SLIDE 17 ===
+[Google Shape;234;p20]: 17
+[Google Shape;235;p20]: Flow 6 - Reporting, Export & Audit
+[Google Shape;237;p20]: Role: Auditor / Admin
+[Google Shape;238;p20]: Traceability & CAA Compliance
+[Google Shape;239;p20]: Automated Audit Trails:
+Entity Framework Interceptors automatically log every create, update, and delete action across the system.
+[Google Shape;240;p20]: Immutable Logs:
+Audit entries record user, action, timestamp, and data changes, and cannot be altered.
+[Google Shape;241;p20]: Regulatory Readiness:
+Streamlines the preparation process for external Civil Aviation Authority (CAA) audits.
+[Google Shape;242;p20]: Package Generation:
+One-click compilation of the entire Training Package (PDF/ZIP) for completed ETRs.
+[Google Shape;246;p20]: Electronic Training Record (ETR)  •  SU26SE104_GSU48
+
+=== SLIDE 18 ===
+[Google Shape;251;p21]: 18
+[Google Shape;252;p21]: Testing & Quality
+[Google Shape;253;p21]: 235 test cases across two levels, three execution rounds
+[Google Shape;255;p21]: Electronic Training Record (ETR)  •  SU26SE104_GSU48
+[Google Shape;256;p21]: 235
+Total test cases (129 unit + 106 system)
+[Google Shape;257;p21]: 100.0%
+Pass rate — 235 of 235 passed
+[Google Shape;258;p21]: 0
+Defects open at release
+[Google Shape;259;p21]: 31 / 27
+Service functions / features covered
+[Google Shape;260;p21]: Unit testing (white-box)
+xUnit + Moq, Arrange-Act-Assert. 129 cases covering 31 service functions — Normal 40 (31.0%), Abnormal 64 (49.6%), Boundary 25 (19.4%).
+System & integration testing (black-box)
+106 cases across 27 features / controllers, executed in 3 rounds: Round 1 defect detection → Round 2 fix & re-test → Round 3 regression verification.
+Security & RBAC testing
+Cross-role checks: an Instructor cannot verify evidence, Academic Staff cannot approve an ETR, Auditor has read-only access and no write operation succeeds.
+[Google Shape;261;p21]: Defect handling
+Defects found in Round 1 were logged in GitHub Issues with severity, then fixed and re-tested in Rounds 2–3. No defect remains open at release (defect log — Report 5).
+Quality gates vs. plan
+Planned defect ceilings: unit ≤ 2%, integration ≤ 4%, system ≤ 5%, acceptance ≤ 3%. All gate criteria were met before deployment.
+Tools & environment
+Swagger / Postman for API, Vitest for frontend, Chrome & Edge for cross-browser checks; automated rollback on the SQL Server test database.
+
+=== SLIDE 19 ===
+[Google Shape;266;p22]: 19
+[Google Shape;267;p22]: Team Roles & Contribution
+[Google Shape;268;p22]: Who did what — with the evidence behind each claim
+[Google Shape;270;p22]: Electronic Training Record (ETR)  •  SU26SE104_GSU48
+[Google Shape;271;p22] TABLE (6 rows x 3 cols):
+   | Member (role) | Main contribution | Evidence / deliverables
+   | Nguyen Huu Nhat Trieu (SE170486) Team Leader · Back-end · Test Manager | Requirements analysis and SRS baseline; system architecture; core ETR workflow (validation, submission, approval, locking); test management and UAT. | Report 3 (SRS), Report 4 (SDD), backend repository, test plan & UAT evidence.
+   | Vo Trong Nhan (SE171411) Front-end · QA Tester | QA and dashboard screens; manual cross-browser testing on Chrome/Edge; defect logging and verification between Rounds 1–2. | Report 6 (user guides), Report 5 test report, frontend repository.
+   | Doan Trong Khoi (SE141053) Back-end · Automation Tester | Backend services and EF Core data access; backend unit tests and API integration tests. | Backend repository, Report5_Unit Test — 129 unit test cases.
+   | Tran Trong Nhan (SE171973) Front-end · UI/UX & Integration Tester | UI/UX prototype; student and auditor screens; API contract checks, Cloudinary upload payloads and Excel import dry-run validation. | UI/UX prototype, Report 6 screens/walkthroughs, Report 5 integration evidence.
+   | All members | Document reviews (R/D responsibility matrix), weekly sprints, code reviews on every pull request and demo rehearsals. | Reports 1–7, GitHub pull-request history, weekly status reports.
+[Google Shape;272;p22]: Work was split in 1–2 week sprints with no single-owner critical task; frontend and backend were developed in parallel against a documented API contract.
+
+=== SLIDE 20 ===
+[Google Shape;277;p23]: 20
+[Google Shape;278;p23]: Limitations & Future Work
+[Google Shape;279;p23]: We state the limitations before the panel has to point them out
+[Google Shape;281;p23]: Electronic Training Record (ETR)  •  SU26SE104_GSU48
+[Google Shape;282;p23]: Limitations (current scope)
+Web-based only — a stable network connection and service availability are required.
+Legacy paper / Excel records are not migrated automatically; migration must be a controlled import.
+Learner access is read-only on official records — learners cannot create, verify or approve them.
+Data accuracy depends on correct data entry by staff and on evidence verification.
+No LMS / e-learning delivery is provided by the system.
+No integration with external aviation authorities, airlines or third-party platforms.
+No native mobile application; no multi-factor authentication yet.
+[Google Shape;283;p23]: Future development
+Mobile application (Android / iOS) for instructors and learners.
+LMS and online-examination integration.
+Direct integration with CAA / airline training systems.
+Advanced analytics and AI-based recommendations (e.g. at-risk learner prediction).
+Automated legacy-data migration tooling.
+Multi-factor authentication and enterprise SSO.
+Offline evidence capture for flight-line and simulator environments.
+
+=== SLIDE 21 ===
+[Google Shape;288;p24]: Conclusion
+[Google Shape;289;p24]: A centralized, traceable and compliant training-record platform — built and verified end to end
+[Google Shape;290;p24]: 68
+Use cases delivered
+[Google Shape;291;p24]: 35
+Major features
+[Google Shape;292;p24]: 7
+Roles with RBAC
+[Google Shape;293;p24]: 235
+Test cases, 100% pass
+[Google Shape;294;p24]: Electronic Training Record (ETR) — SU26SE104_GSU48
+Thank you. We welcome your questions and feedback.
+Group SU2026-GSU-ETR  ·  Nguyen Huu Nhat Trieu · Vo Trong Nhan · Doan Trong Khoi · Tran Trong Nhan  ·  Supervisor: Ngo Dang Ha An
+[Google Shape;295;p24]: Q & A

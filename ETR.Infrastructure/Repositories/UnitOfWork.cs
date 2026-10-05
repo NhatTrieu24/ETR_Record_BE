@@ -25,6 +25,7 @@ public class UnitOfWork : IUnitOfWork
         RoleRepository = new GenericRepository<Role>(_context);
         DepartmentRepository = new GenericRepository<Department>(_context);
         CourseRepository = new GenericRepository<Course>(_context);
+        CourseDepartmentRepository = new GenericRepository<CourseDepartment>(_context);
         EvidenceTypeRepository = new GenericRepository<EvidenceType>(_context);
         SessionRepository = new GenericRepository<Session>(_context);
         SubjectResultRepository = new GenericRepository<SubjectResult>(_context);
@@ -56,6 +57,7 @@ public class UnitOfWork : IUnitOfWork
     public IGenericRepository<Role> RoleRepository { get; }
     public IGenericRepository<Department> DepartmentRepository { get; }
     public IGenericRepository<Course> CourseRepository { get; }
+    public IGenericRepository<CourseDepartment> CourseDepartmentRepository { get; }
     public IGenericRepository<EvidenceType> EvidenceTypeRepository { get; }
     public IGenericRepository<Session> SessionRepository { get; }
     public IGenericRepository<SubjectResult> SubjectResultRepository { get; }

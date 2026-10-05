@@ -15,7 +15,7 @@ namespace ETR.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin,Audit,Academic")]
+[Authorize]
 public class ExportsController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
@@ -34,9 +34,10 @@ public class ExportsController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
     /// [Core Responsibility]: Lấy danh sách phân trang các công việc xuất tệp (export jobs) đã thực hiện.
-    /// [Target Audience]: Admin, Audit, Academic
+    /// [Target Audience]: Admin, Audit, Academic, TrainingManager
     /// </summary>
     [HttpGet]
+    [Authorize(Roles = "Admin,Audit,Academic,TrainingManager")]
     public async Task<ActionResult<PagedResponse<ExportJobResponse>>> GetExportJobs([FromQuery] int page = 1, [FromQuery] int pageSize = 10, CancellationToken cancellationToken = default)
     {
         page = Math.Max(page, 1);
@@ -52,9 +53,10 @@ public class ExportsController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
     /// [Core Responsibility]: Lấy thông tin một công việc xuất tệp (export job) cụ thể theo ID.
-    /// [Target Audience]: Admin
+    /// [Target Audience]: Admin, Audit, Academic, TrainingManager
     /// </summary>
     [HttpGet("{id:int}")]
+    [Authorize(Roles = "Admin,Audit,Academic,TrainingManager")]
     public async Task<ActionResult<ExportJobResponse>> GetExportJob(int id, CancellationToken cancellationToken)
     {
         var job = await _unitOfWork.ExportJobRepository.GetByIdAsync(id, cancellationToken);
@@ -65,9 +67,10 @@ public class ExportsController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
     /// [Core Responsibility]: Kích hoạt một công việc xuất tệp cho gói đào tạo (training package).
-    /// [Target Audience]: Admin
+    /// [Target Audience]: Admin, Audit, Academic
     /// </summary>
     [HttpPost("training-package")]
+    [Authorize(Roles = "Admin,Audit,Academic")]
     public async Task<ActionResult<ExportJobResponse>> ExportTrainingPackage([FromBody] ExportRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -83,9 +86,10 @@ public class ExportsController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
     /// [Core Responsibility]: Kích hoạt một công việc xuất tệp PDF độc lập cho tóm tắt 1 hồ sơ ETR.
-    /// [Target Audience]: Admin
+    /// [Target Audience]: Admin, Audit, Academic, TrainingManager
     /// </summary>
     [HttpPost("pdf")]
+    [Authorize(Roles = "Admin,Audit,Academic,TrainingManager")]
     public async Task<ActionResult<ExportJobResponse>> ExportPdf([FromBody] ExportRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -101,9 +105,10 @@ public class ExportsController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
     /// [Core Responsibility]: Kích hoạt một công việc xuất tệp PDF cho bản tóm tắt dashboard.
-    /// [Target Audience]: Admin
+    /// [Target Audience]: Admin, Academic
     /// </summary>
     [HttpPost("dashboard")]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<ActionResult<ExportJobResponse>> ExportDashboard([FromBody] ExportRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -114,9 +119,10 @@ public class ExportsController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
     /// [Core Responsibility]: Kích hoạt một công việc xuất báo cáo điểm danh độc lập cho 1 lớp học.
-    /// [Target Audience]: Admin
+    /// [Target Audience]: Admin, Academic
     /// </summary>
     [HttpPost("attendance")]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<ActionResult<ExportJobResponse>> ExportAttendanceReport([FromBody] ExportRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -132,9 +138,10 @@ public class ExportsController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
     /// [Core Responsibility]: Kích hoạt một công việc xuất báo cáo đánh giá độc lập cho 1 lớp học.
-    /// [Target Audience]: Admin
+    /// [Target Audience]: Admin, Academic
     /// </summary>
     [HttpPost("assessment")]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<ActionResult<ExportJobResponse>> ExportAssessmentReport([FromBody] ExportRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -151,9 +158,10 @@ public class ExportsController : ControllerBase
     /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
     /// [Core Responsibility]: Kích hoạt một công việc xuất báo cáo Excel tổng hợp toàn bộ học viên
     /// trong 1 lớp/khoá (đa dòng), khác với báo cáo tóm tắt theo từng ETR riêng lẻ.
-    /// [Target Audience]: Admin
+    /// [Target Audience]: Admin, Academic
     /// </summary>
     [HttpPost("class-summary")]
+    [Authorize(Roles = "Admin,Academic")]
     public async Task<ActionResult<ExportJobResponse>> ExportClassSummary([FromBody] ExportRequest request, CancellationToken cancellationToken)
     {
         var accountId = _currentUserService.AccountId ?? throw new UnauthorizedAccessException();
@@ -169,9 +177,10 @@ public class ExportsController : ControllerBase
     /// <summary>
     /// [Module/Flow]: Kiểm toán Hệ thống &amp; Tuân thủ
     /// [Core Responsibility]: Tải xuống tệp đã được tạo từ một công việc xuất tệp hoàn tất.
-    /// [Target Audience]: Admin
+    /// [Target Audience]: Admin, Audit, Academic, TrainingManager
     /// </summary>
     [HttpGet("download/{id:int}")]
+    [Authorize(Roles = "Admin,Audit,Academic,TrainingManager")]
     public async Task<IActionResult> DownloadExportFile(int id, CancellationToken cancellationToken)
     {
         var job = await _unitOfWork.ExportJobRepository.GetByIdAsync(id, cancellationToken);

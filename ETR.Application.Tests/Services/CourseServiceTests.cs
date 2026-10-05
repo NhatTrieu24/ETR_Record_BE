@@ -488,4 +488,484 @@ public class CourseServiceTests
         Assert.Equal("2026.1", response.Subjects![0].SubjectVersion);
         Assert.Equal("2026.2", response.Subjects![1].SubjectVersion);
     }
+
+    [Fact]
+    public async Task CloneCourseVersionAsync_CopiesCourseDepartmentsToNewDraftVersion()
+    {
+        int courseId = 10;
+        var originalCourse = new Course
+        {
+            CourseId = courseId,
+            CourseCode = "PPL-101",
+            CourseName = "Private Pilot",
+            Description = "Desc",
+            DurationHours = 100,
+            Status = CourseStatus.Active,
+            ValidityMonths = 24,
+            CourseType = "Pilot",
+            VersionNo = 1
+        };
+
+        _mockCourseRepo.Setup(r => r.GetByIdAsync(courseId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(originalCourse);
+
+        _mockCourseRepo.Setup(r => r.GetAllIncludingDeletedAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Course> { originalCourse });
+
+        var originalSubjects = new List<CourseSubject>
+        {
+            new() { CourseId = courseId, SubjectId = 1, SequenceNo = 1, RequiredHours = 40, RequiredSessions = 10, IsMandatory = true, PassingScore = 75, SubjectVersion = "2026.1" }
+        };
+
+        _mockCourseSubjectRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(originalSubjects);
+
+        var mockAssessmentRepo = new Mock<IGenericRepository<Assessment>>();
+        mockAssessmentRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<Assessment>());
+        _mockUow.Setup(u => u.AssessmentRepository).Returns(mockAssessmentRepo.Object);
+
+        var mockChecklistRepo = new Mock<IGenericRepository<PracticalChecklist>>();
+        mockChecklistRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<PracticalChecklist>());
+        _mockUow.Setup(u => u.PracticalChecklistRepository).Returns(mockChecklistRepo.Object);
+
+        var mockReqRepo = new Mock<IGenericRepository<CompletionRequirement>>();
+        mockReqRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<CompletionRequirement>());
+        _mockUow.Setup(u => u.CompletionRequirementRepository).Returns(mockReqRepo.Object);
+
+        var originalCourseDepts = new List<CourseDepartment>
+        {
+            new() { CourseId = courseId, DepartmentId = 3, IsDeleted = false },
+            new() { CourseId = courseId, DepartmentId = 4, IsDeleted = false }
+        };
+        var mockCourseDeptRepo = new Mock<IGenericRepository<CourseDepartment>>();
+        mockCourseDeptRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(originalCourseDepts);
+        _mockUow.Setup(u => u.CourseDepartmentRepository).Returns(mockCourseDeptRepo.Object);
+
+        var departments = new List<Department>
+        {
+            new() { DepartmentId = 3, DepartmentName = "Flight Crew", IsTrainingAudience = true },
+            new() { DepartmentId = 4, DepartmentName = "Cabin Crew", IsTrainingAudience = true }
+        };
+        var mockDeptRepo = new Mock<IGenericRepository<Department>>();
+        mockDeptRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(departments);
+        _mockUow.Setup(u => u.DepartmentRepository).Returns(mockDeptRepo.Object);
+
+        var addedCourseDepts = new List<CourseDepartment>();
+        mockCourseDeptRepo.Setup(r => r.AddAsync(It.IsAny<CourseDepartment>(), It.IsAny<CancellationToken>()))
+            .Callback<CourseDepartment, CancellationToken>((cd, _) => addedCourseDepts.Add(cd))
+            .Returns(Task.CompletedTask);
+
+        _mockUow.Setup(u => u.ExecuteInStrategyAsync(It.IsAny<Func<CancellationToken, Task<CourseResponse>>>(), It.IsAny<CancellationToken>()))
+            .Returns<Func<CancellationToken, Task<CourseResponse>>, CancellationToken>((op, ct) => op(ct));
+
+        var response = await _service.CloneCourseVersionAsync(courseId, createdByAccountId: 99);
+
+        Assert.NotNull(response);
+        Assert.Equal(2, addedCourseDepts.Count);
+        Assert.Contains(addedCourseDepts, cd => cd.DepartmentId == 3);
+        Assert.Contains(addedCourseDepts, cd => cd.DepartmentId == 4);
+        Assert.Equal(2, response.DepartmentIds!.Count);
+        Assert.Contains("Flight Crew", response.DepartmentNames!);
+        Assert.Contains("Cabin Crew", response.DepartmentNames!);
+    }
+
+    [Fact]
+    public async Task UpdateCourseAsync_WhenClearingDepartmentIds_MarksCourseDepartmentsAsDeleted()
+    {
+        int courseId = 15;
+        var existingCourse = new Course
+        {
+            CourseId = courseId,
+            CourseCode = "PPL-101",
+            CourseName = "Private Pilot",
+            Description = "Desc",
+            DurationHours = 100,
+            Status = CourseStatus.Draft,
+            ValidityMonths = 24,
+            CourseType = "Pilot",
+            VersionNo = 1
+        };
+
+        _mockCourseRepo.Setup(r => r.GetByIdAsync(courseId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingCourse);
+
+        var existingSubjects = new List<CourseSubject>
+        {
+            new() { CourseId = courseId, SubjectId = 1, SequenceNo = 1, RequiredHours = 40, RequiredSessions = 10, IsMandatory = true, PassingScore = 75, SubjectVersion = "2026.1" }
+        };
+        _mockCourseSubjectRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingSubjects);
+
+        var existingCourseDepts = new List<CourseDepartment>
+        {
+            new() { CourseId = courseId, DepartmentId = 3, IsDeleted = false }
+        };
+        var mockCourseDeptRepo = new Mock<IGenericRepository<CourseDepartment>>();
+        mockCourseDeptRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(existingCourseDepts);
+        _mockUow.Setup(u => u.CourseDepartmentRepository).Returns(mockCourseDeptRepo.Object);
+
+        var departments = new List<Department>
+        {
+            new() { DepartmentId = 3, DepartmentName = "Flight Crew", IsTrainingAudience = true }
+        };
+        var mockDeptRepo = new Mock<IGenericRepository<Department>>();
+        mockDeptRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(departments);
+        _mockUow.Setup(u => u.DepartmentRepository).Returns(mockDeptRepo.Object);
+
+        var updatedDepts = new List<CourseDepartment>();
+        mockCourseDeptRepo.Setup(r => r.Update(It.IsAny<CourseDepartment>()))
+            .Callback<CourseDepartment>(cd => updatedDepts.Add(cd));
+
+        _mockClassRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<Class>());
+        var mockSessionRepo = new Mock<IGenericRepository<Session>>();
+        mockSessionRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<Session>());
+        _mockUow.Setup(u => u.SessionRepository).Returns(mockSessionRepo.Object);
+
+        _mockUow.Setup(u => u.ExecuteInStrategyAsync(It.IsAny<Func<CancellationToken, Task<CourseResponse>>>(), It.IsAny<CancellationToken>()))
+            .Returns<Func<CancellationToken, Task<CourseResponse>>, CancellationToken>((op, ct) => op(ct));
+
+        var reqSubjects = new List<AddCourseSubjectRequest>
+        {
+            new() { SubjectId = 1, SequenceNo = 1, RequiredHours = 40, RequiredSessions = 10, IsMandatory = true, PassingScore = 75, SubjectVersion = "2026.1" }
+        };
+
+        // User clears all departments (DepartmentIds = new List<int>())
+        var updateRequest = new UpdateCourseRequest(
+            courseId,
+            "PPL-101",
+            "Private Pilot",
+            "Desc",
+            100,
+            CourseStatus.Draft,
+            24,
+            "Pilot",
+            reqSubjects,
+            new List<int>() // Empty list
+        );
+
+        var response = await _service.UpdateCourseAsync(courseId, updateRequest, updatedByAccountId: 99);
+
+        Assert.NotNull(response);
+        Assert.True(response.DepartmentIds == null || !response.DepartmentIds.Any());
+        Assert.True(response.DepartmentNames == null || !response.DepartmentNames.Any());
+        Assert.Contains(updatedDepts, cd => cd.DepartmentId == 3 && cd.IsDeleted);
+    }
+
+    [Fact]
+    public async Task CreateCourseAsync_ShouldThrow_WhenDepartmentDoesNotExist()
+    {
+        var reqSubjects = new List<AddCourseSubjectRequest>
+        {
+            new() { SubjectId = 1, SequenceNo = 1, RequiredHours = 40, RequiredSessions = 10, IsMandatory = true, PassingScore = 75 }
+        };
+        var createRequest = new CreateCourseRequest(
+            "C-NEW",
+            "New Course",
+            "Desc",
+            50,
+            CourseStatus.Draft,
+            12,
+            "Pilot",
+            reqSubjects,
+            new List<int> { 999 } // Non-existent dept
+        );
+
+        _mockCourseRepo.Setup(r => r.GetQueryable()).Returns(new List<Course>().AsQueryable());
+        _mockSubjectRepo.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Subject { SubjectId = 1, SubjectCode = "SUB-1", SubjectName = "Subject 1" });
+
+        var mockDeptRepo = new Mock<IGenericRepository<Department>>();
+        mockDeptRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Department>
+            {
+                new() { DepartmentId = 3, DepartmentCode = "FC", DepartmentName = "Flight Crew", IsTrainingAudience = true }
+            });
+        _mockUow.Setup(u => u.DepartmentRepository).Returns(mockDeptRepo.Object);
+
+        var mockCourseDeptRepo = new Mock<IGenericRepository<CourseDepartment>>();
+        _mockUow.Setup(u => u.CourseDepartmentRepository).Returns(mockCourseDeptRepo.Object);
+
+        _mockUow.Setup(u => u.ExecuteInStrategyAsync(It.IsAny<Func<CancellationToken, Task<CourseResponse>>>(), It.IsAny<CancellationToken>()))
+            .Returns<Func<CancellationToken, Task<CourseResponse>>, CancellationToken>((op, ct) => op(ct));
+        _mockUow.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _mockUow.Setup(u => u.CommitTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            _service.CreateCourseAsync(createRequest, createdByAccountId: 1));
+
+        Assert.Contains("không tồn tại trong hệ thống", ex.Message);
+        Assert.Contains("999", ex.Message);
+    }
+
+    [Fact]
+    public async Task CreateCourseAsync_ShouldThrow_WhenDepartmentIsInternal()
+    {
+        var reqSubjects = new List<AddCourseSubjectRequest>
+        {
+            new() { SubjectId = 1, SequenceNo = 1, RequiredHours = 40, RequiredSessions = 10, IsMandatory = true, PassingScore = 75 }
+        };
+        var createRequest = new CreateCourseRequest(
+            "C-NEW-2",
+            "New Course 2",
+            "Desc",
+            50,
+            CourseStatus.Draft,
+            12,
+            "Pilot",
+            reqSubjects,
+            new List<int> { 1 } // Internal dept (Administration)
+        );
+
+        _mockCourseRepo.Setup(r => r.GetQueryable()).Returns(new List<Course>().AsQueryable());
+        _mockSubjectRepo.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Subject { SubjectId = 1, SubjectCode = "SUB-1", SubjectName = "Subject 1" });
+
+        var mockDeptRepo = new Mock<IGenericRepository<Department>>();
+        mockDeptRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Department>
+            {
+                new() { DepartmentId = 1, DepartmentCode = "ADM", DepartmentName = "Administration", IsTrainingAudience = false }
+            });
+        _mockUow.Setup(u => u.DepartmentRepository).Returns(mockDeptRepo.Object);
+
+        var mockCourseDeptRepo = new Mock<IGenericRepository<CourseDepartment>>();
+        _mockUow.Setup(u => u.CourseDepartmentRepository).Returns(mockCourseDeptRepo.Object);
+
+        _mockUow.Setup(u => u.ExecuteInStrategyAsync(It.IsAny<Func<CancellationToken, Task<CourseResponse>>>(), It.IsAny<CancellationToken>()))
+            .Returns<Func<CancellationToken, Task<CourseResponse>>, CancellationToken>((op, ct) => op(ct));
+        _mockUow.Setup(u => u.BeginTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        _mockUow.Setup(u => u.CommitTransactionAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            _service.CreateCourseAsync(createRequest, createdByAccountId: 1));
+
+        Assert.Contains("nội bộ/vận hành", ex.Message);
+        Assert.Contains("Administration", ex.Message);
+    }
+
+    [Fact]
+    public async Task UpdateCourseAsync_WhenDepartmentIdsIsNull_KeepsExistingMapping()
+    {
+        int courseId = 20;
+        var existingCourse = new Course
+        {
+            CourseId = courseId,
+            CourseCode = "PPL-200",
+            CourseName = "Private Pilot 200",
+            Description = "Desc",
+            DurationHours = 100,
+            Status = CourseStatus.Draft,
+            ValidityMonths = 24,
+            CourseType = "Pilot",
+            VersionNo = 1
+        };
+
+        _mockCourseRepo.Setup(r => r.GetByIdAsync(courseId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingCourse);
+
+        var existingSubjects = new List<CourseSubject>
+        {
+            new() { CourseId = courseId, SubjectId = 1, SequenceNo = 1, RequiredHours = 40, RequiredSessions = 10, IsMandatory = true, PassingScore = 75, SubjectVersion = "2026.1" }
+        };
+        _mockCourseSubjectRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingSubjects);
+
+        var existingCourseDepts = new List<CourseDepartment>
+        {
+            new() { CourseId = courseId, DepartmentId = 3, IsDeleted = false }
+        };
+        var mockCourseDeptRepo = new Mock<IGenericRepository<CourseDepartment>>();
+        mockCourseDeptRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(existingCourseDepts);
+        _mockUow.Setup(u => u.CourseDepartmentRepository).Returns(mockCourseDeptRepo.Object);
+
+        var departments = new List<Department>
+        {
+            new() { DepartmentId = 3, DepartmentName = "Flight Crew", IsTrainingAudience = true }
+        };
+        var mockDeptRepo = new Mock<IGenericRepository<Department>>();
+        mockDeptRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(departments);
+        _mockUow.Setup(u => u.DepartmentRepository).Returns(mockDeptRepo.Object);
+
+        _mockClassRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<Class>());
+        var mockSessionRepo = new Mock<IGenericRepository<Session>>();
+        mockSessionRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<Session>());
+        _mockUow.Setup(u => u.SessionRepository).Returns(mockSessionRepo.Object);
+
+        _mockUow.Setup(u => u.ExecuteInStrategyAsync(It.IsAny<Func<CancellationToken, Task<CourseResponse>>>(), It.IsAny<CancellationToken>()))
+            .Returns<Func<CancellationToken, Task<CourseResponse>>, CancellationToken>((op, ct) => op(ct));
+
+        var reqSubjects = new List<AddCourseSubjectRequest>
+        {
+            new() { SubjectId = 1, SequenceNo = 1, RequiredHours = 40, RequiredSessions = 10, IsMandatory = true, PassingScore = 75, SubjectVersion = "2026.1" }
+        };
+
+        // DepartmentIds is null -> keep existing mapping
+        var updateRequest = new UpdateCourseRequest(
+            courseId,
+            "PPL-200",
+            "Private Pilot 200",
+            "Desc",
+            100,
+            CourseStatus.Draft,
+            24,
+            "Pilot",
+            reqSubjects,
+            null
+        );
+
+        var response = await _service.UpdateCourseAsync(courseId, updateRequest, updatedByAccountId: 99);
+
+        Assert.NotNull(response);
+        Assert.NotNull(response.DepartmentIds);
+        Assert.Single(response.DepartmentIds);
+        Assert.Contains(3, response.DepartmentIds);
+        Assert.Contains("Flight Crew", response.DepartmentNames!);
+        mockCourseDeptRepo.Verify(r => r.Update(It.IsAny<CourseDepartment>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateCourseAsync_ShouldThrow_WhenDepartmentDoesNotExist()
+    {
+        int courseId = 25;
+        var existingCourse = new Course
+        {
+            CourseId = courseId,
+            CourseCode = "PPL-250",
+            CourseName = "Private Pilot 250",
+            Description = "Desc",
+            DurationHours = 100,
+            Status = CourseStatus.Draft,
+            ValidityMonths = 24,
+            CourseType = "Pilot",
+            VersionNo = 1
+        };
+
+        _mockCourseRepo.Setup(r => r.GetByIdAsync(courseId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingCourse);
+
+        var existingSubjects = new List<CourseSubject>
+        {
+            new() { CourseId = courseId, SubjectId = 1, SequenceNo = 1, RequiredHours = 40, RequiredSessions = 10, IsMandatory = true, PassingScore = 75, SubjectVersion = "2026.1" }
+        };
+        _mockCourseSubjectRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingSubjects);
+
+        var existingCourseDepts = new List<CourseDepartment>();
+        var mockCourseDeptRepo = new Mock<IGenericRepository<CourseDepartment>>();
+        mockCourseDeptRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(existingCourseDepts);
+        _mockUow.Setup(u => u.CourseDepartmentRepository).Returns(mockCourseDeptRepo.Object);
+
+        var departments = new List<Department>
+        {
+            new() { DepartmentId = 3, DepartmentName = "Flight Crew", IsTrainingAudience = true }
+        };
+        var mockDeptRepo = new Mock<IGenericRepository<Department>>();
+        mockDeptRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(departments);
+        _mockUow.Setup(u => u.DepartmentRepository).Returns(mockDeptRepo.Object);
+
+        _mockClassRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<Class>());
+        var mockSessionRepo = new Mock<IGenericRepository<Session>>();
+        mockSessionRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<Session>());
+        _mockUow.Setup(u => u.SessionRepository).Returns(mockSessionRepo.Object);
+
+        _mockUow.Setup(u => u.ExecuteInStrategyAsync(It.IsAny<Func<CancellationToken, Task<CourseResponse>>>(), It.IsAny<CancellationToken>()))
+            .Returns<Func<CancellationToken, Task<CourseResponse>>, CancellationToken>((op, ct) => op(ct));
+
+        var reqSubjects = new List<AddCourseSubjectRequest>
+        {
+            new() { SubjectId = 1, SequenceNo = 1, RequiredHours = 40, RequiredSessions = 10, IsMandatory = true, PassingScore = 75, SubjectVersion = "2026.1" }
+        };
+
+        var updateRequest = new UpdateCourseRequest(
+            courseId,
+            "PPL-250",
+            "Private Pilot 250",
+            "Desc",
+            100,
+            CourseStatus.Draft,
+            24,
+            "Pilot",
+            reqSubjects,
+            new List<int> { 888 } // Non-existent dept
+        );
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            _service.UpdateCourseAsync(courseId, updateRequest, updatedByAccountId: 99));
+
+        Assert.Contains("không tồn tại trong hệ thống", ex.Message);
+        Assert.Contains("888", ex.Message);
+    }
+
+    [Fact]
+    public async Task UpdateCourseAsync_ShouldThrow_WhenDepartmentIsInternal()
+    {
+        int courseId = 30;
+        var existingCourse = new Course
+        {
+            CourseId = courseId,
+            CourseCode = "PPL-300",
+            CourseName = "Private Pilot 300",
+            Description = "Desc",
+            DurationHours = 100,
+            Status = CourseStatus.Draft,
+            ValidityMonths = 24,
+            CourseType = "Pilot",
+            VersionNo = 1
+        };
+
+        _mockCourseRepo.Setup(r => r.GetByIdAsync(courseId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingCourse);
+
+        var existingSubjects = new List<CourseSubject>
+        {
+            new() { CourseId = courseId, SubjectId = 1, SequenceNo = 1, RequiredHours = 40, RequiredSessions = 10, IsMandatory = true, PassingScore = 75, SubjectVersion = "2026.1" }
+        };
+        _mockCourseSubjectRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingSubjects);
+
+        var existingCourseDepts = new List<CourseDepartment>();
+        var mockCourseDeptRepo = new Mock<IGenericRepository<CourseDepartment>>();
+        mockCourseDeptRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(existingCourseDepts);
+        _mockUow.Setup(u => u.CourseDepartmentRepository).Returns(mockCourseDeptRepo.Object);
+
+        var departments = new List<Department>
+        {
+            new() { DepartmentId = 2, DepartmentCode = "TRN", DepartmentName = "Training", IsTrainingAudience = false }
+        };
+        var mockDeptRepo = new Mock<IGenericRepository<Department>>();
+        mockDeptRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(departments);
+        _mockUow.Setup(u => u.DepartmentRepository).Returns(mockDeptRepo.Object);
+
+        _mockClassRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<Class>());
+        var mockSessionRepo = new Mock<IGenericRepository<Session>>();
+        mockSessionRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new List<Session>());
+        _mockUow.Setup(u => u.SessionRepository).Returns(mockSessionRepo.Object);
+
+        _mockUow.Setup(u => u.ExecuteInStrategyAsync(It.IsAny<Func<CancellationToken, Task<CourseResponse>>>(), It.IsAny<CancellationToken>()))
+            .Returns<Func<CancellationToken, Task<CourseResponse>>, CancellationToken>((op, ct) => op(ct));
+
+        var reqSubjects = new List<AddCourseSubjectRequest>
+        {
+            new() { SubjectId = 1, SequenceNo = 1, RequiredHours = 40, RequiredSessions = 10, IsMandatory = true, PassingScore = 75, SubjectVersion = "2026.1" }
+        };
+
+        var updateRequest = new UpdateCourseRequest(
+            courseId,
+            "PPL-300",
+            "Private Pilot 300",
+            "Desc",
+            100,
+            CourseStatus.Draft,
+            24,
+            "Pilot",
+            reqSubjects,
+            new List<int> { 2 } // Internal dept (Training)
+        );
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            _service.UpdateCourseAsync(courseId, updateRequest, updatedByAccountId: 99));
+
+        Assert.Contains("nội bộ/vận hành", ex.Message);
+        Assert.Contains("Training", ex.Message);
+    }
 }

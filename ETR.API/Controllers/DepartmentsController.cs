@@ -20,7 +20,7 @@ public class DepartmentsController : ControllerBase
     }
 
     [HttpGet]
-    [Authorize(Roles = "Admin,Academic")]
+    [Authorize(Roles = "Admin,Academic,TrainingManager,Instructor,QA,Audit")]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
         var result = await _departmentService.GetAllDepartmentsAsync(cancellationToken);
@@ -28,7 +28,7 @@ public class DepartmentsController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    [Authorize(Roles = "Admin,Academic")]
+    [Authorize(Roles = "Admin,Academic,TrainingManager,Instructor,QA,Audit")]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
     {
         var result = await _departmentService.GetDepartmentByIdAsync(id, cancellationToken);
