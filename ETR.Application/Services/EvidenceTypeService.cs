@@ -21,8 +21,13 @@ public class EvidenceTypeService : IEvidenceTypeService
         return types.Select(d => new EvidenceTypeResponse
         {
             EvidenceTypeId = d.EvidenceTypeId,
+            TypeCode = d.TypeCode,
             TypeName = d.TypeName,
-            Description = d.Description
+            Description = d.Description,
+            DepartmentScope = d.DepartmentScope,
+            SubjectTypeScope = d.SubjectTypeScope,
+            IsMandatory = d.IsMandatory,
+            Category = d.Category
         });
     }
 
@@ -34,8 +39,13 @@ public class EvidenceTypeService : IEvidenceTypeService
         return new EvidenceTypeResponse
         {
             EvidenceTypeId = d.EvidenceTypeId,
+            TypeCode = d.TypeCode,
             TypeName = d.TypeName,
-            Description = d.Description
+            Description = d.Description,
+            DepartmentScope = d.DepartmentScope,
+            SubjectTypeScope = d.SubjectTypeScope,
+            IsMandatory = d.IsMandatory,
+            Category = d.Category
         };
     }
 
@@ -46,11 +56,20 @@ public class EvidenceTypeService : IEvidenceTypeService
         {
             throw new BusinessRuleViolationException($"An evidence type named '{request.TypeName}' already exists.");
         }
+        if (!string.IsNullOrWhiteSpace(request.TypeCode) && existingTypes.Any(t => t.TypeCode.Equals(request.TypeCode, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new BusinessRuleViolationException($"An evidence type with code '{request.TypeCode}' already exists.");
+        }
 
         var evidenceType = new EvidenceType
         {
+            TypeCode = request.TypeCode?.Trim() ?? string.Empty,
             TypeName = request.TypeName,
             Description = request.Description,
+            DepartmentScope = request.DepartmentScope,
+            SubjectTypeScope = request.SubjectTypeScope,
+            IsMandatory = request.IsMandatory,
+            Category = string.IsNullOrWhiteSpace(request.Category) ? "SubjectEvidence" : request.Category,
             CreatedAt = DateTime.UtcNow,
             CreatedByAccountId = createdByAccountId
         };
@@ -61,8 +80,13 @@ public class EvidenceTypeService : IEvidenceTypeService
         return new EvidenceTypeResponse
         {
             EvidenceTypeId = evidenceType.EvidenceTypeId,
+            TypeCode = evidenceType.TypeCode,
             TypeName = evidenceType.TypeName,
-            Description = evidenceType.Description
+            Description = evidenceType.Description,
+            DepartmentScope = evidenceType.DepartmentScope,
+            SubjectTypeScope = evidenceType.SubjectTypeScope,
+            IsMandatory = evidenceType.IsMandatory,
+            Category = evidenceType.Category
         };
     }
 
@@ -76,9 +100,21 @@ public class EvidenceTypeService : IEvidenceTypeService
         {
             throw new BusinessRuleViolationException($"An evidence type named '{request.TypeName}' already exists.");
         }
+        if (!string.IsNullOrWhiteSpace(request.TypeCode) && existingTypes.Any(t => t.EvidenceTypeId != id && t.TypeCode.Equals(request.TypeCode, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new BusinessRuleViolationException($"An evidence type with code '{request.TypeCode}' already exists.");
+        }
 
+        evidenceType.TypeCode = request.TypeCode?.Trim() ?? evidenceType.TypeCode;
         evidenceType.TypeName = request.TypeName;
         evidenceType.Description = request.Description;
+        evidenceType.DepartmentScope = request.DepartmentScope;
+        evidenceType.SubjectTypeScope = request.SubjectTypeScope;
+        evidenceType.IsMandatory = request.IsMandatory;
+        if (!string.IsNullOrWhiteSpace(request.Category))
+        {
+            evidenceType.Category = request.Category;
+        }
         evidenceType.UpdatedAt = DateTime.UtcNow;
         evidenceType.UpdatedByAccountId = updatedByAccountId;
 
@@ -88,8 +124,13 @@ public class EvidenceTypeService : IEvidenceTypeService
         return new EvidenceTypeResponse
         {
             EvidenceTypeId = evidenceType.EvidenceTypeId,
+            TypeCode = evidenceType.TypeCode,
             TypeName = evidenceType.TypeName,
-            Description = evidenceType.Description
+            Description = evidenceType.Description,
+            DepartmentScope = evidenceType.DepartmentScope,
+            SubjectTypeScope = evidenceType.SubjectTypeScope,
+            IsMandatory = evidenceType.IsMandatory,
+            Category = evidenceType.Category
         };
     }
 

@@ -138,7 +138,12 @@ public partial class AppDbContext : DbContext
         modelBuilder.Entity<Department>().Property(d => d.DepartmentCode).HasMaxLength(20);
         modelBuilder.Entity<Department>().HasIndex(d => d.DepartmentName).IsUnique().HasFilter("[IsDeleted] = 0");
         modelBuilder.Entity<Department>().HasIndex(d => d.DepartmentCode).IsUnique().HasFilter("[DepartmentCode] IS NOT NULL AND [DepartmentCode] <> '' AND [IsDeleted] = 0");
+        modelBuilder.Entity<EvidenceType>().Property(et => et.TypeCode).HasMaxLength(50);
+        modelBuilder.Entity<EvidenceType>().Property(et => et.DepartmentScope).HasMaxLength(50);
+        modelBuilder.Entity<EvidenceType>().Property(et => et.SubjectTypeScope).HasMaxLength(50);
+        modelBuilder.Entity<EvidenceType>().Property(et => et.Category).HasMaxLength(50);
         modelBuilder.Entity<EvidenceType>().HasIndex(et => et.TypeName).IsUnique().HasFilter("[IsDeleted] = 0");
+        modelBuilder.Entity<EvidenceType>().HasIndex(et => et.TypeCode).IsUnique().HasFilter("[TypeCode] IS NOT NULL AND [TypeCode] <> '' AND [IsDeleted] = 0");
         modelBuilder.Entity<Course>().HasIndex(c => new { c.CourseCode, c.VersionNo }).IsUnique().HasFilter("[IsDeleted] = 0");
         modelBuilder.Entity<Subject>().HasIndex(s => s.SubjectCode).IsUnique().HasFilter("[IsDeleted] = 0");
         modelBuilder.Entity<Class>().HasIndex(tc => tc.ClassCode).IsUnique().HasFilter("[IsDeleted] = 0");
