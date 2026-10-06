@@ -1,3 +1,4 @@
+using ETR.Application.Compliance;
 using ETR.Application.DTOs.Assessment.Requests;
 using ETR.Application.DTOs.Assessment.Responses;
 using ETR.Application.Interfaces;
@@ -35,7 +36,31 @@ public class AssessmentService : IAssessmentService
 
     public async Task<AssessmentResponse> CreateAssessmentAsync(CreateAssessmentRequest request, int createdByAccountId, CancellationToken cancellationToken = default)
     {
-        await _courseService.EnsureCourseNotLockedAsync(request.CourseId, cancellationToken);
+        var existingAssessments = (_unitOfWork.AssessmentRepository != null
+            ? await _unitOfWork.AssessmentRepository.GetAllAsync(cancellationToken)
+            : null) ?? Enumerable.Empty<Assessment>();
+        var subjectAssessments = existingAssessments
+            .Where(a => a.CourseId == request.CourseId && a.SubjectId == request.SubjectId && !a.IsDeleted)
+            .ToList();
+
+        var existingAssessmentIds = subjectAssessments.Select(a => a.AssessmentId).ToHashSet();
+        var allResults = _unitOfWork.AssessmentResultRepository != null
+            ? await _unitOfWork.AssessmentResultRepository.GetAllAsync(cancellationToken)
+            : null;
+        var hasRecordedResults = (allResults ?? Enumerable.Empty<AssessmentResult>())
+            .Any(ar => existingAssessmentIds.Contains(ar.AssessmentId) && !ar.IsDeleted);
+
+        if (hasRecordedResults)
+        {
+            throw new BusinessRuleViolationException(
+                "Không thể tạo thêm bài kiểm tra cho môn học này vì đã có học viên có kết quả điểm số được ghi nhận trong hệ thống.");
+        }
+
+        var totalWeight = subjectAssessments.Sum(a => a.Weight);
+        if (totalWeight >= 100)
+        {
+            await _courseService.EnsureCourseNotLockedAsync(request.CourseId, cancellationToken);
+        }
 
         var course = await _unitOfWork.CourseRepository.GetByIdAsync(request.CourseId, cancellationToken);
         if (course == null || course.IsDeleted)
@@ -65,7 +90,7 @@ public class AssessmentService : IAssessmentService
             CreatedByAccountId = createdByAccountId
         };
 
-        await _unitOfWork.AssessmentRepository.AddAsync(entity, cancellationToken);
+        await _unitOfWork.AssessmentRepository!.AddAsync(entity, cancellationToken);
         await _unitOfWork.SaveAsync(cancellationToken);
 
         return MapToResponse(entity);
@@ -75,6 +100,18 @@ public class AssessmentService : IAssessmentService
     {
         var item = await _unitOfWork.AssessmentRepository.GetByIdAsync(id, cancellationToken);
         if (item == null) throw new KeyNotFoundException("Assessment not found.");
+
+        var allResults = _unitOfWork.AssessmentResultRepository != null
+            ? await _unitOfWork.AssessmentResultRepository.GetAllAsync(cancellationToken)
+            : null;
+        var hasRecordedResults = (allResults ?? Enumerable.Empty<AssessmentResult>())
+            .Any(ar => ar.AssessmentId == id && !ar.IsDeleted);
+
+        if (hasRecordedResults)
+        {
+            throw new BusinessRuleViolationException(
+                $"Bài kiểm tra '{item.ComponentName}' đã có kết quả điểm số của học viên nên không thể sửa đổi cấu hình.");
+        }
 
         await _courseService.EnsureCourseNotLockedAsync(item.CourseId, cancellationToken);
 
@@ -108,6 +145,18 @@ public class AssessmentService : IAssessmentService
     {
         var item = await _unitOfWork.AssessmentRepository.GetByIdAsync(id, cancellationToken);
         if (item == null) throw new KeyNotFoundException("Assessment not found.");
+
+        var allResults = _unitOfWork.AssessmentResultRepository != null
+            ? await _unitOfWork.AssessmentResultRepository.GetAllAsync(cancellationToken)
+            : null;
+        var hasRecordedResults = (allResults ?? Enumerable.Empty<AssessmentResult>())
+            .Any(ar => ar.AssessmentId == id && !ar.IsDeleted);
+
+        if (hasRecordedResults)
+        {
+            throw new BusinessRuleViolationException(
+                $"Bài kiểm tra '{item.ComponentName}' đã có kết quả điểm số của học viên nên không thể xóa.");
+        }
 
         await _courseService.EnsureCourseNotLockedAsync(item.CourseId, cancellationToken);
 

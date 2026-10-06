@@ -234,6 +234,23 @@ public class CourseServiceTests
     }
 
     [Fact]
+    public async Task EnsureCourseNotLockedAsync_ShouldNotThrow_WhenCourseHasOnlyPlannedClasses()
+    {
+        int courseId = 10;
+        _mockCourseRepo.Setup(r => r.GetByIdAsync(courseId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Course { CourseId = courseId, CourseCode = "C101", CourseName = "Private Pilot", VersionNo = 1 });
+
+        _mockClassRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Class>
+            {
+                new() { ClassId = 1, CourseId = courseId, Status = ClassStatus.Planned, IsDeleted = false }
+            });
+
+        // Should not throw
+        await _service.EnsureCourseNotLockedAsync(courseId);
+    }
+
+    [Fact]
     public async Task CloneCourseVersionAsync_ShouldCloneCourseAndBumpVersionNo()
     {
         int courseId = 10;

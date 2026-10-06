@@ -23,6 +23,7 @@ public class AssessmentAndSessionValidationTests
     private readonly Mock<IGenericRepository<Session>> _mockSessionRepo = new();
     private readonly Mock<IGenericRepository<Class>> _mockClassRepo = new();
     private readonly Mock<IGenericRepository<ClassSubject>> _mockClassSubjectRepo = new();
+    private readonly Mock<IGenericRepository<AssessmentResult>> _mockAssessmentResultRepo = new();
     private readonly Mock<IAuditLogRepository> _mockAuditRepo = new();
 
     public AssessmentAndSessionValidationTests()
@@ -31,6 +32,7 @@ public class AssessmentAndSessionValidationTests
         _mockUow.Setup(u => u.SubjectRepository).Returns(_mockSubjectRepo.Object);
         _mockUow.Setup(u => u.CourseSubjectRepository).Returns(_mockCourseSubjectRepo.Object);
         _mockUow.Setup(u => u.AssessmentRepository).Returns(_mockAssessmentRepo.Object);
+        _mockUow.Setup(u => u.AssessmentResultRepository).Returns(_mockAssessmentResultRepo.Object);
         _mockUow.Setup(u => u.PracticalChecklistRepository).Returns(_mockChecklistRepo.Object);
         _mockUow.Setup(u => u.SessionRepository).Returns(_mockSessionRepo.Object);
         _mockUow.Setup(u => u.ClassRepository).Returns(_mockClassRepo.Object);
@@ -175,5 +177,82 @@ public class AssessmentAndSessionValidationTests
             service.UpdateSessionAsync(100, request, 1));
 
         Assert.Contains("Assessment does not match", ex.Message);
+    }
+
+    [Fact]
+    public async Task CreateAssessmentAsync_AllowsInitialAssessments_WhenSubjectHasNoAssessmentsYet()
+    {
+        var course = new Course { CourseId = 1, CourseCode = "CRS-01", Status = CourseStatus.Active };
+        var subject = new Subject { SubjectId = 2, SubjectCode = "SUB-02" };
+
+        _mockCourseRepo.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(course);
+        _mockSubjectRepo.Setup(r => r.GetByIdAsync(2, It.IsAny<CancellationToken>())).ReturnsAsync(subject);
+
+        var courseSubjects = new List<CourseSubject> { new() { CourseId = 1, SubjectId = 2 } }.AsQueryable();
+        _mockCourseSubjectRepo.Setup(r => r.GetQueryable()).Returns(courseSubjects);
+
+        _mockAssessmentRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<Assessment>());
+        _mockAssessmentResultRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<AssessmentResult>());
+
+        var service = new AssessmentService(_mockUow.Object, _mockCourseService.Object);
+        var request = new CreateAssessmentRequest
+        {
+            CourseId = 1,
+            SubjectId = 2,
+            ComponentName = "Midterm Quiz",
+            AssessmentType = "Theory",
+            Weight = 40,
+            PassingScore = 75
+        };
+
+        var result = await service.CreateAssessmentAsync(request, 10);
+
+        Assert.NotNull(result);
+        Assert.Equal("Midterm Quiz", result.ComponentName);
+        Assert.Equal(40, result.Weight);
+        _mockAssessmentRepo.Verify(r => r.AddAsync(It.IsAny<Assessment>(), It.IsAny<CancellationToken>()), Times.Once);
+        _mockUow.Verify(u => u.SaveAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateAssessmentAsync_ThrowsBusinessRuleViolation_WhenSubjectAlreadyHasAssessmentResults()
+    {
+        var course = new Course { CourseId = 1, CourseCode = "CRS-01" };
+        var subject = new Subject { SubjectId = 2, SubjectCode = "SUB-02" };
+
+        _mockCourseRepo.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(course);
+        _mockSubjectRepo.Setup(r => r.GetByIdAsync(2, It.IsAny<CancellationToken>())).ReturnsAsync(subject);
+
+        var existingAssessments = new List<Assessment>
+        {
+            new() { AssessmentId = 10, CourseId = 1, SubjectId = 2, Weight = 50, ComponentName = "Midterm" }
+        };
+        var existingResults = new List<AssessmentResult>
+        {
+            new() { AssessmentResultId = 100, AssessmentId = 10, Score = 85 }
+        };
+
+        _mockAssessmentRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingAssessments);
+        _mockAssessmentResultRepo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingResults);
+
+        var service = new AssessmentService(_mockUow.Object, _mockCourseService.Object);
+        var request = new CreateAssessmentRequest
+        {
+            CourseId = 1,
+            SubjectId = 2,
+            ComponentName = "Final Exam",
+            AssessmentType = "Theory",
+            Weight = 50,
+            PassingScore = 75
+        };
+
+        var ex = await Assert.ThrowsAsync<ETR.Application.Compliance.BusinessRuleViolationException>(() =>
+            service.CreateAssessmentAsync(request, 10));
+
+        Assert.Contains("đã có học viên có kết quả điểm số", ex.Message);
     }
 }

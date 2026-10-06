@@ -34,20 +34,6 @@ public class CourseService : ICourseService
             throw new BusinessRuleViolationException(
                 $"Giáo trình của khóa học '{course.CourseName}' (Mã: {course.CourseCode}, Version: {course.VersionNo}) đã được mở lớp đào tạo chính thức (Scheduled/InProgress/Completed) nên đã bị đóng băng bất biến. Để sửa đổi giáo trình, vui lòng tạo phiên bản mới (New Version).");
         }
-
-        if (classes.Any())
-        {
-            var classIds = classes.Select(c => c.ClassId).ToHashSet();
-            var allEnrollments = await _unitOfWork.CourseEnrollmentRepository.GetAllAsync(cancellationToken);
-            var hasEnrollments = (allEnrollments ?? Enumerable.Empty<CourseEnrollment>())
-                .Any(e => classIds.Contains(e.ClassId) && !e.IsDeleted);
-
-            if (hasEnrollments)
-            {
-                throw new BusinessRuleViolationException(
-                    $"Giáo trình của khóa học '{course.CourseName}' (Mã: {course.CourseCode}, Version: {course.VersionNo}) đã có học viên ghi danh nên đã bị đóng băng bất biến. Để sửa đổi giáo trình, vui lòng tạo phiên bản mới (New Version).");
-            }
-        }
     }
 
     private async Task<(List<CourseDepartment> courseDepartments, Dictionary<int, string> departments)> SafeGetCourseDepartmentsAsync(CancellationToken cancellationToken)
