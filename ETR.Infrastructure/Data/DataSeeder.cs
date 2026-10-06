@@ -321,97 +321,274 @@ public static class DataSeeder
     /// </summary>
     private static async Task SeedTrainingFacilitiesAsync(AppDbContext context)
     {
-        if (!await context.TrainingFacilities.AnyAsync())
+        var existingCodes = await context.TrainingFacilities.Select(f => f.FacilityCode).ToListAsync();
+        var existingSet = new HashSet<string>(existingCodes, StringComparer.OrdinalIgnoreCase);
+
+        var allFacilities = new List<TrainingFacility>
         {
-            context.TrainingFacilities.AddRange(
-                // 1. Phòng học lý thuyết (Ground Classrooms)
-                new TrainingFacility
-                {
-                    FacilityCode = "CR-101",
-                    FacilityName = "Phòng học lý thuyết 101 (Classroom 101)",
-                    FacilityType = FacilityType.Classroom,
-                    Capacity = 35,
-                    IsActive = true,
-                    Description = "[Mẫu/Sample] Phòng học lý thuyết trang bị máy chiếu và điều hòa tiêu chuẩn ICAO.",
-                    LocationDetail = "Tầng 1 - Khu giảng đường A"
-                },
-                new TrainingFacility
-                {
-                    FacilityCode = "CR-102",
-                    FacilityName = "Phòng học lý thuyết 102 (Classroom 102)",
-                    FacilityType = FacilityType.Classroom,
-                    Capacity = 30,
-                    IsActive = true,
-                    Description = "[Mẫu/Sample] Phòng học lý thuyết trang bị bảng tương tác.",
-                    LocationDetail = "Tầng 1 - Khu giảng đường A"
-                },
+            // 1. Phòng học lý thuyết (Ground Classrooms)
+            new TrainingFacility
+            {
+                FacilityCode = "CR-101",
+                FacilityName = "Phòng học lý thuyết 101 (Classroom 101)",
+                FacilityType = FacilityType.Classroom,
+                Capacity = 35,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Phòng học lý thuyết trang bị máy chiếu và điều hòa tiêu chuẩn ICAO.",
+                LocationDetail = "Tầng 1 - Khu giảng đường A"
+            },
+            new TrainingFacility
+            {
+                FacilityCode = "CR-102",
+                FacilityName = "Phòng học lý thuyết 102 (Classroom 102)",
+                FacilityType = FacilityType.Classroom,
+                Capacity = 30,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Phòng học lý thuyết trang bị bảng tương tác.",
+                LocationDetail = "Tầng 1 - Khu giảng đường A"
+            },
+            new TrainingFacility
+            {
+                FacilityCode = "CR-103",
+                FacilityName = "Phòng học Đa phương tiện 103 (Multimedia Smart Classroom 103)",
+                FacilityType = FacilityType.Classroom,
+                Capacity = 40,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Phòng học trang bị máy tính trạm CBT, hệ thống âm thanh vòm và mô phỏng điện tử.",
+                LocationDetail = "Tầng 2 - Khu giảng đường A"
+            },
+            new TrainingFacility
+            {
+                FacilityCode = "CR-201",
+                FacilityName = "Phòng Điều độ & Khí tượng hàng không (Flight Dispatch & Met Lab 201)",
+                FacilityType = FacilityType.Classroom,
+                Capacity = 30,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Trạm tra cứu thời tiết SIGMET/WAFS, tính toán hiệu năng cất hạ cánh và lập kế hoạch bay OFP.",
+                LocationDetail = "Tầng 2 - Khu giảng đường B"
+            },
+            new TrainingFacility
+            {
+                FacilityCode = "CR-202",
+                FacilityName = "Phòng Pháp quy & Hệ thống An toàn SMS (Aviation Law & SMS Center 202)",
+                FacilityType = FacilityType.Classroom,
+                Capacity = 35,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Đào tạo Quy chế hàng không CAAV VAR Part 6, 8, 9, 10 và quản trị văn hóa an toàn Just Culture.",
+                LocationDetail = "Tầng 2 - Khu giảng đường B"
+            },
+            new TrainingFacility
+            {
+                FacilityCode = "CR-301",
+                FacilityName = "Hội trường Đào tạo Hàng không Quốc tế (Aviation Grand Auditorium 301)",
+                FacilityType = FacilityType.Classroom,
+                Capacity = 120,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Hội trường lớn tổ chức hội thảo an toàn, khai giảng và tốt nghiệp phi công & kỹ sư.",
+                LocationDetail = "Tầng 3 - Tòa nhà Điều hành Trung tâm"
+            },
 
-                // 2. Xưởng thực hành bảo dưỡng & cứu nguy cabin (Workshops)
-                new TrainingFacility
-                {
-                    FacilityCode = "WS-MAINT",
-                    FacilityName = "Xưởng bảo dưỡng kỹ thuật tàu bay (Hangar Workshop A)",
-                    FacilityType = FacilityType.Workshop,
-                    Capacity = 25,
-                    IsActive = true,
-                    Description = "[Mẫu/Sample] Xưởng thực hành động cơ, hệ thống cơ khí và điện tử tàu bay.",
-                    LocationDetail = "Hangar Bảo dưỡng số 1"
-                },
-                new TrainingFacility
-                {
-                    FacilityCode = "WS-CABIN",
-                    FacilityName = "Khu huấn luyện an toàn cabin (Cabin Mockup Safety Center)",
-                    FacilityType = FacilityType.Workshop,
-                    Capacity = 30,
-                    IsActive = true,
-                    Description = "[Mẫu/Sample] Mô hình thân máy bay thực hành thoát hiểm, khói lửa và cứu sinh.",
-                    LocationDetail = "Tòa nhà Huấn luyện An toàn & Khẩn nguy"
-                },
+            // 2. Xưởng thực hành bảo dưỡng & cứu nguy cabin (Workshops)
+            new TrainingFacility
+            {
+                FacilityCode = "WS-MAINT",
+                FacilityName = "Xưởng bảo dưỡng kỹ thuật tàu bay (Hangar Workshop A)",
+                FacilityType = FacilityType.Workshop,
+                Capacity = 25,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Xưởng thực hành động cơ, hệ thống cơ khí và điện tử tàu bay.",
+                LocationDetail = "Hangar Bảo dưỡng số 1"
+            },
+            new TrainingFacility
+            {
+                FacilityCode = "WS-CABIN",
+                FacilityName = "Khu huấn luyện an toàn cabin (Cabin Mockup Safety Center)",
+                FacilityType = FacilityType.Workshop,
+                Capacity = 30,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Mô hình thân máy bay thực hành thoát hiểm, khói lửa và cứu sinh.",
+                LocationDetail = "Tòa nhà Huấn luyện An toàn & Khẩn nguy"
+            },
+            new TrainingFacility
+            {
+                FacilityCode = "WS-AVIONIC",
+                FacilityName = "Xưởng thực hành Điện tử & Khí tài tàu bay (Avionics & Radar Lab B)",
+                FacilityType = FacilityType.Workshop,
+                Capacity = 25,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Bàn thực hành kiểm tra hệ thống Fly-by-wire, radar thời tiết, đài dẫn đường VOR/ILS và đài vô tuyến.",
+                LocationDetail = "Hangar Kỹ thuật số 2"
+            },
+            new TrainingFacility
+            {
+                FacilityCode = "WS-ENG-JET",
+                FacilityName = "Xưởng bảo dưỡng Động cơ phản lực (Jet Engine Maintenance Workshop)",
+                FacilityType = FacilityType.Workshop,
+                Capacity = 20,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Thực hành tháo lắp, kiểm tra nội soi borescope động cơ phản lực CFM56 và LEAP-1A.",
+                LocationDetail = "Hangar Bảo dưỡng số 3"
+            },
+            new TrainingFacility
+            {
+                FacilityCode = "WS-COMPOSITE",
+                FacilityName = "Xưởng vật liệu Composite & Cấu trúc thân vỏ (Sheet Metal & Composite Lab)",
+                FacilityType = FacilityType.Workshop,
+                Capacity = 25,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Thực hành gia công tán đinh hợp kim nhôm, sửa chữa kết cấu sợi carbon theo hướng dẫn SRM.",
+                LocationDetail = "Hangar Kỹ thuật số 2"
+            },
+            new TrainingFacility
+            {
+                FacilityCode = "WS-EVAC-POOL",
+                FacilityName = "Bể huấn luyện sơ tán tiếp nước & Sinh tồn biển (Wet Drill Evacuation Facility)",
+                FacilityType = FacilityType.Workshop,
+                Capacity = 45,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Bể bơi tạo sóng chuyên dụng thực hành mở bè cứu sinh, sơ tán tiếp nước Ditching và áo phao.",
+                LocationDetail = "Trung tâm Huấn luyện Cứu sinh & Sinh tồn biển"
+            },
+            new TrainingFacility
+            {
+                FacilityCode = "WS-DOOR-TRAINER",
+                FacilityName = "Phòng huấn luyện Cửa thoát hiểm tàu bay (Door & Exit Trainer)",
+                FacilityType = FacilityType.Workshop,
+                Capacity = 25,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Thiết bị mô phỏng đóng/mở cửa thoát hiểm A320/B737 có trợ lực khí nén và kẹt cửa khẩn cấp.",
+                LocationDetail = "Tòa nhà Khẩn nguy Cabin - Tầng 2"
+            },
 
-                // 3. Buồng lái mô phỏng (Simulators - FSTD / FNPT / FFS)
-                new TrainingFacility
-                {
-                    FacilityCode = "SIM-A320",
-                    FacilityName = "Phòng mô phỏng A320 Full Flight Simulator (FFS-01)",
-                    FacilityType = FacilityType.Simulator,
-                    Capacity = 4,
-                    IsActive = true,
-                    Description = "[Mẫu/Sample] Thiết bị buồng lái mô phỏng A320 mức Level D chuẩn CAAV/EASA.",
-                    LocationDetail = "Tòa nhà Trung tâm Mô phỏng FSTD - Tầng trệt"
-                },
-                new TrainingFacility
-                {
-                    FacilityCode = "SIM-DA42",
-                    FacilityName = "Phòng mô phỏng Diamond DA42 (FNPT II - 02)",
-                    FacilityType = FacilityType.Simulator,
-                    Capacity = 4,
-                    IsActive = true,
-                    Description = "[Mẫu/Sample] Thiết bị FNPT II phục vụ huấn luyện IFR và đa động cơ ME.",
-                    LocationDetail = "Tòa nhà Trung tâm Mô phỏng FSTD - Phòng 204"
-                },
+            // 3. Buồng lái mô phỏng (Simulators - FSTD / FNPT / FFS)
+            new TrainingFacility
+            {
+                FacilityCode = "SIM-A320",
+                FacilityName = "Phòng mô phỏng A320 Full Flight Simulator (FFS-01)",
+                FacilityType = FacilityType.Simulator,
+                Capacity = 4,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Thiết bị buồng lái mô phỏng A320 mức Level D chuẩn CAAV/EASA.",
+                LocationDetail = "Tòa nhà Trung tâm Mô phỏng FSTD - Tầng trệt"
+            },
+            new TrainingFacility
+            {
+                FacilityCode = "SIM-DA42",
+                FacilityName = "Phòng mô phỏng Diamond DA42 (FNPT II - 02)",
+                FacilityType = FacilityType.Simulator,
+                Capacity = 4,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Thiết bị FNPT II phục vụ huấn luyện IFR và đa động cơ ME.",
+                LocationDetail = "Tòa nhà Trung tâm Mô phỏng FSTD - Phòng 204"
+            },
+            new TrainingFacility
+            {
+                FacilityCode = "SIM-B737",
+                FacilityName = "Phòng mô phỏng Boeing 737 Next Gen Full Flight Simulator (FFS-02)",
+                FacilityType = FacilityType.Simulator,
+                Capacity = 4,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Thiết bị buồng lái mô phỏng B737-800 Level D chuẩn CAAV/FAA với hệ thống chuyển động 6 trục.",
+                LocationDetail = "Tòa nhà Trung tâm Mô phỏng FSTD - Tầng trệt"
+            },
+            new TrainingFacility
+            {
+                FacilityCode = "SIM-A350",
+                FacilityName = "Phòng mô phỏng Airbus A350 XWB Full Flight Simulator (FFS-03)",
+                FacilityType = FacilityType.Simulator,
+                Capacity = 4,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Thiết bị buồng lái mô phỏng thân rộng A350 huấn luyện bay đường dài quốc tế ETOPS.",
+                LocationDetail = "Tòa nhà Trung tâm Mô phỏng FSTD - Tầng 1"
+            },
+            new TrainingFacility
+            {
+                FacilityCode = "SIM-C172",
+                FacilityName = "Phòng mô phỏng Cessna 172SP Garmin G1000 (FNPT I - 01)",
+                FacilityType = FacilityType.Simulator,
+                Capacity = 4,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Thiết bị FNPT I kính bay hiện đại phục vụ giai đoạn đào tạo cơ bản PPL và bay khí tài.",
+                LocationDetail = "Tòa nhà Trung tâm Mô phỏng FSTD - Phòng 201"
+            },
+            new TrainingFacility
+            {
+                FacilityCode = "SIM-HELI",
+                FacilityName = "Phòng mô phỏng Trực thăng Đa năng (Helicopter FTD Level 3)",
+                FacilityType = FacilityType.Simulator,
+                Capacity = 4,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Thiết bị FTD huấn luyện phi công trực thăng dân dụng, bay đêm và cất hạ cánh giàn khoan biển.",
+                LocationDetail = "Khu Huấn luyện Cánh quay - Tòa nhà Mô phỏng"
+            },
 
-                // 4. Sân bay huấn luyện / Căn cứ bay (Airfields)
-                new TrainingFacility
-                {
-                    FacilityCode = "AIRPORT-VVPQ",
-                    FacilityName = "Căn cứ huấn luyện bay Phú Quốc (PQC Flight Base)",
-                    FacilityType = FacilityType.Airfield,
-                    Capacity = 100,
-                    IsActive = true,
-                    Description = "[Mẫu/Sample] Sân bay căn cứ huấn luyện thực hành bay VFR/IFR.",
-                    LocationDetail = "Cảng Hàng không Quốc tế Phú Quốc"
-                },
-                new TrainingFacility
-                {
-                    FacilityCode = "AIRPORT-VVBM",
-                    FacilityName = "Căn cứ huấn luyện bay Buôn Ma Thuột (BMV Airfield Base)",
-                    FacilityType = FacilityType.Airfield,
-                    Capacity = 100,
-                    IsActive = true,
-                    Description = "[Mẫu/Sample] Sân bay huấn luyện thực hành bay đường dài Cross-Country.",
-                    LocationDetail = "Cảng Hàng không Buôn Ma Thuột"
-                }
-            );
+            // 4. Sân bay huấn luyện / Căn cứ bay (Airfields)
+            new TrainingFacility
+            {
+                FacilityCode = "AIRPORT-VVPQ",
+                FacilityName = "Căn cứ huấn luyện bay Phú Quốc (PQC Flight Base)",
+                FacilityType = FacilityType.Airfield,
+                Capacity = 100,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Sân bay căn cứ huấn luyện thực hành bay VFR/IFR.",
+                LocationDetail = "Cảng Hàng không Quốc tế Phú Quốc"
+            },
+            new TrainingFacility
+            {
+                FacilityCode = "AIRPORT-VVBM",
+                FacilityName = "Căn cứ huấn luyện bay Buôn Ma Thuột (BMV Airfield Base)",
+                FacilityType = FacilityType.Airfield,
+                Capacity = 100,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Sân bay huấn luyện thực hành bay đường dài Cross-Country.",
+                LocationDetail = "Cảng Hàng không Buôn Ma Thuột"
+            },
+            new TrainingFacility
+            {
+                FacilityCode = "AIRPORT-VVCR",
+                FacilityName = "Căn cứ huấn luyện bay Cam Ranh (CXR Flight Operations Base)",
+                FacilityType = FacilityType.Airfield,
+                Capacity = 120,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Căn cứ huấn luyện cất hạ cánh ven biển, bay đường dài CPL và bay đêm tích lũy giờ bay.",
+                LocationDetail = "Cảng Hàng không Quốc tế Cam Ranh"
+            },
+            new TrainingFacility
+            {
+                FacilityCode = "AIRPORT-VVCT",
+                FacilityName = "Căn cứ huấn luyện bay Cần Thơ (VCA Flight Operations Base)",
+                FacilityType = FacilityType.Airfield,
+                Capacity = 80,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Căn cứ thực hành tiếp cận thiết bị RNP/ILS vùng đồng bằng và điều kiện thời tiết gió mùa.",
+                LocationDetail = "Cảng Hàng không Quốc tế Cần Thơ"
+            },
+            new TrainingFacility
+            {
+                FacilityCode = "AIRPORT-VVTS",
+                FacilityName = "Căn cứ điều hành & Line Training Tân Sơn Nhất (SGN Flight Base)",
+                FacilityType = FacilityType.Airfield,
+                Capacity = 150,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Căn cứ điều phối, huấn luyện đường dài thương mại và chuyển tiếp thực tế.",
+                LocationDetail = "Cảng Hàng không Quốc tế Tân Sơn Nhất"
+            },
+            new TrainingFacility
+            {
+                FacilityCode = "AIRPORT-VVDN",
+                FacilityName = "Căn cứ huấn luyện bay Đà Nẵng (DAD Flight Operations Base)",
+                FacilityType = FacilityType.Airfield,
+                Capacity = 100,
+                IsActive = true,
+                Description = "[Mẫu/Sample] Căn cứ thực hành bay tiếp cận địa hình đồi núi và thời tiết phức tạp khu vực miền Trung.",
+                LocationDetail = "Cảng Hàng không Quốc tế Đà Nẵng"
+            }
+        };
+
+        var toAdd = allFacilities.Where(f => !existingSet.Contains(f.FacilityCode)).ToList();
+        if (toAdd.Count > 0)
+        {
+            context.TrainingFacilities.AddRange(toAdd);
             await context.SaveChangesAsync();
         }
     }
