@@ -183,6 +183,11 @@ public class AttendanceService : IAttendanceService
                 var session = await _unitOfWork.SessionRepository.GetByIdAsync(sessionId, ct)
                     ?? throw new KeyNotFoundException("Session not found.");
 
+                if (session.SessionDate.HasValue && session.SessionDate.Value.Date > DateTime.UtcNow.Date)
+                {
+                    throw new BusinessRuleViolationException("Không thể chốt điểm danh cho buổi học trong tương lai.");
+                }
+
                 // Instructor assignment check (Admin is permitted by ClassOwnershipValidator policy)
                 var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(session.ClassId, ct);
                 if (trainingClass != null && trainingClass.Status != ClassStatus.InProgress)
@@ -290,6 +295,11 @@ public class AttendanceService : IAttendanceService
 
                 if (session != null)
                 {
+                    if (session.SessionDate.HasValue && session.SessionDate.Value.Date > DateTime.UtcNow.Date)
+                    {
+                        throw new BusinessRuleViolationException("Không thể điểm danh trước cho buổi học trong tương lai.");
+                    }
+
                     // Instructor ownership check
                     var trainingClass = await _unitOfWork.ClassRepository.GetByIdAsync(session.ClassId, ct);
                     if (trainingClass != null && trainingClass.Status != ClassStatus.InProgress)

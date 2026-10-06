@@ -709,4 +709,47 @@ public class AttendanceServiceTests
         Assert.True(result.IsConfirmed);
         Assert.Equal(ClassStatus.InProgress, trainingClass.Status);
     }
+
+    [Fact]
+    public async Task ConfirmSessionAsync_FutureSessionDate_ThrowsBusinessRuleViolationException()
+    {
+        int sessionId = 10;
+        var futureDate = DateTime.UtcNow.Date.AddDays(2);
+        var session = new Session
+        {
+            SessionId = sessionId,
+            ClassId = 20,
+            SubjectId = 30,
+            SessionDate = futureDate,
+            TrainingType = TrainingType.Theory,
+            IsConfirmed = false
+        };
+
+        _mockSessionRepo.Setup(r => r.GetByIdAsync(sessionId, It.IsAny<CancellationToken>())).ReturnsAsync(session);
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            _service.ConfirmSessionAsync(sessionId, 99, "Admin"));
+
+        Assert.Contains("tương lai", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task UpdateAttendanceRecordAsync_FutureSessionDate_ThrowsBusinessRuleViolationException()
+    {
+        int recordId = 1;
+        int sessionId = 10;
+        var futureDate = DateTime.UtcNow.Date.AddDays(2);
+        var record = new AttendanceRecord { AttendanceRecordId = recordId, SessionId = sessionId, Status = AttendanceStatus.Present };
+        var session = new Session { SessionId = sessionId, SessionDate = futureDate, ClassId = 20, SubjectId = 30, IsConfirmed = false };
+
+        _mockAttendanceRepo.Setup(r => r.GetByIdAsync(recordId, It.IsAny<CancellationToken>())).ReturnsAsync(record);
+        _mockSessionRepo.Setup(r => r.GetByIdAsync(sessionId, It.IsAny<CancellationToken>())).ReturnsAsync(session);
+
+        var request = new UpdateAttendanceRecordRequest(AttendanceStatus.Present, "Notes", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+
+        var ex = await Assert.ThrowsAsync<BusinessRuleViolationException>(() =>
+            _service.UpdateAttendanceRecordAsync(recordId, request, 99, "Admin"));
+
+        Assert.Contains("tương lai", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
 }
