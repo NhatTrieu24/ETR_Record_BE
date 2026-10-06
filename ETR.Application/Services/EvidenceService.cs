@@ -145,16 +145,18 @@ public class EvidenceService : IEvidenceService
         if (etrForEvidence == null)
             throw new KeyNotFoundException($"ETRCourseRecord with ID {subjectResultForEvidence.EtrId} not found.");
 
-        // Rule: Chỉ cho phép upload khi ETR còn Draft hoặc ReturnedForCorrection và chưa bị khóa
+        // Rule: Chỉ cho phép upload khi ETR còn đang thực hiện (Draft/InProgress) hoặc ReturnedForCorrection và chưa bị khóa. Sau khi đã nộp (Submitted trở đi), phải được QA trả lại để bổ sung.
         if (etrForEvidence.IsLocked)
         {
             throw new BusinessRuleViolationException("Hồ sơ đào tạo (ETR) đã bị khóa, không thể tải lên minh chứng.");
         }
 
-        if (etrForEvidence.Status != EtrStatus.Draft && etrForEvidence.Status != EtrStatus.ReturnedForCorrection)
+        if (etrForEvidence.Status != EtrStatus.Draft && 
+            etrForEvidence.Status != EtrStatus.InProgress && 
+            etrForEvidence.Status != EtrStatus.ReturnedForCorrection)
         {
             throw new BusinessRuleViolationException(
-                $"Hồ sơ đào tạo (ETR) đang ở trạng thái '{etrForEvidence.Status}'. Chỉ cho phép tải lên minh chứng khi hồ sơ còn là 'Draft' hoặc 'ReturnedForCorrection'. Sau khi đã nộp (Submit), QA/Người thẩm định phải trả lại hồ sơ để bổ sung minh chứng.");
+                $"Hồ sơ đào tạo (ETR) đang ở trạng thái '{etrForEvidence.Status}'. Chỉ cho phép tải lên minh chứng khi hồ sơ đang trong quá trình đào tạo ('Draft', 'InProgress') hoặc được yêu cầu chỉnh sửa ('ReturnedForCorrection'). Sau khi đã nộp (Submit), QA/Người thẩm định phải trả lại hồ sơ để bổ sung minh chứng.");
         }
 
         var enrollmentForEvidence = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(etrForEvidence.EnrollmentId, cancellationToken);
@@ -396,10 +398,12 @@ public class EvidenceService : IEvidenceService
                         throw new BusinessRuleViolationException("Hồ sơ đào tạo (ETR) đã bị khóa, không thể xóa minh chứng.");
                     }
 
-                    if (etr.Status != EtrStatus.Draft && etr.Status != EtrStatus.ReturnedForCorrection)
+                    if (etr.Status != EtrStatus.Draft && 
+                        etr.Status != EtrStatus.InProgress && 
+                        etr.Status != EtrStatus.ReturnedForCorrection)
                     {
                         throw new BusinessRuleViolationException(
-                            $"Hồ sơ đào tạo (ETR) đang ở trạng thái '{etr.Status}'. Chỉ cho phép xóa minh chứng khi hồ sơ còn là 'Draft' hoặc 'ReturnedForCorrection'. Sau khi đã nộp (Submit), QA/Người thẩm định phải trả lại hồ sơ để chỉnh sửa.");
+                            $"Hồ sơ đào tạo (ETR) đang ở trạng thái '{etr.Status}'. Chỉ cho phép xóa minh chứng khi hồ sơ đang trong quá trình đào tạo ('Draft', 'InProgress') hoặc được yêu cầu chỉnh sửa ('ReturnedForCorrection'). Sau khi đã nộp (Submit), QA/Người thẩm định phải trả lại hồ sơ để chỉnh sửa.");
                     }
                 }
             }
