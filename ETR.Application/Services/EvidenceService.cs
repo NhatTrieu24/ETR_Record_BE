@@ -138,17 +138,31 @@ public class EvidenceService : IEvidenceService
         // "Sân nhà ai nấy đá" — Instructor can only upload Evidence into a class they are actually
         // assigned to (see ClassOwnershipValidator).
         var subjectResultForEvidence = await _unitOfWork.SubjectResultRepository.GetByIdAsync(request.SubjectResultId, cancellationToken);
-        var etrForEvidence = subjectResultForEvidence != null
-            ? await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(subjectResultForEvidence.EtrId, cancellationToken)
-            : null;
-        var enrollmentForEvidence = etrForEvidence != null
-            ? await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(etrForEvidence.EnrollmentId, cancellationToken)
-            : null;
+        if (subjectResultForEvidence == null)
+            throw new KeyNotFoundException($"SubjectResult with ID {request.SubjectResultId} not found.");
+
+        var etrForEvidence = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(subjectResultForEvidence.EtrId, cancellationToken);
+        if (etrForEvidence == null)
+            throw new KeyNotFoundException($"ETRCourseRecord with ID {subjectResultForEvidence.EtrId} not found.");
+
+        // Rule: Chỉ cho phép upload khi ETR còn Draft hoặc ReturnedForCorrection và chưa bị khóa
+        if (etrForEvidence.IsLocked)
+        {
+            throw new BusinessRuleViolationException("Hồ sơ đào tạo (ETR) đã bị khóa, không thể tải lên minh chứng.");
+        }
+
+        if (etrForEvidence.Status != EtrStatus.Draft && etrForEvidence.Status != EtrStatus.ReturnedForCorrection)
+        {
+            throw new BusinessRuleViolationException(
+                $"Hồ sơ đào tạo (ETR) đang ở trạng thái '{etrForEvidence.Status}'. Chỉ cho phép tải lên minh chứng khi hồ sơ còn là 'Draft' hoặc 'ReturnedForCorrection'. Sau khi đã nộp (Submit), QA/Người thẩm định phải trả lại hồ sơ để bổ sung minh chứng.");
+        }
+
+        var enrollmentForEvidence = await _unitOfWork.CourseEnrollmentRepository.GetByIdAsync(etrForEvidence.EnrollmentId, cancellationToken);
         var classForEvidence = enrollmentForEvidence != null
             ? await _unitOfWork.ClassRepository.GetByIdAsync(enrollmentForEvidence.ClassId, cancellationToken)
             : null;
 
-        var isAssigned = classForEvidence != null && subjectResultForEvidence != null && _unitOfWork.ClassSubjectRepository.GetQueryable()
+        var isAssigned = classForEvidence != null && _unitOfWork.ClassSubjectRepository.GetQueryable()
             .Any(cs => cs.ClassId == classForEvidence.ClassId && cs.SubjectId == subjectResultForEvidence.SubjectId && cs.InstructorAccountId == uploadedByAccountId);
         ClassOwnershipValidator.EnsureInstructorOwnsSubject(uploadedByRoleName, isAssigned);
 
@@ -370,6 +384,25 @@ public class EvidenceService : IEvidenceService
             
             if (isSignedOff)
                 throw new ForbiddenAccessException("Cannot delete evidence for a subject result that has already been signed off.");
+
+            var subjectResult = await _unitOfWork.SubjectResultRepository.GetByIdAsync(evidence.SubjectResultId, cancellationToken);
+            if (subjectResult != null)
+            {
+                var etr = await _unitOfWork.ETRCourseRecordRepository.GetByIdAsync(subjectResult.EtrId, cancellationToken);
+                if (etr != null)
+                {
+                    if (etr.IsLocked)
+                    {
+                        throw new BusinessRuleViolationException("Hồ sơ đào tạo (ETR) đã bị khóa, không thể xóa minh chứng.");
+                    }
+
+                    if (etr.Status != EtrStatus.Draft && etr.Status != EtrStatus.ReturnedForCorrection)
+                    {
+                        throw new BusinessRuleViolationException(
+                            $"Hồ sơ đào tạo (ETR) đang ở trạng thái '{etr.Status}'. Chỉ cho phép xóa minh chứng khi hồ sơ còn là 'Draft' hoặc 'ReturnedForCorrection'. Sau khi đã nộp (Submit), QA/Người thẩm định phải trả lại hồ sơ để chỉnh sửa.");
+                    }
+                }
+            }
         }
 
         await _unitOfWork.AuditLogRepository.AddAsync(new AuditLog
