@@ -1800,10 +1800,10 @@ public class EtrService : IEtrService
         etr.CompletedAt = DateTime.UtcNow;
         etr.IsLocked = true;
         etr.IssuedDate = DateTime.UtcNow;
-        if (course != null && course.ValidityMonths.HasValue)
-        {
-            etr.ExpiryDate = DateTime.UtcNow.AddMonths(course.ValidityMonths.Value);
-        }
+        var validityMonths = (course != null && course.ValidityMonths.HasValue && course.ValidityMonths.Value > 0)
+            ? course.ValidityMonths.Value
+            : 24;
+        etr.ExpiryDate = DateTime.UtcNow.AddMonths(validityMonths);
         etr.UpdatedAt = DateTime.UtcNow;
         etr.UpdatedByAccountId = accountId;
 

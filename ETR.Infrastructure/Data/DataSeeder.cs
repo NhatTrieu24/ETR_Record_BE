@@ -832,81 +832,117 @@ public static class DataSeeder
 
     private static async Task SeedApprovalWorkflowAsync(AppDbContext context)
     {
-        if (!await context.ApprovalRequests.AnyAsync())
+        var etrs = await context.ETRCourseRecords.ToListAsync();
+        var managerId = (await context.Accounts.FirstAsync(a => a.Username == ManagerUsername)).AccountId;
+        var qaId = (await context.Accounts.FirstAsync(a => a.Username == QaUsername)).AccountId;
+        var instructorId = (await context.Accounts.FirstAsync(a => a.Username == InstructorUsername)).AccountId;
+
+        // 1. Ensure all Completed ETRs have valid IssuedDate and ExpiryDate
+        foreach (var etr in etrs)
         {
-            var etrs = await context.ETRCourseRecords.ToListAsync();
-            var managerId = (await context.Accounts.FirstAsync(a => a.Username == ManagerUsername)).AccountId;
-            var instructorId = (await context.Accounts.FirstAsync(a => a.Username == InstructorUsername)).AccountId;
-            var rand = new Random(42);
-
-            var sampleEtrs = etrs.OrderBy(x => rand.Next()).Take(30).ToList();
-
-            foreach(var etr in sampleEtrs)
+            if (etr.Status == EtrStatus.Completed || etr.IsLocked)
             {
-                var statuses = new[] { "Pending", "UnderReview", "Approved", "Rejected" };
-                var status = statuses[rand.Next(statuses.Length)];
-
-                var request = new ApprovalRequest
+                if (!etr.IssuedDate.HasValue)
                 {
-                    ETRCourseRecordId = etr.ETRCourseRecordId,
-                    CurrentStatus = status,
-                    SubmittedByAccountId = instructorId,
-                    SubmittedAt = DateTime.UtcNow.AddDays(-5),
-                    CurrentApproverId = managerId,
-                    CompletedAt = (status == "Approved" || status == "Rejected") ? DateTime.UtcNow.AddDays(-1) : null
-                };
-                context.ApprovalRequests.Add(request);
-                await context.SaveChangesAsync(); // Save to get ID
+                    etr.IssuedDate = etr.CompletedAt ?? DateTime.UtcNow.AddMonths(-2);
+                }
+                if (!etr.ExpiryDate.HasValue)
+                {
+                    etr.ExpiryDate = etr.IssuedDate.Value.AddMonths(24);
+                }
+            }
+        }
+        await context.SaveChangesAsync();
 
+        // 2. Ensure all ETRs have corresponding ApprovalRequest and ApprovalHistories
+        var existingRequestEtrIds = (await context.ApprovalRequests.Select(r => r.ETRCourseRecordId).ToListAsync()).ToHashSet();
+
+        foreach (var etr in etrs)
+        {
+            if (existingRequestEtrIds.Contains(etr.ETRCourseRecordId))
+                continue;
+
+            string status = etr.Status switch
+            {
+                EtrStatus.Completed => "Approved",
+                EtrStatus.Verified => "UnderReview",
+                EtrStatus.Submitted => "Pending",
+                EtrStatus.ReturnedForCorrection => "Rejected",
+                _ => "Pending"
+            };
+
+            var submitTime = etr.SubmittedAt ?? DateTime.UtcNow.AddDays(-10);
+            var verifyTime = etr.VerifiedAt ?? submitTime.AddDays(3);
+            var approveTime = etr.CompletedAt ?? verifyTime.AddDays(2);
+
+            var request = new ApprovalRequest
+            {
+                ETRCourseRecordId = etr.ETRCourseRecordId,
+                CurrentStatus = status,
+                SubmittedByAccountId = instructorId,
+                SubmittedAt = submitTime,
+                CurrentApproverId = managerId,
+                CompletedAt = (status == "Approved" || status == "Rejected") ? approveTime : null
+            };
+            context.ApprovalRequests.Add(request);
+            await context.SaveChangesAsync(); // Save to obtain ApprovalRequestId
+
+            // Stage 1: Academic Staff / Instructor Submit
+            context.ApprovalHistories.Add(new ApprovalHistory
+            {
+                ApprovalRequestId = request.ApprovalRequestId,
+                ActionByAccountId = instructorId,
+                ActionType = ApprovalHistoryActionType.Submit.ToString(),
+                PreviousStatus = "Draft",
+                NewStatus = "Pending",
+                Comments = "Hồ sơ ETR hoàn thiện và nộp lên QA thẩm định.",
+                ActionAt = submitTime
+            });
+
+            // Stage 2: QA Review / Verification
+            if (status == "UnderReview" || status == "Approved" || status == "Rejected" || etr.Status == EtrStatus.Verified || etr.Status == EtrStatus.Completed || etr.IsLocked)
+            {
                 context.ApprovalHistories.Add(new ApprovalHistory
                 {
                     ApprovalRequestId = request.ApprovalRequestId,
-                    ActionByAccountId = instructorId,
-                    ActionType = ApprovalHistoryActionType.Submit.ToString(),
-                    NewStatus = "Pending",
-                    ActionAt = DateTime.UtcNow.AddDays(-5)
+                    ActionByAccountId = qaId,
+                    ActionType = ApprovalHistoryActionType.Review.ToString(),
+                    PreviousStatus = "Pending",
+                    NewStatus = "UnderReview",
+                    Comments = "Phòng QA đã kiểm tra đối chiếu dữ liệu bay, SIM và minh chứng.",
+                    ActionAt = verifyTime
                 });
-
-                if (status == "UnderReview" || status == "Approved" || status == "Rejected")
-                {
-                    context.ApprovalHistories.Add(new ApprovalHistory
-                    {
-                        ApprovalRequestId = request.ApprovalRequestId,
-                        ActionByAccountId = managerId,
-                        ActionType = ApprovalHistoryActionType.Review.ToString(),
-                        PreviousStatus = "Pending",
-                        NewStatus = "UnderReview",
-                        ActionAt = DateTime.UtcNow.AddDays(-3)
-                    });
-                }
-
-                if (status == "Approved")
-                {
-                    context.ApprovalHistories.Add(new ApprovalHistory
-                    {
-                        ApprovalRequestId = request.ApprovalRequestId,
-                        ActionByAccountId = managerId,
-                        ActionType = ApprovalHistoryActionType.Approve.ToString(),
-                        PreviousStatus = "UnderReview",
-                        NewStatus = "Approved",
-                        ActionAt = DateTime.UtcNow.AddDays(-1)
-                    });
-                }
-                else if (status == "Rejected")
-                {
-                    context.ApprovalHistories.Add(new ApprovalHistory
-                    {
-                        ApprovalRequestId = request.ApprovalRequestId,
-                        ActionByAccountId = managerId,
-                        ActionType = ApprovalHistoryActionType.Reject.ToString(),
-                        PreviousStatus = "UnderReview",
-                        NewStatus = "Rejected",
-                        ActionAt = DateTime.UtcNow.AddDays(-1)
-                    });
-                }
             }
-            await context.SaveChangesAsync();
+
+            // Stage 3: Training Manager Approval
+            if (status == "Approved" || etr.Status == EtrStatus.Completed || etr.IsLocked)
+            {
+                context.ApprovalHistories.Add(new ApprovalHistory
+                {
+                    ApprovalRequestId = request.ApprovalRequestId,
+                    ActionByAccountId = managerId,
+                    ActionType = ApprovalHistoryActionType.Approve.ToString(),
+                    PreviousStatus = "UnderReview",
+                    NewStatus = "Approved",
+                    Comments = "Trưởng phòng Quản lý Đào tạo phê duyệt hoàn thành hồ sơ huấn luyện ETR.",
+                    ActionAt = approveTime
+                });
+            }
+            else if (status == "Rejected")
+            {
+                context.ApprovalHistories.Add(new ApprovalHistory
+                {
+                    ApprovalRequestId = request.ApprovalRequestId,
+                    ActionByAccountId = managerId,
+                    ActionType = ApprovalHistoryActionType.Reject.ToString(),
+                    PreviousStatus = "UnderReview",
+                    NewStatus = "Rejected",
+                    Comments = "Hồ sơ yêu cầu bổ sung minh chứng giờ bay.",
+                    ActionAt = approveTime
+                });
+            }
         }
+        await context.SaveChangesAsync();
     }
 
     private static async Task SeedMiscellaneousAsync(AppDbContext context)
